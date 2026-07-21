@@ -104,9 +104,10 @@ function Login({ onLogin }) {
       // Map code to email for Supabase
       const isAd = role === "admin" || code.trim().toUpperCase() === "ADMIN";
       const userCode = isAd ? "admin" : code.trim().toLowerCase() || yardId.split("-")[0].toLowerCase();
-      const email = `${userCode}@yard.nippon`;
+      const email = isAd ? "admin@nippon.toyota" : `${userCode}@yard.nippon`;
       
-      const sessionData = await login(email, "stockyard123");
+      const password = isAd ? "admin123" : "stockyard123";
+      const sessionData = await login(email, password);
       onLogin(sessionData);
     } catch (err) {
       setError(err.message || "Invalid access code.");
