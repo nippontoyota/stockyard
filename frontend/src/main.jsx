@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import {
   login,
@@ -29,18 +29,6 @@ function App() {
     localStorage.setItem("yardSession", JSON.stringify(session));
   }, [session]);
 
-  useEffect(() => {
-    navigator.serviceWorker?.register("/sw.js").catch(() => {});
-    const up = () => setOnline(true);
-    const down = () => setOnline(false);
-    addEventListener("online", up);
-    addEventListener("offline", down);
-    return () => {
-      removeEventListener("online", up);
-      removeEventListener("offline", down);
-    };
-  }, []);
-
   const syncOffline = useCallback(async () => {
     const queue = getQueue();
     if (queue.length === 0) return;
@@ -51,6 +39,18 @@ function App() {
     } catch (err) {
       console.error("Bulk sync failed", err);
     }
+  }, []);
+
+  useEffect(() => {
+    navigator.serviceWorker?.register("/sw.js").catch(() => {});
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    addEventListener("online", up);
+    addEventListener("offline", down);
+    return () => {
+      removeEventListener("online", up);
+      removeEventListener("offline", down);
+    };
   }, []);
 
   useEffect(() => {
@@ -90,53 +90,73 @@ function App() {
 }
 
 function Login({ onLogin }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
+  const [role, setRole] = useState("stockyard");
+  const [yardId, setYardId] = useState(yards[0].id);
+  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   async function submit(event) {
     event.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const sessionData = await login(email, password);
+      // Map code to email for Supabase
+      const isAd = role === "admin" || code.trim().toUpperCase() === "ADMIN";
+      const userCode = isAd ? "admin" : code.trim().toLowerCase() || yardId.split("-")[0].toLowerCase();
+      const email = `${userCode}@yard.nippon`;
+      
+      const sessionData = await login(email, "stockyard123");
       onLogin(sessionData);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Invalid access code.");
     } finally {
       setLoading(false);
     }
   }
 
-  // Pre-fill helper for demo purposes based on selected yard
-  const setDemoLogin = (e) => {
-    const code = e.target.value.toLowerCase();
-    setEmail(`${code}@yard.nippon`);
-    setPassword("stockyard123");
-  };
-
   return (
     <main className="login">
       <section className="login-panel">
-        <div className="brand-mark"><span className="material-symbols-outlined">qr_code_scanner</span></div>
-        <h1>Nippon Yard Scan</h1>
-        <p>Log vehicle IN and OUT at the yard gate.</p>
-        <form onSubmit={submit} className="stack">
-          <label>Demo Yard (Auto-fills login)</label>
-          <select onChange={setDemoLogin} defaultValue="">
-             <option value="" disabled>Select a demo yard...</option>
-             {yards.map(y => <option key={y.code} value={y.code}>{y.code} - {y.name}</option>)}
-             <option value="admin">Admin User (admin@nippon.local)</option>
-          </select>
-          <hr />
-          <label htmlFor="email">Email</label>
-          <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
-          <label htmlFor="password">Password</label>
-          <input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
-          {error && <p className="notice error">{error}</p>}
-          <button className="primary" disabled={loading}>{loading ? "Logging in..." : "Login"}</button>
-        </form>
+        <div className="login-visual" aria-hidden="true">
+          <div className="login-visual-top">
+            <span className="toyota-dot"></span>
+            <strong>Stockyard gate</strong>
+          </div>
+          <div className="yard-strip">
+            <span>Live yard access</span>
+            <b>{yards.length} yards</b>
+          </div>
+        </div>
+        <div className="login-form-panel">
+          <div className="brand-row">
+            <div className="brand-mark"><span className="material-symbols-outlined">qr_code_scanner</span></div>
+            <div>
+              <span className="eyebrow">Toyota yard operations</span>
+              <h1>Nippon Yard Scan</h1>
+            </div>
+          </div>
+          <p>Sign in to scan vehicle movement at the gate.</p>
+          <form onSubmit={submit} className="stack">
+            <label>Account type</label>
+            <div className="segmented">
+              <button type="button" className={role === "stockyard" ? "active" : ""} onClick={() => setRole("stockyard")}>Stockyard</button>
+              <button type="button" className={role === "admin" ? "active" : ""} onClick={() => setRole("admin")}>Admin</button>
+            </div>
+            {role === "stockyard" && (
+              <>
+                <label htmlFor="yard">Physical yard</label>
+                <select id="yard" value={yardId} onChange={(event) => setYardId(event.target.value)}>
+                  {yards.map((yard) => <option key={yard.id} value={yard.id}>{yard.code} · {yard.name}</option>)}
+                </select>
+              </>
+            )}
+            <label htmlFor="code">Access code</label>
+            <input id="code" required value={code} onChange={(event) => setCode(event.target.value)} placeholder={role === "admin" ? "ADMIN" : "Shared yard code"} />
+            {error && <p className="notice error">{error}</p>}
+            <button className="primary" disabled={loading}><span>{loading ? "Verifying..." : "Login"}</span><span className="material-symbols-outlined">arrow_forward</span></button>
+          </form>
+        </div>
       </section>
     </main>
   );
@@ -168,10 +188,31 @@ function ScanView({ session, online, onQueueUpdate }) {
   const [outRemark, setOutRemark] = useState("");
   const [damaged, setDamaged] = useState(false);
   const [damageRemark, setDamageRemark] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState("");
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
-  
+  const videoRef = useRef(null);
   const yard = yards.find((item) => item.id === session.userDetails?.yard_id) || yards[0];
+
+  useEffect(() => {
+    if (!cameraOpen) return;
+    let stream;
+
+    async function openCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        if (videoRef.current) videoRef.current.srcObject = stream;
+        setCameraError("");
+      } catch {
+        setCameraError("Camera access blocked. Allow camera permission and try again.");
+        setCameraOpen(false);
+      }
+    }
+
+    openCamera();
+    return () => stream?.getTracks().forEach((track) => track.stop());
+  }, [cameraOpen]);
 
   async function submit(event) {
     event.preventDefault();
@@ -209,15 +250,33 @@ function ScanView({ session, online, onQueueUpdate }) {
   return (
     <section className="scan-grid">
       <form className="scan-card stack" onSubmit={submit}>
-        <div className="segmented big">
-          <button type="button" className={type === "in" ? "active" : ""} onClick={() => setType("in")}>IN</button>
-          <button type="button" className={type === "out" ? "active out" : ""} onClick={() => setType("out")}>OUT</button>
+        <div className="scan-ticket">
+          <span className={`scan-badge ${type}`}>{type.toUpperCase()}</span>
+          <div>
+            <h1>{yard.code}</h1>
+            <p>{yard.name}</p>
+          </div>
+          <span className={online ? "status-dot ok" : "status-dot warn"}>{online ? "Online" : "Offline"}</span>
+        </div>
+        <div className="segmented big scan-toggle">
+          <button type="button" className={type === "in" ? "active" : ""} onClick={() => setType("in")}>Vehicle IN</button>
+          <button type="button" className={type === "out" ? "active out" : ""} onClick={() => setType("out")}>Vehicle OUT</button>
         </div>
         <div className="camera">
-          <div className="scan-box"><span>Align QR</span></div>
+          <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => setCameraOpen(true)} aria-label="Open camera scanner">
+            {cameraOpen && <video ref={videoRef} autoPlay muted playsInline />}
+            <span className="corner top-left"></span>
+            <span className="corner top-right"></span>
+            <span className="corner bottom-left"></span>
+            <span className="corner bottom-right"></span>
+            {!cameraOpen && <span className="qr-pattern" aria-hidden="true"></span>}
+          </button>
+          <p>{cameraOpen ? "Point the camera at the vehicle QR code." : "Tap the QR grid to open camera scanner."}</p>
+          {cameraError && <p className="camera-error">{cameraError}</p>}
+          {cameraOpen && <button type="button" className="ghost" onClick={() => setCameraOpen(false)}>Close camera</button>}
           <button type="button" onClick={() => setVin("JTMBA38V70D123456")}><span className="material-symbols-outlined">barcode_scanner</span> Demo Scan</button>
         </div>
-        <label htmlFor="vin">Manual VIN Entry</label>
+        <label htmlFor="vin">Manual VIN entry</label>
         <div className="inline-form">
           <input id="vin" value={vin} onChange={(event) => setVin(event.target.value.toUpperCase())} placeholder="Enter VIN" />
           <button className="primary" disabled={loading}>{loading ? "..." : "Submit"}</button>
@@ -236,16 +295,21 @@ function ScanView({ session, online, onQueueUpdate }) {
         )}
         {message && <p className={`notice ${message.kind}`}>{message.text}</p>}
       </form>
-      <aside className="panel">
+      <aside className="panel yard-card">
+        <span className="eyebrow">Assigned yard</span>
         <h2>{yard.name}</h2>
-        <p className="muted">{yard.code} · capacity {yard.capacity}</p>
-        <p className="muted">GPS captured on submit. Offline scans stay in the queue until the browser comes online.</p>
+        <div className="yard-meta"><span>{yard.code}</span><b>Capacity {yard.capacity}</b></div>
+        <div className="yard-device">
+          <span className="material-symbols-outlined">smartphone</span>
+          <span>Device Connected</span>
+        </div>
+        <p className="muted">GPS is captured on submit. Offline scans stay queued until the browser comes online.</p>
       </aside>
     </section>
   );
 }
 
-function StockView() {
+function StockView({ session }) {
   const [query, setQuery] = useState("");
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -278,8 +342,6 @@ function StockView() {
 }
 
 function VehicleCard({ vehicle }) {
-  // Backend doesn't return flags inline for stock view, so we don't know if it's FLAGGED here. 
-  // We can just show current_status.
   return (
     <article className={`vehicle ${vehicle.current_status}`}>
       <div>
@@ -288,7 +350,7 @@ function VehicleCard({ vehicle }) {
       </div>
       <div>
         <b>{vehicle.current_status ? vehicle.current_status.toUpperCase() : "UNKNOWN"}</b>
-        <small>{vehicle.last_changed_at ? new Date(vehicle.last_changed_at).toLocaleString() : ""}</small>
+        <small>{vehicle.last_changed_at ? new Date(vehicle.last_changed_at).toLocaleDateString("en-GB") : ""}</small>
       </div>
     </article>
   );
@@ -321,7 +383,7 @@ function DashboardView() {
   const handleResolve = async (id) => {
     try {
       await resolveFlag(id);
-      load(); // refresh
+      load();
     } catch (err) {
       alert("Failed to resolve: " + err.message);
     }
@@ -333,8 +395,7 @@ function DashboardView() {
     <section className="stack">
       <div className="metrics">
         <Metric label="Current Stock" value={stats.total_in} />
-        {/* We just show an average of averages for simplicity, or just omit if too complex */}
-        <Metric label="Avg Dwell (Model)" value={`${stats.dwell_time?.by_model[0]?.avg_dwell_hours || 0}h`} />
+        <Metric label="Avg Dwell" value={`${stats.dwell_time?.by_model[0]?.avg_dwell_hours || 0}h`} />
         <Metric label="Open Flags" value={flags.length} tone="bad" />
       </div>
       <section className="panel">
