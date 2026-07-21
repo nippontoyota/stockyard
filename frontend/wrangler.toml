@@ -1,0 +1,8 @@
+name = "nippon-yard-scan"
+compatibility_date = "2024-03-20"
+pages_build_output_dir = "dist"
+
+[vars]
+VITE_API_URL = "https://your-backend-url.onrender.com" # TODO: Update this when backend is deployed
+VITE_SUPABASE_URL = "https://zalxafdphwepacvfsqxu.supabase.co"
+VITE_SUPABASE_ANON_KEY = "sb_publishable_i14mQj2KAY_I21dapPvzoQ_xrsm0lRZ"
