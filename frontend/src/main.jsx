@@ -203,7 +203,12 @@ function ScanView({ session, online, onQueueUpdate }) {
     async function openCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        if (videoRef.current) videoRef.current.srcObject = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          const settings = stream.getVideoTracks()[0]?.getSettings() || {};
+          // Mirror the video preview if it's a front-facing (or desktop) camera
+          videoRef.current.style.transform = settings.facingMode === "environment" ? "scaleX(1)" : "scaleX(-1)";
+        }
         setCameraError("");
       } catch {
         setCameraError("Camera access blocked. Allow camera permission and try again.");
