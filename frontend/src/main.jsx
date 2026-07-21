@@ -20,7 +20,16 @@ import {
 import "./styles.css";
 
 function App() {
-  const [session, setSession] = useState(() => JSON.parse(localStorage.getItem("yardSession") || "null"));
+  const [session, setSession] = useState(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem("yardSession") || "null");
+      // Check if it looks like a valid Supabase session (has access_token or user)
+      if (parsed && !parsed.access_token && !parsed.user) return null;
+      return parsed;
+    } catch (e) {
+      return null;
+    }
+  });
   const [view, setView] = useState("scan");
   const [online, setOnline] = useState(navigator.onLine);
   const [queueCount, setQueueCount] = useState(getQueue().length);
@@ -164,7 +173,7 @@ function Login({ onLogin }) {
 }
 
 function Header({ session, online, pending, onLogout }) {
-  const name = session.userDetails?.role === "admin" ? "Admin Console" : (yards.find(y => y.id === session.userDetails?.yard_id)?.name || session.user.email);
+  const name = session?.userDetails?.role === "admin" ? "Admin Console" : (yards.find(y => y.id === session?.userDetails?.yard_id)?.name || session?.user?.email || session?.name || "Unknown User");
   return (
     <header className="topbar">
       <div>
