@@ -1,192 +1,165 @@
-export const STORAGE_KEY = "yardScanState";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+const apiUrl = import.meta.env.VITE_API_URL || "";
+
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
+export async function login(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  // Get custom claims or user metadata to determine role/yardId
+  const { data: userDetails, error: meError } = await apiFetch("/api/auth/me", {
+    headers: { Authorization: `Bearer ${data.session.access_token}` },
+  });
+  if (meError) throw meError;
+  return { ...data.session, userDetails };
+}
+
+export async function logout() {
+  await supabase.auth.signOut();
+}
+
+async function apiFetch(endpoint, options = {}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("No session");
+
+  const headers = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${session.access_token}`,
+    ...options.headers,
+  };
+
+  const response = await fetch(`${apiUrl}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    let errorData = {};
+    try {
+      errorData = await response.json();
+    } catch {}
+    throw new Error(errorData.error || `API error: ${response.status}`);
+  }
+
+  return response.json();
+}
 
 export const yards = [
-  ["CO01A-1", "CO01A", "Nettur Showroom, Cochin", 125, 9.9369, 76.3149, 250],
-  ["CO01B-1", "CO01B", "Kalamasery, Cochin", 200, 10.0529, 76.3157, 250],
-  ["CO01B-2", "CO01B", "Nippon Tower - 7th floor, Cochin", 80, 9.9667, 76.2999, 120],
-  ["KY01A-1", "KY01A", "Showroom, Kayamkulam", 60, 9.1746, 76.5004, 250],
-  ["KY01A-2", "KY01A", "Ramapuram East, Kayamkulam", 210, 9.185, 76.517, 300],
-  ["KY01A-3", "KY01A", "Ramapuram West, Kayamkulam", 80, 9.184, 76.493, 300],
-  ["KY01A-4", "KY01A", "Evoor Yard, Kayamkulam", 110, 9.1923, 76.482, 300],
-  ["IR01A-1", "IR01A", "Showroom, Irinjalakuda", 30, 10.342, 76.211, 200],
-  ["KL01A-1", "KL01A", "Showroom, Kollam", 55, 8.8932, 76.6141, 200],
-  ["KL01B-1", "KL01B", "Thazhuthala, Kollam", 225, 8.8795, 76.645, 300],
-  ["TI01A-1", "TI01A", "Peramangalam, Trissur", 175, 10.588, 76.172, 300],
-  ["MV01A-1", "MV01A", "Muvattupuzha", 105, 9.9849, 76.5773, 250],
-  ["PH01A-1", "PH01A", "Pathanamthitta", 70, 9.2648, 76.787, 250],
-  ["TL01A-1", "TL01A", "Thiruvalla", 45, 9.3835, 76.5741, 250],
-  ["TR01C-1", "TR01C", "Vallakkadavu, Trivandrum", 45, 8.482, 76.928, 200],
-  ["TR01C-2", "TR01C", "Enchakkal, Trivandrum", 20, 8.4827, 76.919, 200],
-  ["TR01A-1", "TR01A", "Showroom, Kazhakuttam, Trivandrum", 40, 8.568, 76.873, 200],
-  ["TR01A-2", "TR01A", "Yard-1, Kazhakuttam, Trivandrum", 130, 8.571, 76.875, 250],
-  ["TR01A-3", "TR01A", "Yard-2, Kazhakuttam, Trivandrum", 65, 8.573, 76.877, 250],
-  ["TR01A-4", "TR01A", "Yard-3, Kazhakuttam, Trivandrum", 130, 8.575, 76.879, 250],
-  ["KT01A-1", "KT01A", "Kottayam, behind the showroom", 300, 9.5916, 76.5222, 300],
-].map(([id, code, name, capacity, latitude, longitude, gpsRadiusMeters]) => ({ id, code, name, capacity, latitude, longitude, gpsRadiusMeters }));
+  { id: "CO01A-1", code: "CO01A", name: "Nettur Showroom, Cochin", capacity: 125, latitude: 9.9369, longitude: 76.3149, gpsRadiusMeters: 250 },
+  { id: "CO01B-1", code: "CO01B", name: "Kalamasery, Cochin", capacity: 200, latitude: 10.0529, longitude: 76.3157, gpsRadiusMeters: 250 },
+  { id: "CO01B-2", code: "CO01B", name: "Nippon Tower - 7th floor, Cochin", capacity: 80, latitude: 9.9667, longitude: 76.2999, gpsRadiusMeters: 120 },
+  { id: "KY01A-1", code: "KY01A", name: "Showroom, Kayamkulam", capacity: 60, latitude: 9.1746, longitude: 76.5004, gpsRadiusMeters: 250 },
+  { id: "KY01A-2", code: "KY01A", name: "Ramapuram East, Kayamkulam", capacity: 210, latitude: 9.185, longitude: 76.517, gpsRadiusMeters: 300 },
+  { id: "KY01A-3", code: "KY01A", name: "Ramapuram West, Kayamkulam", capacity: 80, latitude: 9.184, longitude: 76.493, gpsRadiusMeters: 300 },
+  { id: "KY01A-4", code: "KY01A", name: "Evoor Yard, Kayamkulam", capacity: 110, latitude: 9.1923, longitude: 76.482, gpsRadiusMeters: 300 },
+  { id: "IR01A-1", code: "IR01A", name: "Showroom, Irinjalakuda", capacity: 30, latitude: 10.342, longitude: 76.211, gpsRadiusMeters: 200 },
+  { id: "KL01A-1", code: "KL01A", name: "Showroom, Kollam", capacity: 55, latitude: 8.8932, longitude: 76.6141, gpsRadiusMeters: 200 },
+  { id: "KL01B-1", code: "KL01B", name: "Thazhuthala, Kollam", capacity: 225, latitude: 8.8795, longitude: 76.645, gpsRadiusMeters: 300 },
+  { id: "TI01A-1", code: "TI01A", name: "Peramangalam, Trissur", capacity: 175, latitude: 10.588, longitude: 76.172, gpsRadiusMeters: 300 },
+  { id: "MV01A-1", code: "MV01A", name: "Muvattupuzha", capacity: 105, latitude: 9.9849, longitude: 76.5773, gpsRadiusMeters: 250 },
+  { id: "PH01A-1", code: "PH01A", name: "Pathanamthitta", capacity: 70, latitude: 9.2648, longitude: 76.787, gpsRadiusMeters: 250 },
+  { id: "TL01A-1", code: "TL01A", name: "Thiruvalla", capacity: 45, latitude: 9.3835, longitude: 76.5741, gpsRadiusMeters: 250 },
+  { id: "TR01C-1", code: "TR01C", name: "Vallakkadavu, Trivandrum", capacity: 45, latitude: 8.482, longitude: 76.928, gpsRadiusMeters: 200 },
+  { id: "TR01C-2", code: "TR01C", name: "Enchakkal, Trivandrum", capacity: 20, latitude: 8.4827, longitude: 76.919, gpsRadiusMeters: 200 },
+  { id: "TR01A-1", code: "TR01A", name: "Showroom, Kazhakuttam, Trivandrum", capacity: 40, latitude: 8.568, longitude: 76.873, gpsRadiusMeters: 200 },
+  { id: "TR01A-2", code: "TR01A", name: "Yard-1, Kazhakuttam, Trivandrum", capacity: 130, latitude: 8.571, longitude: 76.875, gpsRadiusMeters: 250 },
+  { id: "TR01A-3", code: "TR01A", name: "Yard-2, Kazhakuttam, Trivandrum", capacity: 65, latitude: 8.573, longitude: 76.877, gpsRadiusMeters: 250 },
+  { id: "TR01A-4", code: "TR01A", name: "Yard-3, Kazhakuttam, Trivandrum", capacity: 130, latitude: 8.575, longitude: 76.879, gpsRadiusMeters: 250 },
+  { id: "KT01A-1", code: "KT01A", name: "Kottayam, behind the showroom", capacity: 300, latitude: 9.5916, longitude: 76.5222, gpsRadiusMeters: 300 },
+];
 
-export function createInitialState(now = new Date().toISOString()) {
-  const deviceId = localStorage.getItem("yardDeviceId") || crypto.randomUUID();
-  localStorage.setItem("yardDeviceId", deviceId);
-  const vehicles = {};
-  const scans = [];
-  const flags = [];
-  [
-    ["JTMBA38V70D123456", "in", "CO01B-1", "TOYOTA HILUX"],
-    ["1FTEW1E4XNFA12345", "in", "CO01B-1", "FORD F-150"],
-    ["MMBKN1660MD123456", "out", "CO01A-1", "MITSUBISHI TRITON"],
-    ["JTDAR32100D123456", "in", "CO01B-2", "TOYOTA RAV4"],
-  ].forEach(([vin, currentStatus, currentYardId, model], index) => {
-    vehicles[vin] = { vin, model, vinValid: true, currentStatus, currentYardId, lastChangedAt: new Date(Date.now() - index * 86400000).toISOString() };
-  });
-  flags.push({ id: crypto.randomUUID(), vin: "1FTEW1E4XNFA12345", type: "damage_reported", message: "Damage reported on last OUT scan.", resolved: false, createdAt: now });
-  return { deviceId, vehicles, scans, flags, queue: [] };
+export function getDeviceId() {
+  let deviceId = localStorage.getItem("yardDeviceId");
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem("yardDeviceId", deviceId);
+  }
+  return deviceId;
 }
 
 export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, gps, outRemark = "", damaged = false, damageRemark = "", online = true }) {
+export function createScanPayload({ vin, type, gps, outRemark, damaged, damageRemark }) {
   return {
-    id: crypto.randomUUID(),
-    clientScanId: createClientScanId(),
-    vinRaw: vin,
-    type,
-    yardId,
-    gps,
-    outRemark,
-    damaged,
-    damageRemark,
-    deviceId: localStorage.getItem("yardDeviceId") || "unknown-device",
-    scannedAt: new Date().toISOString(),
-    syncStatus: online ? "synced" : "queued",
+    client_scan_id: createClientScanId(),
+    vin: vin.toUpperCase(),
+    scan_type: type, // used for bulk sync schema
+    scanned_at: new Date().toISOString(),
+    latitude: gps?.latitude,
+    longitude: gps?.longitude,
+    gps_accuracy_meters: gps?.accuracy,
+    device_fingerprint: getDeviceId(),
+    out_remark: outRemark || undefined,
+    damaged: damaged || false,
+    damage_remark: damageRemark || undefined,
   };
 }
 
-export function normalizeVin(value) {
-  const text = String(value || "").toUpperCase();
-  const vinMatch = text.match(/[A-HJ-NPR-Z0-9]{17}/);
-  return vinMatch ? vinMatch[0] : text.replace(/[^A-Z0-9]/g, "").slice(0, 17);
-}
-
-export function isValidVin(vin) {
-  return /^[A-HJ-NPR-Z0-9]{17}$/.test(vin);
-}
-
-export function detectModel(vin) {
-  if (vin.startsWith("JTMBA")) return "TOYOTA HILUX";
-  if (vin.startsWith("JTDAR")) return "TOYOTA RAV4";
-  if (vin.startsWith("JTD")) return "TOYOTA";
-  if (vin.startsWith("1FT")) return "FORD F-150";
-  if (vin.startsWith("MMB")) return "MITSUBISHI TRITON";
-  return "UNKNOWN MODEL";
-}
-
-export function applyScan(state, scan) {
-  if (state.scans.some((item) => item.clientScanId === scan.clientScanId)) {
-    return { state, accepted: true, message: "Duplicate sync ignored." };
-  }
-  const vin = normalizeVin(scan.vinRaw);
-  const vinValid = isValidVin(vin);
-  const existing = state.vehicles[vin];
-  const yard = yards.find((item) => item.id === scan.yardId);
-  const flags = [];
-
-  if (!vinValid) flags.push(flag(vin, "invalid_vin", "VIN format needs admin review."));
-  if (gpsFlag(scan.gps, yard)) flags.push(flag(vin, "gps_outside_yard", "GPS missing or outside yard radius."));
-
-  if (scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId === scan.yardId) {
-    return {
-      state: { ...state, scans: [...state.scans, { ...scan, vin, status: "rejected" }], flags: [...state.flags, ...flags] },
-      accepted: false,
-      message: "Vehicle is already IN at this yard.",
-    };
-  }
-
-  if (scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId !== scan.yardId) {
-    flags.push(flag(vin, "duplicate_yard_status", "VIN scanned IN at another yard while still IN."));
-  }
-
-  if (scan.type === "out" && !existing) flags.push(flag(vin, "unverified_in", "OUT scan has no prior IN record."));
-  if (scan.type === "out" && scan.damaged) flags.push(flag(vin, "damage_reported", scan.damageRemark || "Damage reported."));
-
-  const vehicle = {
-    vin,
-    model: existing?.model || detectModel(vin),
-    vinValid,
-    currentStatus: scan.type,
-    currentYardId: scan.type === "in" ? scan.yardId : existing?.currentYardId || scan.yardId,
-    lastChangedAt: scan.scannedAt,
-  };
-  const next = {
-    ...state,
-    vehicles: { ...state.vehicles, [vin]: vehicle },
-    scans: [...state.scans, { ...scan, vin, status: flags.length ? "flagged" : "accepted" }],
-    flags: [...state.flags, ...capacityFlags(state, scan, vin), ...flags],
-    queue: scan.syncStatus === "queued" ? [...state.queue, scan.clientScanId] : state.queue,
-  };
-  return { state: next, accepted: true, message: flags.length ? "Scan accepted with admin flag." : "Scan accepted." };
-}
-
-function flag(vin, type, message) {
-  return { id: crypto.randomUUID(), vin, type, message, resolved: false, createdAt: new Date().toISOString() };
-}
-
-function capacityFlags(state, scan, vin) {
-  if (scan.type !== "in") return [];
-  const yard = yards.find((item) => item.id === scan.yardId);
-  const count = Object.values(state.vehicles).filter((vehicle) => vehicle.currentStatus === "in" && vehicle.currentYardId === scan.yardId).length;
-  return count + 1 > yard.capacity ? [flag(vin, "yard_capacity_exceeded", `${yard.name} is above capacity.`)] : [];
-}
-
-function gpsFlag(gps, yard) {
-  if (!gps?.latitude || !gps?.longitude || !yard) return true;
-  return distanceMeters(gps.latitude, gps.longitude, yard.latitude, yard.longitude) > yard.gpsRadiusMeters;
-}
-
-function distanceMeters(lat1, lon1, lat2, lon2) {
-  const toRad = (value) => (value * Math.PI) / 180;
-  const earth = 6371000;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return earth * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-export function dashboard(state) {
-  const inVehicles = Object.values(state.vehicles).filter((vehicle) => vehicle.currentStatus === "in");
-  const models = Object.entries(groupCount(inVehicles, "model")).map(([model, count]) => ({ model, count }));
-  const yardsData = yards.map((yard) => {
-    const count = inVehicles.filter((vehicle) => vehicle.currentYardId === yard.id).length;
-    return { ...yard, count, utilization: Math.round((count / yard.capacity) * 100) };
+export async function scanIn(payload) {
+  return apiFetch("/api/scans/in", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
-  const dwellDays = inVehicles.map((vehicle) => Math.max(1, Math.ceil((Date.now() - Date.parse(vehicle.lastChangedAt)) / 86400000)));
-  return {
-    currentStock: inVehicles.length,
-    averageDwellDays: dwellDays.length ? Math.round(dwellDays.reduce((a, b) => a + b, 0) / dwellDays.length) : 0,
-    openFlags: state.flags.filter((flagItem) => !flagItem.resolved).length,
-    models,
-    yards: yardsData,
-  };
 }
 
-function groupCount(items, key) {
-  return items.reduce((acc, item) => ({ ...acc, [item[key]]: (acc[item[key]] || 0) + 1 }), {});
+export async function scanOut(payload) {
+  return apiFetch("/api/scans/out", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
-export function resolveFlag(state, id) {
-  return { ...state, flags: state.flags.map((flagItem) => flagItem.id === id ? { ...flagItem, resolved: true, resolvedAt: new Date().toISOString() } : flagItem) };
+export async function bulkSync(scans) {
+  return apiFetch("/api/scans/bulk-sync", {
+    method: "POST",
+    body: JSON.stringify({ scans }),
+  });
 }
 
-export function updateVehicleAdmin(state, { vin, yardId, status, reason }) {
-  const normalized = normalizeVin(vin);
-  const existing = state.vehicles[normalized] || { vin: normalized, model: detectModel(normalized), vinValid: isValidVin(normalized) };
-  return {
-    ...state,
-    vehicles: {
-      ...state.vehicles,
-      [normalized]: { ...existing, currentStatus: status, currentYardId: status === "in" ? yardId : existing.currentYardId, lastChangedAt: new Date().toISOString(), overrideReason: reason },
-    },
-    flags: [...state.flags, flag(normalized, "manual_admin_override", reason)],
-  };
+export async function fetchStock(query = "") {
+  return apiFetch(`/api/vehicles?limit=100&model=${query}`);
+}
+
+export async function fetchDashboard() {
+  return apiFetch("/api/admin/dashboard");
+}
+
+export async function fetchFlags() {
+  return apiFetch("/api/admin/flags?resolved=false");
+}
+
+export async function resolveFlag(id) {
+  return apiFetch(`/api/admin/flags/${id}/resolve`, { method: "PATCH" });
+}
+
+export async function adminOverride(vin, payload) {
+  return apiFetch(`/api/admin/vehicles/${vin}/status`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export const QUEUE_KEY = "yardOfflineQueue";
+
+export function getQueue() {
+  try {
+    return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function addToQueue(scan) {
+  const queue = getQueue();
+  queue.push(scan);
+  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+}
+
+export function clearQueue() {
+  localStorage.setItem(QUEUE_KEY, JSON.stringify([]));
 }
