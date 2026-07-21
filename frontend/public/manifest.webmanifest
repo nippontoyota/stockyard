@@ -1,0 +1,9 @@
+{
+  "name": "Nippon Yard Scan",
+  "short_name": "Yard Scan",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f9ff",
+  "theme_color": "#002046",
+  "icons": []
+}

@@ -1,0 +1,192 @@
+export const STORAGE_KEY = "yardScanState";
+
+export const yards = [
+  ["CO01A-1", "CO01A", "Nettur Showroom, Cochin", 125, 9.9369, 76.3149, 250],
+  ["CO01B-1", "CO01B", "Kalamasery, Cochin", 200, 10.0529, 76.3157, 250],
+  ["CO01B-2", "CO01B", "Nippon Tower - 7th floor, Cochin", 80, 9.9667, 76.2999, 120],
+  ["KY01A-1", "KY01A", "Showroom, Kayamkulam", 60, 9.1746, 76.5004, 250],
+  ["KY01A-2", "KY01A", "Ramapuram East, Kayamkulam", 210, 9.185, 76.517, 300],
+  ["KY01A-3", "KY01A", "Ramapuram West, Kayamkulam", 80, 9.184, 76.493, 300],
+  ["KY01A-4", "KY01A", "Evoor Yard, Kayamkulam", 110, 9.1923, 76.482, 300],
+  ["IR01A-1", "IR01A", "Showroom, Irinjalakuda", 30, 10.342, 76.211, 200],
+  ["KL01A-1", "KL01A", "Showroom, Kollam", 55, 8.8932, 76.6141, 200],
+  ["KL01B-1", "KL01B", "Thazhuthala, Kollam", 225, 8.8795, 76.645, 300],
+  ["TI01A-1", "TI01A", "Peramangalam, Trissur", 175, 10.588, 76.172, 300],
+  ["MV01A-1", "MV01A", "Muvattupuzha", 105, 9.9849, 76.5773, 250],
+  ["PH01A-1", "PH01A", "Pathanamthitta", 70, 9.2648, 76.787, 250],
+  ["TL01A-1", "TL01A", "Thiruvalla", 45, 9.3835, 76.5741, 250],
+  ["TR01C-1", "TR01C", "Vallakkadavu, Trivandrum", 45, 8.482, 76.928, 200],
+  ["TR01C-2", "TR01C", "Enchakkal, Trivandrum", 20, 8.4827, 76.919, 200],
+  ["TR01A-1", "TR01A", "Showroom, Kazhakuttam, Trivandrum", 40, 8.568, 76.873, 200],
+  ["TR01A-2", "TR01A", "Yard-1, Kazhakuttam, Trivandrum", 130, 8.571, 76.875, 250],
+  ["TR01A-3", "TR01A", "Yard-2, Kazhakuttam, Trivandrum", 65, 8.573, 76.877, 250],
+  ["TR01A-4", "TR01A", "Yard-3, Kazhakuttam, Trivandrum", 130, 8.575, 76.879, 250],
+  ["KT01A-1", "KT01A", "Kottayam, behind the showroom", 300, 9.5916, 76.5222, 300],
+].map(([id, code, name, capacity, latitude, longitude, gpsRadiusMeters]) => ({ id, code, name, capacity, latitude, longitude, gpsRadiusMeters }));
+
+export function createInitialState(now = new Date().toISOString()) {
+  const deviceId = localStorage.getItem("yardDeviceId") || crypto.randomUUID();
+  localStorage.setItem("yardDeviceId", deviceId);
+  const vehicles = {};
+  const scans = [];
+  const flags = [];
+  [
+    ["JTMBA38V70D123456", "in", "CO01B-1", "TOYOTA HILUX"],
+    ["1FTEW1E4XNFA12345", "in", "CO01B-1", "FORD F-150"],
+    ["MMBKN1660MD123456", "out", "CO01A-1", "MITSUBISHI TRITON"],
+    ["JTDAR32100D123456", "in", "CO01B-2", "TOYOTA RAV4"],
+  ].forEach(([vin, currentStatus, currentYardId, model], index) => {
+    vehicles[vin] = { vin, model, vinValid: true, currentStatus, currentYardId, lastChangedAt: new Date(Date.now() - index * 86400000).toISOString() };
+  });
+  flags.push({ id: crypto.randomUUID(), vin: "1FTEW1E4XNFA12345", type: "damage_reported", message: "Damage reported on last OUT scan.", resolved: false, createdAt: now });
+  return { deviceId, vehicles, scans, flags, queue: [] };
+}
+
+export function createClientScanId() {
+  return `${Date.now()}-${crypto.randomUUID()}`;
+}
+
+export function createScan({ vin, type, yardId, gps, outRemark = "", damaged = false, damageRemark = "", online = true }) {
+  return {
+    id: crypto.randomUUID(),
+    clientScanId: createClientScanId(),
+    vinRaw: vin,
+    type,
+    yardId,
+    gps,
+    outRemark,
+    damaged,
+    damageRemark,
+    deviceId: localStorage.getItem("yardDeviceId") || "unknown-device",
+    scannedAt: new Date().toISOString(),
+    syncStatus: online ? "synced" : "queued",
+  };
+}
+
+export function normalizeVin(value) {
+  const text = String(value || "").toUpperCase();
+  const vinMatch = text.match(/[A-HJ-NPR-Z0-9]{17}/);
+  return vinMatch ? vinMatch[0] : text.replace(/[^A-Z0-9]/g, "").slice(0, 17);
+}
+
+export function isValidVin(vin) {
+  return /^[A-HJ-NPR-Z0-9]{17}$/.test(vin);
+}
+
+export function detectModel(vin) {
+  if (vin.startsWith("JTMBA")) return "TOYOTA HILUX";
+  if (vin.startsWith("JTDAR")) return "TOYOTA RAV4";
+  if (vin.startsWith("JTD")) return "TOYOTA";
+  if (vin.startsWith("1FT")) return "FORD F-150";
+  if (vin.startsWith("MMB")) return "MITSUBISHI TRITON";
+  return "UNKNOWN MODEL";
+}
+
+export function applyScan(state, scan) {
+  if (state.scans.some((item) => item.clientScanId === scan.clientScanId)) {
+    return { state, accepted: true, message: "Duplicate sync ignored." };
+  }
+  const vin = normalizeVin(scan.vinRaw);
+  const vinValid = isValidVin(vin);
+  const existing = state.vehicles[vin];
+  const yard = yards.find((item) => item.id === scan.yardId);
+  const flags = [];
+
+  if (!vinValid) flags.push(flag(vin, "invalid_vin", "VIN format needs admin review."));
+  if (gpsFlag(scan.gps, yard)) flags.push(flag(vin, "gps_outside_yard", "GPS missing or outside yard radius."));
+
+  if (scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId === scan.yardId) {
+    return {
+      state: { ...state, scans: [...state.scans, { ...scan, vin, status: "rejected" }], flags: [...state.flags, ...flags] },
+      accepted: false,
+      message: "Vehicle is already IN at this yard.",
+    };
+  }
+
+  if (scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId !== scan.yardId) {
+    flags.push(flag(vin, "duplicate_yard_status", "VIN scanned IN at another yard while still IN."));
+  }
+
+  if (scan.type === "out" && !existing) flags.push(flag(vin, "unverified_in", "OUT scan has no prior IN record."));
+  if (scan.type === "out" && scan.damaged) flags.push(flag(vin, "damage_reported", scan.damageRemark || "Damage reported."));
+
+  const vehicle = {
+    vin,
+    model: existing?.model || detectModel(vin),
+    vinValid,
+    currentStatus: scan.type,
+    currentYardId: scan.type === "in" ? scan.yardId : existing?.currentYardId || scan.yardId,
+    lastChangedAt: scan.scannedAt,
+  };
+  const next = {
+    ...state,
+    vehicles: { ...state.vehicles, [vin]: vehicle },
+    scans: [...state.scans, { ...scan, vin, status: flags.length ? "flagged" : "accepted" }],
+    flags: [...state.flags, ...capacityFlags(state, scan, vin), ...flags],
+    queue: scan.syncStatus === "queued" ? [...state.queue, scan.clientScanId] : state.queue,
+  };
+  return { state: next, accepted: true, message: flags.length ? "Scan accepted with admin flag." : "Scan accepted." };
+}
+
+function flag(vin, type, message) {
+  return { id: crypto.randomUUID(), vin, type, message, resolved: false, createdAt: new Date().toISOString() };
+}
+
+function capacityFlags(state, scan, vin) {
+  if (scan.type !== "in") return [];
+  const yard = yards.find((item) => item.id === scan.yardId);
+  const count = Object.values(state.vehicles).filter((vehicle) => vehicle.currentStatus === "in" && vehicle.currentYardId === scan.yardId).length;
+  return count + 1 > yard.capacity ? [flag(vin, "yard_capacity_exceeded", `${yard.name} is above capacity.`)] : [];
+}
+
+function gpsFlag(gps, yard) {
+  if (!gps?.latitude || !gps?.longitude || !yard) return true;
+  return distanceMeters(gps.latitude, gps.longitude, yard.latitude, yard.longitude) > yard.gpsRadiusMeters;
+}
+
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const earth = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return earth * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export function dashboard(state) {
+  const inVehicles = Object.values(state.vehicles).filter((vehicle) => vehicle.currentStatus === "in");
+  const models = Object.entries(groupCount(inVehicles, "model")).map(([model, count]) => ({ model, count }));
+  const yardsData = yards.map((yard) => {
+    const count = inVehicles.filter((vehicle) => vehicle.currentYardId === yard.id).length;
+    return { ...yard, count, utilization: Math.round((count / yard.capacity) * 100) };
+  });
+  const dwellDays = inVehicles.map((vehicle) => Math.max(1, Math.ceil((Date.now() - Date.parse(vehicle.lastChangedAt)) / 86400000)));
+  return {
+    currentStock: inVehicles.length,
+    averageDwellDays: dwellDays.length ? Math.round(dwellDays.reduce((a, b) => a + b, 0) / dwellDays.length) : 0,
+    openFlags: state.flags.filter((flagItem) => !flagItem.resolved).length,
+    models,
+    yards: yardsData,
+  };
+}
+
+function groupCount(items, key) {
+  return items.reduce((acc, item) => ({ ...acc, [item[key]]: (acc[item[key]] || 0) + 1 }), {});
+}
+
+export function resolveFlag(state, id) {
+  return { ...state, flags: state.flags.map((flagItem) => flagItem.id === id ? { ...flagItem, resolved: true, resolvedAt: new Date().toISOString() } : flagItem) };
+}
+
+export function updateVehicleAdmin(state, { vin, yardId, status, reason }) {
+  const normalized = normalizeVin(vin);
+  const existing = state.vehicles[normalized] || { vin: normalized, model: detectModel(normalized), vinValid: isValidVin(normalized) };
+  return {
+    ...state,
+    vehicles: {
+      ...state.vehicles,
+      [normalized]: { ...existing, currentStatus: status, currentYardId: status === "in" ? yardId : existing.currentYardId, lastChangedAt: new Date().toISOString(), overrideReason: reason },
+    },
+    flags: [...state.flags, flag(normalized, "manual_admin_override", reason)],
+  };
+}
