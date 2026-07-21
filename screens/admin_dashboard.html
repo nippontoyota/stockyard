@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Nippon Yard Scan - Admin Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary-fixed": "#001b3d",
+                        "inverse-on-surface": "#eaf1ff",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#2e476f",
+                        "primary-fixed": "#d6e3ff",
+                        "tertiary": "#321c00",
+                        "on-primary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#dce9ff",
+                        "error-container": "#ffdad6",
+                        "surface-bright": "#f8f9ff",
+                        "primary": "#002046",
+                        "primary-fixed-dim": "#aec7f7",
+                        "outline": "#74777f",
+                        "surface-container": "#e5eeff",
+                        "inverse-primary": "#aec7f7",
+                        "surface-variant": "#d3e4fe",
+                        "on-primary-container": "#87a0cd",
+                        "tertiary-fixed-dim": "#f1bd81",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#0b1c30",
+                        "secondary": "#9d4300",
+                        "on-secondary-container": "#5c2400",
+                        "tertiary-container": "#4f2f00",
+                        "surface-container-highest": "#d3e4fe",
+                        "surface": "#f8f9ff",
+                        "on-background": "#0b1c30",
+                        "secondary-container": "#fd761a",
+                        "outline-variant": "#c4c6cf",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed": "#2b1700",
+                        "on-error": "#ffffff",
+                        "surface-dim": "#cbdbf5",
+                        "on-tertiary-fixed-variant": "#623f0f",
+                        "tertiary-fixed": "#ffddb9",
+                        "background": "#f8f9ff",
+                        "on-tertiary-container": "#c6965e",
+                        "primary-container": "#1b365d",
+                        "surface-container-low": "#eff4ff",
+                        "on-surface-variant": "#44474e",
+                        "inverse-surface": "#213145",
+                        "on-secondary-fixed-variant": "#783200",
+                        "surface-tint": "#465f88",
+                        "secondary-fixed": "#ffdbca",
+                        "secondary-fixed-dim": "#ffb690",
+                        "on-secondary-fixed": "#341100"
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.125rem",
+                        lg: "0.25rem",
+                        xl: "0.5rem",
+                        full: "0.75rem"
+                    },
+                    spacing: {
+                        "margin-mobile": "16px",
+                        "stack-lg": "24px",
+                        "gutter": "12px",
+                        "stack-sm": "8px",
+                        "touch-target-min": "48px",
+                        "stack-md": "16px"
+                    },
+                    fontFamily: {
+                        "body-md": ["Open Sans"],
+                        "label-caps": ["Open Sans"],
+                        "body-lg": ["Open Sans"],
+                        "headline-md": ["Open Sans"],
+                        "headline-lg-mobile": ["Open Sans"],
+                        "data-mono": ["Open Sans"],
+                        "headline-lg": ["Open Sans"]
+                    },
+                    fontSize: {
+                        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "label-caps": ["12px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" }],
+                        "body-lg": ["18px", { lineHeight: "26px", fontWeight: "400" }],
+                        "headline-md": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+                        "headline-lg-mobile": ["24px", { lineHeight: "32px", fontWeight: "700" }],
+                        "data-mono": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "500" }],
+                        "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col pt-16 pb-20 md:pb-0 md:pl-72">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full bg-surface dark:bg-on-background border-b border-outline-variant dark:border-outline flex items-center justify-between px-margin-mobile h-touch-target-min z-50 md:hidden">
+<button aria-label="Menu" class="h-touch-target-min w-touch-target-min flex items-center justify-center text-primary dark:text-primary-fixed-dim hover:bg-surface-container dark:hover:bg-surface-container-highest active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary dark:text-primary-fixed-dim uppercase tracking-tighter">Nippon Yard Scan</h1>
+<button aria-label="Status" class="h-touch-target-min w-touch-target-min flex items-center justify-center text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-highest active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="cloud_off">cloud_off</span>
+</button>
+</header>
+<!-- NavigationDrawer (Web) -->
+<nav class="hidden md:flex fixed inset-y-0 left-0 z-[60] flex-col py-stack-lg bg-surface-container-low dark:bg-on-background border-r border-outline-variant dark:border-outline h-full w-72 rounded-r-full">
+<div class="px-6 mb-8">
+<h2 class="font-headline-md text-headline-md text-on-surface">Admin Console</h2>
+</div>
+<ul class="flex flex-col gap-2">
+<li>
+<a class="flex items-center gap-4 bg-primary-container text-on-primary-container font-bold rounded-full mx-2 px-4 py-3 active:opacity-80 transition-opacity" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="font-body-md text-body-md">Yard Map</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-body-md text-body-md">Staff Management</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-body-md text-body-md">Reports</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 p-margin-mobile md:p-8 flex flex-col gap-stack-lg max-w-5xl mx-auto w-full">
+<!-- Key Stats Bento Grid -->
+<section class="flex flex-col gap-stack-sm">
+<div class="flex items-center justify-between pb-2 border-b border-outline-variant">
+<h2 class="font-headline-md text-headline-md text-on-surface">Live Stats</h2>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-gutter md:gap-4">
+<div class="col-span-2 md:col-span-1 bg-surface p-4 border border-outline-variant rounded-lg flex flex-col justify-between h-32 relative overflow-hidden">
+<div class="absolute right-0 top-0 w-2 h-full bg-[#1b365d]"></div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant">VEHICLE THROUGHPUT (24H)</h3>
+<div class="flex items-end justify-between">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-primary">1,428</span>
+<span class="material-symbols-outlined text-outline" data-icon="swap_horiz">swap_horiz</span>
+</div>
+</div>
+<div class="bg-surface p-4 border border-outline-variant rounded-lg flex flex-col justify-between h-32 relative overflow-hidden">
+<div class="absolute right-0 top-0 w-2 h-full bg-[#fd761a]"></div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant">AVG DWELL TIME</h3>
+<div class="flex items-end justify-between">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-secondary-container">3.4<span class="text-sm">d</span></span>
+<span class="material-symbols-outlined text-secondary-container" data-icon="timer">timer</span>
+</div>
+</div>
+<div class="bg-surface p-4 border border-outline-variant rounded-lg flex flex-col justify-between h-32 relative overflow-hidden">
+<div class="absolute right-0 top-0 w-2 h-full bg-[#ba1a1a]"></div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant">ACTIVE FLAGS</h3>
+<div class="flex items-end justify-between">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-error">15</span>
+<span class="material-symbols-outlined text-error" data-icon="flag">flag</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Yard Capacity Overview -->
+<section class="flex flex-col gap-stack-sm">
+<div class="flex items-center justify-between pb-2 border-b border-outline-variant">
+<h2 class="font-headline-md text-headline-md text-on-surface">Yard Capacity Overview</h2>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-gutter">
+<div class="bg-surface border border-outline-variant p-4 rounded-lg flex flex-col gap-3">
+<div class="flex justify-between items-center">
+<span class="font-data-mono text-data-mono text-on-surface font-bold">Nippon Tower</span>
+<span class="font-label-caps text-label-caps text-error bg-error-container px-2 py-0.5 rounded">95% FULL</span>
+</div>
+<div class="w-full bg-surface-variant h-2 rounded-full overflow-hidden">
+<div class="bg-error h-full rounded-full" style="width: 95%;"></div>
+</div>
+<div class="text-right font-data-mono text-data-mono text-on-surface-variant text-xs">950 / 1000</div>
+</div>
+<div class="bg-surface border border-outline-variant p-4 rounded-lg flex flex-col gap-3">
+<div class="flex justify-between items-center">
+<span class="font-data-mono text-data-mono text-on-surface font-bold">Kalamasery</span>
+<span class="font-label-caps text-label-caps text-secondary-container bg-surface-container-highest px-2 py-0.5 rounded">82% FULL</span>
+</div>
+<div class="w-full bg-surface-variant h-2 rounded-full overflow-hidden">
+<div class="bg-secondary-container h-full rounded-full" style="width: 82%;"></div>
+</div>
+<div class="text-right font-data-mono text-data-mono text-on-surface-variant text-xs">410 / 500</div>
+</div>
+<div class="bg-surface border border-outline-variant p-4 rounded-lg flex flex-col gap-3">
+<div class="flex justify-between items-center">
+<span class="font-data-mono text-data-mono text-on-surface font-bold">Edappally</span>
+<span class="font-label-caps text-label-caps text-[#1b365d] bg-surface-container px-2 py-0.5 rounded">45% FULL</span>
+</div>
+<div class="w-full bg-surface-variant h-2 rounded-full overflow-hidden">
+<div class="bg-[#1b365d] h-full rounded-full" style="width: 45%;"></div>
+</div>
+<div class="text-right font-data-mono text-data-mono text-on-surface-variant text-xs">225 / 500</div>
+</div>
+</div>
+</section>
+<!-- Bottom Section: Model Dist & Flags -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-lg">
+<!-- Model Distribution -->
+<section class="flex flex-col gap-stack-sm">
+<div class="flex items-center justify-between pb-2 border-b border-outline-variant">
+<h2 class="font-headline-md text-headline-md text-on-surface">Model Distribution</h2>
+</div>
+<div class="bg-surface p-4 border border-outline-variant rounded-lg flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<span class="font-data-mono text-data-mono text-on-surface">Hilux</span>
+<span class="font-data-mono text-data-mono text-on-surface-variant">450</span>
+</div>
+<div class="w-full bg-surface-variant h-1.5 rounded-full overflow-hidden -mt-2">
+<div class="bg-primary h-full rounded-full" style="width: 80%;"></div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-data-mono text-data-mono text-on-surface">F-150</span>
+<span class="font-data-mono text-data-mono text-on-surface-variant">320</span>
+</div>
+<div class="w-full bg-surface-variant h-1.5 rounded-full overflow-hidden -mt-2">
+<div class="bg-primary-container h-full rounded-full" style="width: 60%;"></div>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-data-mono text-data-mono text-on-surface">Corolla</span>
+<span class="font-data-mono text-data-mono text-on-surface-variant">210</span>
+</div>
+<div class="w-full bg-surface-variant h-1.5 rounded-full overflow-hidden -mt-2">
+<div class="bg-surface-tint h-full rounded-full" style="width: 40%;"></div>
+</div>
+</div>
+</section>
+<!-- Recent Flagged Events -->
+<section class="flex flex-col gap-stack-sm">
+<div class="flex items-center justify-between pb-2 border-b border-outline-variant">
+<h2 class="font-headline-md text-headline-md text-on-surface">Recent Flagged Events</h2>
+<button class="font-label-caps text-label-caps text-primary hover:underline">VIEW ALL</button>
+</div>
+<div class="flex flex-col gap-2">
+<div class="bg-surface border border-outline-variant p-4 flex flex-col gap-2 min-h-[64px] rounded-DEFAULT active:border-secondary-container transition-colors relative overflow-hidden">
+<div class="absolute left-0 top-0 w-1.5 h-full bg-[#fd761a]"></div>
+<div class="pl-2 flex justify-between items-start">
+<div>
+<p class="font-data-mono text-data-mono text-on-surface">VIN: 1HGCM82633AXXXXXX</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">GPS Mismatch - Sector B2</p>
+</div>
+<button class="bg-secondary-container text-on-secondary px-3 py-1 rounded text-xs font-bold">RESOLVE</button>
+</div>
+</div>
+<div class="bg-surface border border-outline-variant p-4 flex flex-col gap-2 min-h-[64px] rounded-DEFAULT active:border-secondary-container transition-colors relative overflow-hidden">
+<div class="absolute left-0 top-0 w-1.5 h-full bg-[#ba1a1a]"></div>
+<div class="pl-2 flex justify-between items-start">
+<div>
+<p class="font-data-mono text-data-mono text-on-surface">VIN: JTDYF17U700XXXXXX</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Missing Documentation</p>
+</div>
+<button class="bg-error text-on-error px-3 py-1 rounded text-xs font-bold">REVIEW</button>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Primary Scan FAB (Mobile Only) -->
+<button class="md:hidden fixed bottom-24 right-4 h-16 w-16 bg-secondary-container text-on-secondary rounded-full shadow-lg flex flex-col items-center justify-center active:scale-95 transition-transform z-[55]">
+<span class="material-symbols-outlined" data-icon="barcode_scanner">barcode_scanner</span>
+</button>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-16 px-2 bg-surface dark:bg-on-background border-t border-outline-variant dark:border-outline z-50">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all w-1/4" href="#">
+<span class="material-symbols-outlined" data-icon="barcode_scanner">barcode_scanner</span>
+<span class="font-label-caps text-label-caps mt-1">Scan</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all w-1/4" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-label-caps text-label-caps mt-1">Stock</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary rounded-full px-4 py-1 active:scale-90 transition-all w-1/4" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-label-caps text-label-caps mt-1">History</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all w-1/4" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-caps text-label-caps mt-1">Profile</span>
+</a>
+</nav>
+</body></html>
