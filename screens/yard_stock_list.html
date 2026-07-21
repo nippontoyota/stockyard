@@ -1,326 +1,395 @@
 <!DOCTYPE html>
 
-<html class="light" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
-<title>Yard Stock - Nippon Yard Scan</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
-  tailwind.config = {
-    darkMode: "class",
-    theme: {
-      extend: {
-        "colors": {
-                "tertiary-fixed-dim": "#b7c8e1",
-                "on-secondary-container": "#572000",
-                "on-tertiary-fixed-variant": "#38485d",
-                "on-secondary-fixed-variant": "#7a3000",
-                "tertiary-fixed": "#d3e4fe",
-                "on-primary": "#ffffff",
-                "on-surface": "#191c1e",
-                "inverse-surface": "#2d3133",
-                "on-tertiary-container": "#8495ad",
-                "surface": "#f7f9fb",
-                "on-primary-fixed": "#001b3e",
-                "inverse-primary": "#aac7ff",
-                "surface-bright": "#f7f9fb",
-                "inverse-on-surface": "#eff1f3",
-                "error-container": "#ffdad6",
-                "tertiary": "#07182b",
-                "on-error-container": "#93000a",
-                "primary-fixed": "#d6e3ff",
-                "error": "#ba1a1a",
-                "on-background": "#191c1e",
-                "secondary": "#a04100",
-                "surface-variant": "#e0e3e5",
-                "surface-dim": "#d8dadc",
-                "primary-fixed-dim": "#aac7ff",
-                "outline-variant": "#c4c6d0",
-                "surface-container-lowest": "#ffffff",
-                "secondary-container": "#fe6b00",
-                "secondary-fixed-dim": "#ffb693",
-                "secondary-fixed": "#ffdbcc",
-                "on-primary-container": "#7594cb",
-                "surface-container": "#eceef0",
-                "on-secondary": "#ffffff",
-                "primary": "#001736",
-                "background": "#f7f9fb",
-                "surface-container-high": "#e6e8ea",
-                "surface-tint": "#3f5f92",
-                "surface-container-low": "#f2f4f6",
-                "primary-container": "#002b5c",
-                "tertiary-container": "#1d2d41",
-                "surface-container-highest": "#e0e3e5",
-                "on-surface-variant": "#43474f",
-                "outline": "#747780",
-                "on-tertiary": "#ffffff",
-                "on-error": "#ffffff",
-                "on-primary-fixed-variant": "#264779",
-                "on-tertiary-fixed": "#0b1c30",
-                "on-secondary-fixed": "#351000"
-        },
-        "borderRadius": {
-                "DEFAULT": "0.125rem",
-                "lg": "0.25rem",
-                "xl": "0.5rem",
-                "full": "0.75rem"
-        },
-        "spacing": {
-                "margin-mobile": "16px",
-                "margin-desktop": "32px",
-                "base": "4px",
-                "gutter": "16px",
-                "column-gap": "24px",
-                "stack-lg": "24px",
-                "stack-sm": "8px",
-                "touch-target-min": "48px",
-                "stack-md": "16px"
-        },
-        "fontFamily": {
-                "code-sm": [
-                        "monospace"
-                ],
-                "label-md": [
-                        "Open Sans"
-                ],
-                "headline-sm": [
-                        "Open Sans"
-                ],
-                "headline-lg-mobile": [
-                        "Open Sans"
-                ],
-                "headline-md": [
-                        "Open Sans"
-                ],
-                "body-lg": [
-                        "Open Sans"
-                ],
-                "headline-lg": [
-                        "Open Sans"
-                ],
-                "body-md": [
-                        "Open Sans"
-                ]
-        },
-        "fontSize": {
-                "code-sm": [
-                        "13px",
-                        {
-                                "lineHeight": "18px",
-                                "fontWeight": "400"
-                        }
-                ],
-                "label-md": [
-                        "12px",
-                        {
-                                "lineHeight": "16px",
-                                "letterSpacing": "0.05em",
-                                "fontWeight": "600"
-                        }
-                ],
-                "headline-sm": [
-                        "20px",
-                        {
-                                "lineHeight": "28px",
-                                "fontWeight": "600"
-                        }
-                ],
-                "headline-lg-mobile": [
-                        "24px",
-                        {
-                                "lineHeight": "32px",
-                                "letterSpacing": "-0.01em",
-                                "fontWeight": "700"
-                        }
-                ],
-                "headline-md": [
-                        "24px",
-                        {
-                                "lineHeight": "32px",
-                                "fontWeight": "600"
-                        }
-                ],
-                "body-lg": [
-                        "16px",
-                        {
-                                "lineHeight": "24px",
-                                "fontWeight": "400"
-                        }
-                ],
-                "headline-lg": [
-                        "32px",
-                        {
-                                "lineHeight": "40px",
-                                "letterSpacing": "-0.02em",
-                                "fontWeight": "700"
-                        }
-                ],
-                "body-md": [
-                        "14px",
-                        {
-                                "lineHeight": "20px",
-                                "fontWeight": "400"
-                        }
-                ]
-        }
-},
-    },
-  }
-</script>
-<style>
-        body { -webkit-tap-highlight-color: transparent; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
+<html class="light" lang="en">
+
+<head>
+        <meta charset="utf-8" />
+        <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport" />
+        <title>Yard Stock - Nippon Yard Scan</title>
+        <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&amp;display=swap"
+                rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+                rel="stylesheet" />
+        <script id="tailwind-config">
+                tailwind.config = {
+                        darkMode: "class",
+                        theme: {
+                                extend: {
+                                        "colors": {
+                                                "tertiary-fixed-dim": "#b7c8e1",
+                                                "on-secondary-container": "#572000",
+                                                "on-tertiary-fixed-variant": "#38485d",
+                                                "on-secondary-fixed-variant": "#7a3000",
+                                                "tertiary-fixed": "#d3e4fe",
+                                                "on-primary": "#ffffff",
+                                                "on-surface": "#191c1e",
+                                                "inverse-surface": "#2d3133",
+                                                "on-tertiary-container": "#8495ad",
+                                                "surface": "#f7f9fb",
+                                                "on-primary-fixed": "#001b3e",
+                                                "inverse-primary": "#aac7ff",
+                                                "surface-bright": "#f7f9fb",
+                                                "inverse-on-surface": "#eff1f3",
+                                                "error-container": "#ffdad6",
+                                                "tertiary": "#07182b",
+                                                "on-error-container": "#93000a",
+                                                "primary-fixed": "#d6e3ff",
+                                                "error": "#ba1a1a",
+                                                "on-background": "#191c1e",
+                                                "secondary": "#a04100",
+                                                "surface-variant": "#e0e3e5",
+                                                "surface-dim": "#d8dadc",
+                                                "primary-fixed-dim": "#aac7ff",
+                                                "outline-variant": "#c4c6d0",
+                                                "surface-container-lowest": "#ffffff",
+                                                "secondary-container": "#fe6b00",
+                                                "secondary-fixed-dim": "#ffb693",
+                                                "secondary-fixed": "#ffdbcc",
+                                                "on-primary-container": "#7594cb",
+                                                "surface-container": "#eceef0",
+                                                "on-secondary": "#ffffff",
+                                                "primary": "#001736",
+                                                "background": "#f7f9fb",
+                                                "surface-container-high": "#e6e8ea",
+                                                "surface-tint": "#3f5f92",
+                                                "surface-container-low": "#f2f4f6",
+                                                "primary-container": "#002b5c",
+                                                "tertiary-container": "#1d2d41",
+                                                "surface-container-highest": "#e0e3e5",
+                                                "on-surface-variant": "#43474f",
+                                                "outline": "#747780",
+                                                "on-tertiary": "#ffffff",
+                                                "on-error": "#ffffff",
+                                                "on-primary-fixed-variant": "#264779",
+                                                "on-tertiary-fixed": "#0b1c30",
+                                                "on-secondary-fixed": "#351000"
+                                        },
+                                        "borderRadius": {
+                                                "DEFAULT": "0.125rem",
+                                                "lg": "0.25rem",
+                                                "xl": "0.5rem",
+                                                "full": "0.75rem"
+                                        },
+                                        "spacing": {
+                                                "margin-mobile": "16px",
+                                                "margin-desktop": "32px",
+                                                "base": "4px",
+                                                "gutter": "16px",
+                                                "column-gap": "24px",
+                                                "stack-lg": "24px",
+                                                "stack-sm": "8px",
+                                                "touch-target-min": "48px",
+                                                "stack-md": "16px"
+                                        },
+                                        "fontFamily": {
+                                                "code-sm": [
+                                                        "monospace"
+                                                ],
+                                                "label-md": [
+                                                        "Open Sans"
+                                                ],
+                                                "headline-sm": [
+                                                        "Open Sans"
+                                                ],
+                                                "headline-lg-mobile": [
+                                                        "Open Sans"
+                                                ],
+                                                "headline-md": [
+                                                        "Open Sans"
+                                                ],
+                                                "body-lg": [
+                                                        "Open Sans"
+                                                ],
+                                                "headline-lg": [
+                                                        "Open Sans"
+                                                ],
+                                                "body-md": [
+                                                        "Open Sans"
+                                                ]
+                                        },
+                                        "fontSize": {
+                                                "code-sm": [
+                                                        "13px",
+                                                        {
+                                                                "lineHeight": "18px",
+                                                                "fontWeight": "400"
+                                                        }
+                                                ],
+                                                "label-md": [
+                                                        "12px",
+                                                        {
+                                                                "lineHeight": "16px",
+                                                                "letterSpacing": "0.05em",
+                                                                "fontWeight": "600"
+                                                        }
+                                                ],
+                                                "headline-sm": [
+                                                        "20px",
+                                                        {
+                                                                "lineHeight": "28px",
+                                                                "fontWeight": "600"
+                                                        }
+                                                ],
+                                                "headline-lg-mobile": [
+                                                        "24px",
+                                                        {
+                                                                "lineHeight": "32px",
+                                                                "letterSpacing": "-0.01em",
+                                                                "fontWeight": "700"
+                                                        }
+                                                ],
+                                                "headline-md": [
+                                                        "24px",
+                                                        {
+                                                                "lineHeight": "32px",
+                                                                "fontWeight": "600"
+                                                        }
+                                                ],
+                                                "body-lg": [
+                                                        "16px",
+                                                        {
+                                                                "lineHeight": "24px",
+                                                                "fontWeight": "400"
+                                                        }
+                                                ],
+                                                "headline-lg": [
+                                                        "32px",
+                                                        {
+                                                                "lineHeight": "40px",
+                                                                "letterSpacing": "-0.02em",
+                                                                "fontWeight": "700"
+                                                        }
+                                                ],
+                                                "body-md": [
+                                                        "14px",
+                                                        {
+                                                                "lineHeight": "20px",
+                                                                "fontWeight": "400"
+                                                        }
+                                                ]
+                                        }
+                                },
+                        },
+                }
+        </script>
+        <style>
+                body {
+                        -webkit-tap-highlight-color: transparent;
+                }
+
+                .hide-scrollbar::-webkit-scrollbar {
+                        display: none;
+                }
+
+                .hide-scrollbar {
+                        -ms-overflow-style: none;
+                        scrollbar-width: none;
+                }
+        </style>
+        <style>
+                body {
+                        min-height: max(884px, 100dvh);
+                }
+        </style>
 </head>
+
 <body class="bg-background text-on-background antialiased md:hidden pb-[80px] pt-[64px]">
-<!-- TopAppBar -->
-<header class="bg-surface dark:bg-on-background fixed top-0 w-full border-b border-outline-variant dark:border-outline flex items-center justify-between px-margin-mobile h-[64px] z-50">
-<div class="flex items-center justify-center w-touch-target-min h-touch-target-min active:scale-95 transition-transform hover:bg-surface-container dark:hover:bg-surface-container-highest rounded-full text-primary dark:text-primary-fixed-dim">
-<span class="material-symbols-outlined text-[24px]">menu</span>
-</div>
-<div class="font-headline-lg-mobile text-headline-lg-mobile text-primary dark:text-primary-fixed-dim uppercase tracking-tighter">NIPPON YARD SCAN</div>
-<div class="flex items-center justify-center w-touch-target-min h-touch-target-min active:scale-95 transition-transform hover:bg-surface-container dark:hover:bg-surface-container-highest rounded-full text-on-surface-variant dark:text-outline-variant">
-<span class="material-symbols-outlined text-[24px]">cloud_off</span>
-</div>
-</header>
-<main class="px-margin-mobile py-stack-md flex flex-col gap-stack-md">
-<!-- Utilization Header -->
-<div class="bg-surface-container-low rounded-xl p-4 border border-outline-variant flex flex-col gap-2">
-<div class="flex justify-between items-end">
-<div>
-<h2 class="font-label-md text-label-md text-on-surface-variant uppercase">Current Stock</h2>
-<p class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">142 <span class="font-body-md text-body-md text-on-surface-variant">/ 200</span></p>
-</div>
-<div class="font-label-md text-label-md text-primary bg-primary-container px-3 py-1 rounded-full">
-                    71% UTILIZED
+        <!-- TopAppBar -->
+        <header
+                class="bg-surface dark:bg-on-background fixed top-0 w-full border-b border-outline-variant dark:border-outline flex items-center justify-between px-margin-mobile h-[64px] z-50">
+                <div
+                        class="flex items-center justify-center w-touch-target-min h-touch-target-min active:scale-95 transition-transform hover:bg-surface-container dark:hover:bg-surface-container-highest rounded-full text-primary dark:text-primary-fixed-dim">
+                        <span class="material-symbols-outlined text-[24px]">menu</span>
                 </div>
-</div>
-<!-- Progress Bar -->
-<div class="w-full h-2 bg-surface-variant rounded-full overflow-hidden mt-1">
-<div class="h-full bg-primary" style="width: 71%;"></div>
-</div>
-</div>
-<!-- Search Bar -->
-<div class="relative">
-<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
-<input class="w-full h-touch-target-min pl-12 pr-4 bg-surface border border-outline-variant rounded-lg font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-on-surface-variant" placeholder="Search VIN or Model..." type="text"/>
-</div>
-<!-- Filters -->
-<div class="flex gap-gutter overflow-x-auto hide-scrollbar py-1">
-<button class="flex-shrink-0 h-[40px] px-4 rounded-full border-2 border-primary text-primary font-label-md text-label-md bg-primary-container flex items-center gap-2 active:scale-95 transition-transform">
-<span class="material-symbols-outlined text-[18px]">filter_list</span>
-                ALL MODELS
-            </button>
-<button class="flex-shrink-0 h-[40px] px-4 rounded-full border border-outline-variant text-on-surface-variant font-label-md text-label-md bg-surface flex items-center gap-2 active:scale-95 transition-transform">
-<span class="w-2 h-2 rounded-full bg-[#fd761a]"></span>
-                FLAGGED
-            </button>
-<button class="flex-shrink-0 h-[40px] px-4 rounded-full border border-outline-variant text-on-surface-variant font-label-md text-label-md bg-surface flex items-center gap-2 active:scale-95 transition-transform">
-                TOYOTA
-            </button>
-<button class="flex-shrink-0 h-[40px] px-4 rounded-full border border-outline-variant text-on-surface-variant font-label-md text-label-md bg-surface flex items-center gap-2 active:scale-95 transition-transform">
-                FORD
-            </button>
-</div>
-<!-- Vehicle List -->
-<div class="flex flex-col gap-stack-sm mt-2">
-<!-- Card 1 -->
-<div class="bg-surface rounded-lg border border-outline-variant flex overflow-hidden active:bg-surface-container-low transition-colors min-h-[80px]">
-<div class="w-2 bg-[#22c55e] flex-shrink-0"></div> <!-- Green In Status -->
-<div class="flex-1 p-3 flex flex-col justify-center">
-<div class="flex justify-between items-start mb-1">
-<span class="font-code-sm text-code-sm text-on-surface">JTMBA38V70</span>
-<span class="font-label-md text-label-md text-[#22c55e] bg-[#22c55e]/10 px-2 py-0.5 rounded-sm">IN</span>
-</div>
-<div class="flex justify-between items-end">
-<span class="font-body-md text-body-md font-bold text-on-surface">TOYOTA HILUX</span>
-<span class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
-<span class="material-symbols-outlined text-[14px]">schedule</span> 4 DAYS
-                        </span>
-</div>
-</div>
-</div>
-<!-- Card 2: Flagged -->
-<div class="bg-surface rounded-lg border-2 border-[#fd761a] flex overflow-hidden active:bg-surface-container-low transition-colors min-h-[80px]">
-<div class="w-2 bg-[#fd761a] flex-shrink-0"></div> <!-- Amber Flagged Status -->
-<div class="flex-1 p-3 flex flex-col justify-center">
-<div class="flex justify-between items-start mb-1">
-<span class="font-code-sm text-code-sm text-on-surface">1FTEW1E4XN</span>
-<span class="font-label-md text-label-md text-[#fd761a] bg-[#fd761a]/10 px-2 py-0.5 rounded-sm flex items-center gap-1">
-<span class="material-symbols-outlined text-[12px]">warning</span> FLAGGED
-                        </span>
-</div>
-<div class="flex justify-between items-end">
-<span class="font-body-md text-body-md font-bold text-on-surface">FORD F-150</span>
-<span class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
-<span class="material-symbols-outlined text-[14px]">schedule</span> 12 DAYS
-                        </span>
-</div>
-</div>
-</div>
-<!-- Card 3 -->
-<div class="bg-surface rounded-lg border border-outline-variant flex overflow-hidden active:bg-surface-container-low transition-colors min-h-[80px]">
-<div class="w-2 bg-[#64748b] flex-shrink-0"></div> <!-- Slate Out Status -->
-<div class="flex-1 p-3 flex flex-col justify-center">
-<div class="flex justify-between items-start mb-1">
-<span class="font-code-sm text-code-sm text-on-surface-variant line-through">MMBKN1660M</span>
-<span class="font-label-md text-label-md text-on-surface-variant bg-surface-variant px-2 py-0.5 rounded-sm">OUT</span>
-</div>
-<div class="flex justify-between items-end opacity-70">
-<span class="font-body-md text-body-md font-bold text-on-surface-variant">MITSUBISHI TRITON</span>
-<span class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
-<span class="material-symbols-outlined text-[14px]">logout</span> TODAY
-                        </span>
-</div>
-</div>
-</div>
-<!-- Card 4 -->
-<div class="bg-surface rounded-lg border border-outline-variant flex overflow-hidden active:bg-surface-container-low transition-colors min-h-[80px]">
-<div class="w-2 bg-[#22c55e] flex-shrink-0"></div>
-<div class="flex-1 p-3 flex flex-col justify-center">
-<div class="flex justify-between items-start mb-1">
-<span class="font-code-sm text-code-sm text-on-surface">JTDAR32100</span>
-<span class="font-label-md text-label-md text-[#22c55e] bg-[#22c55e]/10 px-2 py-0.5 rounded-sm">IN</span>
-</div>
-<div class="flex justify-between items-end">
-<span class="font-body-md text-body-md font-bold text-on-surface">TOYOTA RAV4</span>
-<span class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
-<span class="material-symbols-outlined text-[14px]">schedule</span> 1 DAY
-                        </span>
-</div>
-</div>
-</div>
-</div>
-</main>
-<!-- FAB for Quick Scan -->
-<button class="fixed bottom-24 right-4 md:right-8 w-14 h-14 bg-secondary-container text-on-secondary-container rounded-xl shadow-lg flex items-center justify-center active:scale-90 transition-transform z-40 border-2 border-surface">
-<span class="material-symbols-outlined text-[28px]">barcode_scanner</span>
-</button>
-<!-- BottomNavBar -->
-<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center h-16 px-2 bg-surface dark:bg-on-background z-50 border-t border-outline-variant dark:border-outline">
-<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all rounded-lg flex-1">
-<span class="material-symbols-outlined mb-1">barcode_scanner</span>
-<span class="font-label-md text-label-md">Scan</span>
-</div>
-<div class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary rounded-full px-4 py-2 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all flex-1">
-<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
-<span class="font-label-md text-label-md">Stock</span>
-</div>
-<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all rounded-lg flex-1">
-<span class="material-symbols-outlined mb-1">history</span>
-<span class="font-label-md text-label-md">History</span>
-</div>
-<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all rounded-lg flex-1">
-<span class="material-symbols-outlined mb-1">person</span>
-<span class="font-label-md text-label-md">Profile</span>
-</div>
-</nav>
-</body></html>
+                <div
+                        class="font-headline-lg-mobile text-headline-lg-mobile text-primary dark:text-primary-fixed-dim uppercase tracking-tighter">
+                        NIPPON YARD SCAN</div>
+                <div
+                        class="flex items-center justify-center w-touch-target-min h-touch-target-min active:scale-95 transition-transform hover:bg-surface-container dark:hover:bg-surface-container-highest rounded-full text-on-surface-variant dark:text-outline-variant">
+                        <span class="material-symbols-outlined text-[24px]">cloud_off</span>
+                </div>
+        </header>
+        <main class="px-margin-mobile py-stack-md flex flex-col gap-stack-md">
+                <!-- Utilization Header -->
+                <div class="bg-surface-container-low rounded-xl p-4 border border-outline-variant flex flex-col gap-2">
+                        <div class="flex justify-between items-end">
+                                <div>
+                                        <h2 class="font-label-md text-label-md text-on-surface-variant uppercase">
+                                                Current Stock</h2>
+                                        <p class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">142
+                                                <span class="font-body-md text-body-md text-on-surface-variant">/
+                                                        200</span></p>
+                                </div>
+                                <div
+                                        class="font-label-md text-label-md text-primary bg-primary-container px-3 py-1 rounded-full">
+                                        71% UTILIZED
+                                </div>
+                        </div>
+                        <!-- Progress Bar -->
+                        <div class="w-full h-2 bg-surface-variant rounded-full overflow-hidden mt-1">
+                                <div class="h-full bg-primary" style="width: 71%;"></div>
+                        </div>
+                </div>
+                <!-- Search Bar -->
+                <div class="relative">
+                        <span
+                                class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+                        <input class="w-full h-touch-target-min pl-12 pr-4 bg-surface border border-outline-variant rounded-lg font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-on-surface-variant"
+                                placeholder="Search VIN or Model..." type="text" />
+                </div>
+                <!-- Filters -->
+                <div class="flex gap-gutter overflow-x-auto hide-scrollbar py-1">
+                        <button
+                                class="flex-shrink-0 h-[40px] px-4 rounded-full border-2 border-primary text-primary font-label-md text-label-md bg-primary-container flex items-center gap-2 active:scale-95 transition-transform">
+                                <span class="material-symbols-outlined text-[18px]">filter_list</span>
+                                ALL MODELS
+                        </button>
+                        <button
+                                class="flex-shrink-0 h-[40px] px-4 rounded-full border border-outline-variant text-on-surface-variant font-label-md text-label-md bg-surface flex items-center gap-2 active:scale-95 transition-transform">
+                                <span class="w-2 h-2 rounded-full bg-[#fd761a]"></span>
+                                FLAGGED
+                        </button>
+                        <button
+                                class="flex-shrink-0 h-[40px] px-4 rounded-full border border-outline-variant text-on-surface-variant font-label-md text-label-md bg-surface flex items-center gap-2 active:scale-95 transition-transform">
+                                TOYOTA
+                        </button>
+                        <button
+                                class="flex-shrink-0 h-[40px] px-4 rounded-full border border-outline-variant text-on-surface-variant font-label-md text-label-md bg-surface flex items-center gap-2 active:scale-95 transition-transform">
+                                FORD
+                        </button>
+                </div>
+                <!-- Vehicle List -->
+                <div class="flex flex-col gap-stack-sm mt-2">
+                        <!-- Card 1 -->
+                        <div
+                                class="bg-surface rounded-lg border border-outline-variant flex overflow-hidden active:bg-surface-container-low transition-colors min-h-[80px]">
+                                <div class="w-2 bg-[#22c55e] flex-shrink-0"></div> <!-- Green In Status -->
+                                <div class="flex-1 p-3 flex flex-col justify-center">
+                                        <div class="flex justify-between items-start mb-1">
+                                                <span
+                                                        class="font-code-sm text-code-sm text-on-surface">JTMBA38V70</span>
+                                                <span
+                                                        class="font-label-md text-label-md text-[#22c55e] bg-[#22c55e]/10 px-2 py-0.5 rounded-sm">IN</span>
+                                        </div>
+                                        <div class="flex justify-between items-end">
+                                                <span class="font-body-md text-body-md font-bold text-on-surface">TOYOTA
+                                                        HILUX</span>
+                                                <span
+                                                        class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
+                                                        <span
+                                                                class="material-symbols-outlined text-[14px]">schedule</span>
+                                                        4 DAYS
+                                                </span>
+                                        </div>
+                                </div>
+                        </div>
+                        <!-- Card 2: Flagged -->
+                        <div
+                                class="bg-surface rounded-lg border-2 border-[#fd761a] flex overflow-hidden active:bg-surface-container-low transition-colors min-h-[80px]">
+                                <div class="w-2 bg-[#fd761a] flex-shrink-0"></div> <!-- Amber Flagged Status -->
+                                <div class="flex-1 p-3 flex flex-col justify-center">
+                                        <div class="flex justify-between items-start mb-1">
+                                                <span
+                                                        class="font-code-sm text-code-sm text-on-surface">1FTEW1E4XN</span>
+                                                <span
+                                                        class="font-label-md text-label-md text-[#fd761a] bg-[#fd761a]/10 px-2 py-0.5 rounded-sm flex items-center gap-1">
+                                                        <span
+                                                                class="material-symbols-outlined text-[12px]">warning</span>
+                                                        FLAGGED
+                                                </span>
+                                        </div>
+                                        <div class="flex justify-between items-end">
+                                                <span class="font-body-md text-body-md font-bold text-on-surface">FORD
+                                                        F-150</span>
+                                                <span
+                                                        class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
+                                                        <span
+                                                                class="material-symbols-outlined text-[14px]">schedule</span>
+                                                        12 DAYS
+                                                </span>
+                                        </div>
+                                </div>
+                        </div>
+                        <!-- Card 3 -->
+                        <div
+                                class="bg-surface rounded-lg border border-outline-variant flex overflow-hidden active:bg-surface-container-low transition-colors min-h-[80px]">
+                                <div class="w-2 bg-[#64748b] flex-shrink-0"></div> <!-- Slate Out Status -->
+                                <div class="flex-1 p-3 flex flex-col justify-center">
+                                        <div class="flex justify-between items-start mb-1">
+                                                <span
+                                                        class="font-code-sm text-code-sm text-on-surface-variant line-through">MMBKN1660M</span>
+                                                <span
+                                                        class="font-label-md text-label-md text-on-surface-variant bg-surface-variant px-2 py-0.5 rounded-sm">OUT</span>
+                                        </div>
+                                        <div class="flex justify-between items-end opacity-70">
+                                                <span
+                                                        class="font-body-md text-body-md font-bold text-on-surface-variant">MITSUBISHI
+                                                        TRITON</span>
+                                                <span
+                                                        class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
+                                                        <span
+                                                                class="material-symbols-outlined text-[14px]">logout</span>
+                                                        TODAY
+                                                </span>
+                                        </div>
+                                </div>
+                        </div>
+                        <!-- Card 4 -->
+                        <div
+                                class="bg-surface rounded-lg border border-outline-variant flex overflow-hidden active:bg-surface-container-low transition-colors min-h-[80px]">
+                                <div class="w-2 bg-[#22c55e] flex-shrink-0"></div>
+                                <div class="flex-1 p-3 flex flex-col justify-center">
+                                        <div class="flex justify-between items-start mb-1">
+                                                <span
+                                                        class="font-code-sm text-code-sm text-on-surface">JTDAR32100</span>
+                                                <span
+                                                        class="font-label-md text-label-md text-[#22c55e] bg-[#22c55e]/10 px-2 py-0.5 rounded-sm">IN</span>
+                                        </div>
+                                        <div class="flex justify-between items-end">
+                                                <span class="font-body-md text-body-md font-bold text-on-surface">TOYOTA
+                                                        RAV4</span>
+                                                <span
+                                                        class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
+                                                        <span
+                                                                class="material-symbols-outlined text-[14px]">schedule</span>
+                                                        1 DAY
+                                                </span>
+                                        </div>
+                                </div>
+                        </div>
+                </div>
+        </main>
+        <!-- FAB for Quick Scan -->
+        <button
+                class="fixed bottom-[88px] right-margin-mobile w-14 h-14 bg-secondary-container text-on-secondary-container rounded-xl shadow-lg flex items-center justify-center active:scale-90 transition-transform z-40 border-2 border-surface">
+                <span class="material-symbols-outlined text-[28px]">barcode_scanner</span>
+        </button>
+        <!-- BottomNavBar -->
+        <nav
+                class="fixed bottom-0 left-0 w-full flex justify-around items-center h-16 px-2 bg-surface dark:bg-on-background z-50 border-t border-outline-variant dark:border-outline">
+                <div
+                        class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all rounded-lg w-full max-w-[80px]">
+                        <span class="material-symbols-outlined mb-1">barcode_scanner</span>
+                        <span class="font-label-md text-label-md">Scan</span>
+                </div>
+                <div
+                        class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary rounded-full px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all w-full max-w-[80px]">
+                        <span class="material-symbols-outlined mb-1"
+                                style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+                        <span class="font-label-md text-label-md">Stock</span>
+                </div>
+                <div
+                        class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all rounded-lg w-full max-w-[80px]">
+                        <span class="material-symbols-outlined mb-1">history</span>
+                        <span class="font-label-md text-label-md">History</span>
+                </div>
+                <div
+                        class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all rounded-lg w-full max-w-[80px]">
+                        <span class="material-symbols-outlined mb-1">person</span>
+                        <span class="font-label-md text-label-md">Profile</span>
+                </div>
+        </nav>
+</body>
+
+</html>

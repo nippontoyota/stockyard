@@ -1,108 +1,118 @@
 <!DOCTYPE html>
 
-<html lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Nippon Yard Scan - Scanning</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Nippon Yard Scan - Scanning</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
         tailwind.config = {
-          darkMode: "class",
-          theme: {
-            extend: {
-              "colors": {
-                      "on-primary-fixed": "#001b3d",
-                      "inverse-on-surface": "#eaf1ff",
-                      "error": "#ba1a1a",
-                      "on-primary-fixed-variant": "#2e476f",
-                      "primary-fixed": "#d6e3ff",
-                      "tertiary": "#321c00",
-                      "on-primary": "#ffffff",
-                      "surface-container-lowest": "#ffffff",
-                      "on-secondary": "#ffffff",
-                      "surface-container-high": "#dce9ff",
-                      "error-container": "#ffdad6",
-                      "surface-bright": "#f8f9ff",
-                      "primary": "#002046",
-                      "primary-fixed-dim": "#aec7f7",
-                      "outline": "#74777f",
-                      "surface-container": "#e5eeff",
-                      "inverse-primary": "#aec7f7",
-                      "surface-variant": "#d3e4fe",
-                      "on-primary-container": "#87a0cd",
-                      "tertiary-fixed-dim": "#f1bd81",
-                      "on-error-container": "#93000a",
-                      "on-surface": "#0b1c30",
-                      "secondary": "#9d4300",
-                      "on-secondary-container": "#5c2400",
-                      "tertiary-container": "#4f2f00",
-                      "surface-container-highest": "#d3e4fe",
-                      "surface": "#f8f9ff",
-                      "on-background": "#0b1c30",
-                      "secondary-container": "#fd761a",
-                      "outline-variant": "#c4c6cf",
-                      "on-tertiary": "#ffffff",
-                      "on-tertiary-fixed": "#2b1700",
-                      "on-error": "#ffffff",
-                      "surface-dim": "#cbdbf5",
-                      "on-tertiary-fixed-variant": "#623f0f",
-                      "tertiary-fixed": "#ffddb9",
-                      "background": "#f8f9ff",
-                      "on-tertiary-container": "#c6965e",
-                      "primary-container": "#1b365d",
-                      "surface-container-low": "#eff4ff",
-                      "on-surface-variant": "#44474e",
-                      "inverse-surface": "#213145",
-                      "on-secondary-fixed-variant": "#783200",
-                      "surface-tint": "#465f88",
-                      "secondary-fixed": "#ffdbca",
-                      "secondary-fixed-dim": "#ffb690",
-                      "on-secondary-fixed": "#341100",
-                      "status-in": "#15803d", /* Added for specific requirement */
-                      "status-out": "#475569", /* Added for specific requirement */
-                      "status-flagged": "#d97706" /* Added for specific requirement */
-              },
-              "borderRadius": {
-                      "DEFAULT": "0.125rem",
-                      "lg": "0.25rem",
-                      "xl": "0.5rem",
-                      "full": "0.75rem"
-              },
-              "spacing": {
-                      "margin-mobile": "16px",
-                      "stack-lg": "24px",
-                      "gutter": "12px",
-                      "stack-sm": "8px",
-                      "touch-target-min": "48px",
-                      "stack-md": "16px"
-              },
-              "fontFamily": {
-                      "body-md": ["Open Sans"],
-                      "label-caps": ["Open Sans"],
-                      "body-lg": ["Open Sans"],
-                      "headline-md": ["Open Sans"],
-                      "headline-lg-mobile": ["Open Sans"],
-                      "data-mono": ["Open Sans"],
-                      "headline-lg": ["Open Sans"]
-              },
-              "fontSize": {
-                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
-                      "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
-                      "body-lg": ["18px", {"lineHeight": "26px", "fontWeight": "400"}],
-                      "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
-                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
-                      "data-mono": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
-                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
-              }
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#001b3d",
+                        "inverse-on-surface": "#eaf1ff",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#2e476f",
+                        "primary-fixed": "#d6e3ff",
+                        "tertiary": "#321c00",
+                        "on-primary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#dce9ff",
+                        "error-container": "#ffdad6",
+                        "surface-bright": "#f8f9ff",
+                        "primary": "#002046",
+                        "primary-fixed-dim": "#aec7f7",
+                        "outline": "#74777f",
+                        "surface-container": "#e5eeff",
+                        "inverse-primary": "#aec7f7",
+                        "surface-variant": "#d3e4fe",
+                        "on-primary-container": "#87a0cd",
+                        "tertiary-fixed-dim": "#f1bd81",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#0b1c30",
+                        "secondary": "#9d4300",
+                        "on-secondary-container": "#5c2400",
+                        "tertiary-container": "#4f2f00",
+                        "surface-container-highest": "#d3e4fe",
+                        "surface": "#f8f9ff",
+                        "on-background": "#0b1c30",
+                        "secondary-container": "#fd761a",
+                        "outline-variant": "#c4c6cf",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed": "#2b1700",
+                        "on-error": "#ffffff",
+                        "surface-dim": "#cbdbf5",
+                        "on-tertiary-fixed-variant": "#623f0f",
+                        "tertiary-fixed": "#ffddb9",
+                        "background": "#f8f9ff",
+                        "on-tertiary-container": "#c6965e",
+                        "primary-container": "#1b365d",
+                        "surface-container-low": "#eff4ff",
+                        "on-surface-variant": "#44474e",
+                        "inverse-surface": "#213145",
+                        "on-secondary-fixed-variant": "#783200",
+                        "surface-tint": "#465f88",
+                        "secondary-fixed": "#ffdbca",
+                        "secondary-fixed-dim": "#ffb690",
+                        "on-secondary-fixed": "#341100",
+                        "status-in": "#15803d", /* Added for specific requirement */
+                        "status-out": "#475569", /* Added for specific requirement */
+                        "status-flagged": "#d97706" /* Added for specific requirement */
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "stack-lg": "24px",
+                        "gutter": "12px",
+                        "stack-sm": "8px",
+                        "touch-target-min": "48px",
+                        "stack-md": "16px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Open Sans"],
+                        "label-caps": ["Open Sans"],
+                        "body-lg": ["Open Sans"],
+                        "headline-md": ["Open Sans"],
+                        "headline-lg-mobile": ["Open Sans"],
+                        "data-mono": ["Open Sans"],
+                        "headline-lg": ["Open Sans"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "26px", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "data-mono": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
             }
-          }
         }
     </script>
-<style>
-        body { font-family: 'Open Sans', sans-serif; }
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+        }
+
         .camera-overlay::before {
             content: '';
             position: absolute;
@@ -116,146 +126,210 @@
             border-radius: 8px;
             pointer-events: none;
         }
+
         .corner {
             position: absolute;
             width: 30px;
             height: 30px;
             border: 4px solid theme('colors.secondary-container');
         }
-        .corner-tl { top: 10px; left: 10px; border-right: none; border-bottom: none; }
-        .corner-tr { top: 10px; right: 10px; border-left: none; border-bottom: none; }
-        .corner-bl { bottom: 10px; left: 10px; border-right: none; border-top: none; }
-        .corner-br { bottom: 10px; right: 10px; border-left: none; border-top: none; }
+
+        .corner-tl {
+            top: 10px;
+            left: 10px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .corner-tr {
+            top: 10px;
+            right: 10px;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .corner-bl {
+            bottom: 10px;
+            left: 10px;
+            border-right: none;
+            border-top: none;
+        }
+
+        .corner-br {
+            bottom: 10px;
+            right: 10px;
+            border-left: none;
+            border-top: none;
+        }
     </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
 </head>
+
 <body class="bg-surface text-on-surface min-h-screen flex flex-col pb-24 md:pb-0">
-<!-- TopAppBar -->
-<header class="fixed top-0 w-full bg-surface dark:bg-on-background border-b border-outline-variant dark:border-outline flat no shadows flex items-center justify-between px-margin-mobile h-touch-target-min w-full z-50">
-<button class="flex items-center justify-center w-12 h-12 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-highest active:scale-95 transition-transform rounded-full">
-<span class="material-symbols-outlined" data-icon="menu">menu</span>
-</button>
-<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary dark:text-primary-fixed-dim uppercase tracking-tighter">Nippon Yard Scan</h1>
-<div class="flex items-center gap-2">
-<div class="flex flex-col items-end mr-2">
-<span class="font-label-caps text-label-caps text-status-in flex items-center gap-1">
-<span class="material-symbols-outlined text-[14px]">location_on</span>
+    <!-- TopAppBar -->
+    <header
+        class="fixed top-0 w-full bg-surface dark:bg-on-background border-b border-outline-variant dark:border-outline flat no shadows flex items-center justify-between px-margin-mobile h-touch-target-min w-full z-50">
+        <button
+            class="flex items-center justify-center w-12 h-12 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-highest active:scale-95 transition-transform rounded-full">
+            <span class="material-symbols-outlined" data-icon="menu">menu</span>
+        </button>
+        <h1
+            class="font-headline-lg-mobile text-headline-lg-mobile text-primary dark:text-primary-fixed-dim uppercase tracking-tighter">
+            Nippon Yard Scan</h1>
+        <div class="flex items-center gap-2">
+            <div class="flex flex-col items-end mr-2">
+                <span class="font-label-caps text-label-caps text-status-in flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">location_on</span>
                     GPS Locked
                 </span>
-<span class="font-label-caps text-[10px] text-outline">3 scans pending sync</span>
-</div>
-<button class="flex items-center justify-center w-12 h-12 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-highest active:scale-95 transition-transform rounded-full">
-<span class="material-symbols-outlined" data-icon="cloud_off">cloud_off</span>
-</button>
-</div>
-</header>
-<!-- Main Canvas -->
-<main class="flex-1 mt-16 px-margin-mobile py-stack-md flex flex-col gap-stack-lg max-w-2xl mx-auto w-full">
-<!-- Mode Toggle -->
-<div class="flex bg-surface-container-highest rounded p-1 w-full border border-outline-variant">
-<button class="flex-1 font-headline-md text-headline-md py-3 rounded text-on-primary bg-primary border-2 border-primary shadow-sm" id="btn-mode-in">IN</button>
-<button class="flex-1 font-headline-md text-headline-md py-3 rounded text-on-surface-variant bg-transparent border-2 border-transparent" id="btn-mode-out">OUT</button>
-</div>
-<!-- Camera Area -->
-<div class="relative w-full h-[350px] bg-black rounded-xl overflow-hidden border border-outline-variant">
-<!-- Simulated Camera Feed -->
-<img alt="Camera Feed" class="w-full h-full object-cover opacity-80" data-alt="A rugged, industrial stockyard setting. Blurred out vehicles and concrete barriers in the background, seen through a camera viewfinder. High contrast, bright daylight, realistic texture." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2HDxLmTmaSBvyv6ZxrPx-pQkQ3EQs9B0zC9Hnyo-SCKle6AQ0OMahk08zUT9yS4tz8kfE3LMXAx6ReqgBT9fi-c8frufjT1eZ2Gh7sLe1XqbuOVvlOZulkD5FK5IWKDzrIapHrMLSiSK_lX2zXHFMYN9uunbTcrqO4pMuBHBB6nkY3puwl0oU2lXL6gZrjydqgYfR3FummZsJNjT5YlHq7seyFvws6Ucf6G_0gKOMADBqB5xcwsLz2JJcdcmvB-59Z3Yb6FfBDwS5"/>
-<div class="absolute inset-0 camera-overlay flex items-center justify-center">
-<div class="relative w-[250px] h-[250px]">
-<div class="corner corner-tl"></div>
-<div class="corner corner-tr"></div>
-<div class="corner corner-bl"></div>
-<div class="corner corner-br"></div>
-<div class="absolute inset-0 flex items-center justify-center">
-<span class="text-white font-label-caps text-label-caps bg-black/50 px-2 py-1 rounded">ALIGN QR/BARCODE</span>
-</div>
-</div>
-</div>
-<!-- Scan Action FAB (Contextual) -->
-<button class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-secondary-container text-on-secondary-container rounded-full px-6 py-4 flex items-center gap-2 font-headline-md text-headline-md shadow-lg border-2 border-secondary-container active:scale-95 transition-transform w-full max-w-[12rem] justify-center">
-<span class="material-symbols-outlined font-bold">barcode_scanner</span>
+                <span class="font-label-caps text-[10px] text-outline">3 scans pending sync</span>
+            </div>
+            <button
+                class="flex items-center justify-center w-12 h-12 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-highest active:scale-95 transition-transform rounded-full">
+                <span class="material-symbols-outlined" data-icon="cloud_off">cloud_off</span>
+            </button>
+        </div>
+    </header>
+    <!-- Main Canvas -->
+    <main class="flex-1 mt-16 px-margin-mobile py-stack-md flex flex-col gap-stack-lg max-w-2xl mx-auto w-full">
+        <!-- Mode Toggle -->
+        <div class="flex bg-surface-container-highest rounded p-1 w-full border border-outline-variant">
+            <button
+                class="flex-1 font-headline-md text-headline-md py-3 rounded text-on-primary bg-primary border-2 border-primary shadow-sm"
+                id="btn-mode-in">IN</button>
+            <button
+                class="flex-1 font-headline-md text-headline-md py-3 rounded text-on-surface-variant bg-transparent border-2 border-transparent"
+                id="btn-mode-out">OUT</button>
+        </div>
+        <!-- Camera Area -->
+        <div class="relative w-full h-[350px] bg-black rounded-xl overflow-hidden border border-outline-variant">
+            <!-- Simulated Camera Feed -->
+            <img alt="Camera Feed" class="w-full h-full object-cover opacity-80"
+                data-alt="A rugged, industrial stockyard setting. Blurred out vehicles and concrete barriers in the background, seen through a camera viewfinder. High contrast, bright daylight, realistic texture."
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2HDxLmTmaSBvyv6ZxrPx-pQkQ3EQs9B0zC9Hnyo-SCKle6AQ0OMahk08zUT9yS4tz8kfE3LMXAx6ReqgBT9fi-c8frufjT1eZ2Gh7sLe1XqbuOVvlOZulkD5FK5IWKDzrIapHrMLSiSK_lX2zXHFMYN9uunbTcrqO4pMuBHBB6nkY3puwl0oU2lXL6gZrjydqgYfR3FummZsJNjT5YlHq7seyFvws6Ucf6G_0gKOMADBqB5xcwsLz2JJcdcmvB-59Z3Yb6FfBDwS5" />
+            <div class="absolute inset-0 camera-overlay flex items-center justify-center">
+                <div class="relative w-[250px] h-[250px]">
+                    <div class="corner corner-tl"></div>
+                    <div class="corner corner-tr"></div>
+                    <div class="corner corner-bl"></div>
+                    <div class="corner corner-br"></div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-white font-label-caps text-label-caps bg-black/50 px-2 py-1 rounded">ALIGN
+                            QR/BARCODE</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Scan Action FAB (Contextual) -->
+            <button
+                class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-secondary-container text-on-secondary-container rounded-full px-6 py-4 flex items-center gap-2 font-headline-md text-headline-md shadow-lg border-2 border-secondary-container active:scale-95 transition-transform min-w-[150px] justify-center">
+                <span class="material-symbols-outlined font-bold">barcode_scanner</span>
                 SCAN
             </button>
-</div>
-<!-- Manual Entry Fallback -->
-<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md flex flex-col gap-stack-sm">
-<label class="font-body-md text-body-md text-on-surface-variant" for="vin-input">Manual VIN Entry</label>
-<div class="flex gap-2">
-<input class="flex-1 bg-surface-bright border border-outline-variant rounded-md px-4 py-3 font-data-mono text-data-mono text-on-surface focus:border-primary focus:ring-1 focus:ring-primary h-touch-target-min uppercase" id="vin-input" placeholder="Enter VIN manually" type="text"/>
-<button class="bg-primary-container text-on-primary-container px-6 rounded-md font-headline-md text-headline-md border border-primary-container hover:bg-surface-tint hover:text-white transition-colors h-touch-target-min">Submit</button>
-</div>
-</div>
-<!-- OUT Mode Specific Fields (Hidden by default, shown via JS) -->
-<div class="hidden flex-col gap-stack-lg animate-fade-in" id="out-mode-fields">
-<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md flex flex-col gap-stack-sm">
-<label class="font-body-md text-body-md text-on-surface-variant" for="out-remark">OUT Remark</label>
-<select class="w-full bg-surface-bright border border-outline-variant rounded-md px-4 py-3 font-body-lg text-body-lg text-on-surface focus:border-primary focus:ring-1 focus:ring-primary h-touch-target-min" id="out-remark">
-<option disabled="" selected="" value="">Select Remark</option>
-<option value="customer_acquisition">Customer Acquisition</option>
-<option value="stockyard_transfer">Stockyard Transfer</option>
-</select>
-</div>
-<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md flex flex-col gap-stack-sm">
-<div class="flex items-center gap-3 mb-2">
-<input class="w-6 h-6 border-outline-variant rounded text-error focus:ring-error" id="damage-flag" type="checkbox"/>
-<label class="font-headline-md text-headline-md text-on-surface" for="damage-flag">Report Damage</label>
-</div>
-<textarea class="w-full bg-surface-bright border border-outline-variant rounded-md px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary hidden" id="damage-details" placeholder="Describe damage details..." rows="3"></textarea>
-</div>
-</div>
-</main>
-<!-- BottomNavBar (Mobile Only) -->
-<nav class="md:hidden fixed bottom-0 w-full z-50 bg-surface dark:bg-on-background border-t border-outline-variant dark:border-outline flat no shadows flex justify-around items-center h-16 px-2">
-<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary rounded-full px-4 py-2 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all flex-1" href="#">
-<span class="material-symbols-outlined" data-icon="barcode_scanner" data-weight="fill">barcode_scanner</span>
-<span class="font-label-caps text-label-caps mt-1">Scan</span>
-</a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all flex-1" href="#">
-<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
-<span class="font-label-caps text-label-caps mt-1">Stock</span>
-</a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all flex-1" href="#">
-<span class="material-symbols-outlined" data-icon="history">history</span>
-<span class="font-label-caps text-label-caps mt-1">History</span>
-</a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all flex-1" href="#">
-<span class="material-symbols-outlined" data-icon="person">person</span>
-<span class="font-label-caps text-label-caps mt-1">Profile</span>
-</a>
-</nav>
-<!-- Navigation Drawer (Desktop Only - Hidden on Mobile) -->
-<aside class="hidden md:flex fixed inset-y-0 left-0 z-[60] flex-col py-stack-lg bg-surface-container-low dark:bg-on-background border-r border-outline-variant dark:border-outline flat no shadows h-full w-72 rounded-r-full">
-<div class="px-6 mb-8">
-<h2 class="font-headline-md text-headline-md text-on-surface">Admin Console</h2>
-</div>
-<nav class="flex flex-col gap-2">
-<a class="text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity flex items-center gap-4 rounded-full min-h-[48px]" href="#">
-<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
-<span class="font-body-md text-body-md">Dashboard</span>
-</a>
-<a class="bg-primary-container text-on-primary-container font-bold rounded-full mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity flex items-center gap-4 min-h-[48px]" href="#">
-<span class="material-symbols-outlined" data-icon="barcode_scanner" data-weight="fill">barcode_scanner</span>
-<span class="font-body-md text-body-md">Scan</span>
-</a>
-<a class="text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity flex items-center gap-4 rounded-full min-h-[48px]" href="#">
-<span class="material-symbols-outlined" data-icon="map">map</span>
-<span class="font-body-md text-body-md">Yard Map</span>
-</a>
-<a class="text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity flex items-center gap-4 rounded-full min-h-[48px]" href="#">
-<span class="material-symbols-outlined" data-icon="group">group</span>
-<span class="font-body-md text-body-md">Staff Management</span>
-</a>
-<a class="text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity flex items-center gap-4 rounded-full min-h-[48px]" href="#">
-<span class="material-symbols-outlined" data-icon="settings">settings</span>
-<span class="font-body-md text-body-md">Settings</span>
-</a>
-</nav>
-</aside>
-<script>
+        </div>
+        <!-- Manual Entry Fallback -->
+        <div
+            class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md flex flex-col gap-stack-sm">
+            <label class="font-body-md text-body-md text-on-surface-variant" for="vin-input">Manual VIN Entry</label>
+            <div class="flex gap-2">
+                <input
+                    class="flex-1 bg-surface-bright border border-outline-variant rounded-md px-4 py-3 font-data-mono text-data-mono text-on-surface focus:border-primary focus:ring-1 focus:ring-primary h-touch-target-min uppercase"
+                    id="vin-input" placeholder="Enter VIN manually" type="text" />
+                <button
+                    class="bg-primary-container text-on-primary-container px-6 rounded-md font-headline-md text-headline-md border border-primary-container hover:bg-surface-tint hover:text-white transition-colors h-touch-target-min">Submit</button>
+            </div>
+        </div>
+        <!-- OUT Mode Specific Fields (Hidden by default, shown via JS) -->
+        <div class="hidden flex-col gap-stack-lg animate-fade-in" id="out-mode-fields">
+            <div
+                class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md flex flex-col gap-stack-sm">
+                <label class="font-body-md text-body-md text-on-surface-variant" for="out-remark">OUT Remark</label>
+                <select
+                    class="w-full bg-surface-bright border border-outline-variant rounded-md px-4 py-3 font-body-lg text-body-lg text-on-surface focus:border-primary focus:ring-1 focus:ring-primary h-touch-target-min"
+                    id="out-remark">
+                    <option disabled="" selected="" value="">Select Remark</option>
+                    <option value="customer_acquisition">Customer Acquisition</option>
+                    <option value="stockyard_transfer">Stockyard Transfer</option>
+                </select>
+            </div>
+            <div
+                class="bg-surface-container-lowest border border-outline-variant rounded-lg p-stack-md flex flex-col gap-stack-sm">
+                <div class="flex items-center gap-3 mb-2">
+                    <input class="w-6 h-6 border-outline-variant rounded text-error focus:ring-error" id="damage-flag"
+                        type="checkbox" />
+                    <label class="font-headline-md text-headline-md text-on-surface" for="damage-flag">Report
+                        Damage</label>
+                </div>
+                <textarea
+                    class="w-full bg-surface-bright border border-outline-variant rounded-md px-4 py-3 font-body-md text-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary hidden"
+                    id="damage-details" placeholder="Describe damage details..." rows="3"></textarea>
+            </div>
+        </div>
+    </main>
+    <!-- BottomNavBar (Mobile Only) -->
+    <nav
+        class="md:hidden fixed bottom-0 w-full z-50 bg-surface dark:bg-on-background border-t border-outline-variant dark:border-outline flat no shadows flex justify-around items-center h-16 px-2">
+        <a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary rounded-full px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all min-w-[64px] min-h-[48px]"
+            href="#">
+            <span class="material-symbols-outlined" data-icon="barcode_scanner"
+                data-weight="fill">barcode_scanner</span>
+            <span class="font-label-caps text-label-caps mt-1">Scan</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all min-w-[64px] min-h-[48px]"
+            href="#">
+            <span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+            <span class="font-label-caps text-label-caps mt-1">Stock</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all min-w-[64px] min-h-[48px]"
+            href="#">
+            <span class="material-symbols-outlined" data-icon="history">history</span>
+            <span class="font-label-caps text-label-caps mt-1">History</span>
+        </a>
+        <a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest active:scale-90 transition-all min-w-[64px] min-h-[48px]"
+            href="#">
+            <span class="material-symbols-outlined" data-icon="person">person</span>
+            <span class="font-label-caps text-label-caps mt-1">Profile</span>
+        </a>
+    </nav>
+    <!-- Navigation Drawer (Desktop Only - Hidden on Mobile) -->
+    <aside
+        class="hidden md:flex fixed inset-y-0 left-0 z-[60] flex-col py-stack-lg bg-surface-container-low dark:bg-on-background border-r border-outline-variant dark:border-outline flat no shadows h-full w-72 rounded-r-full">
+        <div class="px-6 mb-8">
+            <h2 class="font-headline-md text-headline-md text-on-surface">Admin Console</h2>
+        </div>
+        <nav class="flex flex-col gap-2">
+            <a class="text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity flex items-center gap-4 rounded-full min-h-[48px]"
+                href="#">
+                <span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                <span class="font-body-md text-body-md">Dashboard</span>
+            </a>
+            <a class="bg-primary-container text-on-primary-container font-bold rounded-full mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity flex items-center gap-4 min-h-[48px]"
+                href="#">
+                <span class="material-symbols-outlined" data-icon="barcode_scanner"
+                    data-weight="fill">barcode_scanner</span>
+                <span class="font-body-md text-body-md">Scan</span>
+            </a>
+            <a class="text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity flex items-center gap-4 rounded-full min-h-[48px]"
+                href="#">
+                <span class="material-symbols-outlined" data-icon="map">map</span>
+                <span class="font-body-md text-body-md">Yard Map</span>
+            </a>
+            <a class="text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity flex items-center gap-4 rounded-full min-h-[48px]"
+                href="#">
+                <span class="material-symbols-outlined" data-icon="group">group</span>
+                <span class="font-body-md text-body-md">Staff Management</span>
+            </a>
+            <a class="text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-3 hover:bg-surface-variant dark:hover:bg-surface-container-highest active:opacity-80 transition-opacity flex items-center gap-4 rounded-full min-h-[48px]"
+                href="#">
+                <span class="material-symbols-outlined" data-icon="settings">settings</span>
+                <span class="font-body-md text-body-md">Settings</span>
+            </a>
+        </nav>
+    </aside>
+    <script>
         // Simple Interaction Logic
         const btnIn = document.getElementById('btn-mode-in');
         const btnOut = document.getElementById('btn-mode-out');
@@ -266,10 +340,10 @@
         btnIn.addEventListener('click', () => {
             btnIn.classList.add('bg-primary', 'text-on-primary', 'border-primary', 'shadow-sm');
             btnIn.classList.remove('bg-transparent', 'text-on-surface-variant', 'border-transparent');
-            
+
             btnOut.classList.remove('bg-status-out', 'text-white', 'border-status-out', 'shadow-sm');
             btnOut.classList.add('bg-transparent', 'text-on-surface-variant', 'border-transparent');
-            
+
             outFields.classList.add('hidden');
             outFields.classList.remove('flex');
         });
@@ -277,20 +351,22 @@
         btnOut.addEventListener('click', () => {
             btnOut.classList.add('bg-status-out', 'text-white', 'border-status-out', 'shadow-sm');
             btnOut.classList.remove('bg-transparent', 'text-on-surface-variant', 'border-transparent');
-            
+
             btnIn.classList.remove('bg-primary', 'text-on-primary', 'border-primary', 'shadow-sm');
             btnIn.classList.add('bg-transparent', 'text-on-surface-variant', 'border-transparent');
-            
+
             outFields.classList.remove('hidden');
             outFields.classList.add('flex');
         });
 
         damageFlag.addEventListener('change', (e) => {
-            if(e.target.checked) {
+            if (e.target.checked) {
                 damageDetails.classList.remove('hidden');
             } else {
                 damageDetails.classList.add('hidden');
             }
         });
     </script>
-</body></html>
+</body>
+
+</html>
