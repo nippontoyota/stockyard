@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   applyScan,
@@ -94,27 +94,44 @@ function Login({ onLogin }) {
   return (
     <main className="login">
       <section className="login-panel">
-        <div className="brand-mark"><span className="material-symbols-outlined">qr_code_scanner</span></div>
-        <h1>Nippon Yard Scan</h1>
-        <p>Log vehicle IN and OUT at the yard gate.</p>
-        <form onSubmit={submit} className="stack">
-          <label>Account Type</label>
-          <div className="segmented">
-            <button type="button" className={role === "stockyard" ? "active" : ""} onClick={() => setRole("stockyard")}>Stockyard</button>
-            <button type="button" className={role === "admin" ? "active" : ""} onClick={() => setRole("admin")}>Admin</button>
+        <div className="login-visual" aria-hidden="true">
+          <div className="login-visual-top">
+            <span className="toyota-dot"></span>
+            <strong>Stockyard gate</strong>
           </div>
-          {role === "stockyard" && (
-            <>
-              <label htmlFor="yard">Physical Yard</label>
-              <select id="yard" value={yardId} onChange={(event) => setYardId(event.target.value)}>
-                {yards.map((yard) => <option key={yard.id} value={yard.id}>{yard.code} · {yard.name}</option>)}
-              </select>
-            </>
-          )}
-          <label htmlFor="code">Access Code</label>
-          <input id="code" required value={code} onChange={(event) => setCode(event.target.value)} placeholder={role === "admin" ? "ADMIN" : "Shared yard code"} />
-          <button className="primary">Login</button>
-        </form>
+          <div className="yard-strip">
+            <span>Live yard access</span>
+            <b>{yards.length} yards</b>
+          </div>
+        </div>
+        <div className="login-form-panel">
+          <div className="brand-row">
+            <div className="brand-mark"><span className="material-symbols-outlined">qr_code_scanner</span></div>
+            <div>
+              <span className="eyebrow">Toyota yard operations</span>
+              <h1>Nippon Yard Scan</h1>
+            </div>
+          </div>
+          <p>Sign in to scan vehicle movement at the gate.</p>
+          <form onSubmit={submit} className="stack">
+            <label>Account type</label>
+            <div className="segmented">
+              <button type="button" className={role === "stockyard" ? "active" : ""} onClick={() => setRole("stockyard")}>Stockyard</button>
+              <button type="button" className={role === "admin" ? "active" : ""} onClick={() => setRole("admin")}>Admin</button>
+            </div>
+            {role === "stockyard" && (
+              <>
+                <label htmlFor="yard">Physical yard</label>
+                <select id="yard" value={yardId} onChange={(event) => setYardId(event.target.value)}>
+                  {yards.map((yard) => <option key={yard.id} value={yard.id}>{yard.code} · {yard.name}</option>)}
+                </select>
+              </>
+            )}
+            <label htmlFor="code">Access code</label>
+            <input id="code" required value={code} onChange={(event) => setCode(event.target.value)} placeholder={role === "admin" ? "ADMIN" : "Shared yard code"} />
+            <button className="primary"><span>Login</span><span className="material-symbols-outlined">arrow_forward</span></button>
+          </form>
+        </div>
       </section>
     </main>
   );
@@ -145,8 +162,30 @@ function ScanView({ state, setState, session, online }) {
   const [outRemark, setOutRemark] = useState("");
   const [damaged, setDamaged] = useState(false);
   const [damageRemark, setDamageRemark] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState("");
   const [message, setMessage] = useState(null);
+  const videoRef = useRef(null);
   const yard = yards.find((item) => item.id === session.yardId) || yards[0];
+
+  useEffect(() => {
+    if (!cameraOpen) return;
+    let stream;
+
+    async function openCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        if (videoRef.current) videoRef.current.srcObject = stream;
+        setCameraError("");
+      } catch {
+        setCameraError("Camera access blocked. Allow camera permission and try again.");
+        setCameraOpen(false);
+      }
+    }
+
+    openCamera();
+    return () => stream?.getTracks().forEach((track) => track.stop());
+  }, [cameraOpen]);
 
   function submit(event) {
     event.preventDefault();
@@ -165,15 +204,33 @@ function ScanView({ state, setState, session, online }) {
   return (
     <section className="scan-grid">
       <form className="scan-card stack" onSubmit={submit}>
-        <div className="segmented big">
-          <button type="button" className={type === "in" ? "active" : ""} onClick={() => setType("in")}>IN</button>
-          <button type="button" className={type === "out" ? "active out" : ""} onClick={() => setType("out")}>OUT</button>
+        <div className="scan-ticket">
+          <span className={`scan-badge ${type}`}>{type.toUpperCase()}</span>
+          <div>
+            <h1>{yard.code}</h1>
+            <p>{yard.name}</p>
+          </div>
+          <span className={online ? "status-dot ok" : "status-dot warn"}>{online ? "Online" : "Offline"}</span>
+        </div>
+        <div className="segmented big scan-toggle">
+          <button type="button" className={type === "in" ? "active" : ""} onClick={() => setType("in")}>Vehicle IN</button>
+          <button type="button" className={type === "out" ? "active out" : ""} onClick={() => setType("out")}>Vehicle OUT</button>
         </div>
         <div className="camera">
-          <div className="scan-box"><span>Align QR</span></div>
+          <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => setCameraOpen(true)} aria-label="Open camera scanner">
+            {cameraOpen && <video ref={videoRef} autoPlay muted playsInline />}
+            <span className="corner top-left"></span>
+            <span className="corner top-right"></span>
+            <span className="corner bottom-left"></span>
+            <span className="corner bottom-right"></span>
+            {!cameraOpen && <span className="qr-pattern" aria-hidden="true"></span>}
+          </button>
+          <p>{cameraOpen ? "Point the camera at the vehicle QR code." : "Tap the QR grid to open camera scanner."}</p>
+          {cameraError && <p className="camera-error">{cameraError}</p>}
+          {cameraOpen && <button type="button" className="ghost" onClick={() => setCameraOpen(false)}>Close camera</button>}
           <button type="button" onClick={() => setVin("JTMBA38V70D123456")}><span className="material-symbols-outlined">barcode_scanner</span> Demo Scan</button>
         </div>
-        <label htmlFor="vin">Manual VIN Entry</label>
+        <label htmlFor="vin">Manual VIN entry</label>
         <div className="inline-form">
           <input id="vin" value={vin} onChange={(event) => setVin(event.target.value.toUpperCase())} placeholder="Enter VIN" />
           <button className="primary">Submit</button>
@@ -192,11 +249,15 @@ function ScanView({ state, setState, session, online }) {
         )}
         {message && <p className={`notice ${message.kind}`}>{message.text}</p>}
       </form>
-      <aside className="panel">
+      <aside className="panel yard-card">
+        <span className="eyebrow">Assigned yard</span>
         <h2>{yard.name}</h2>
-        <p className="muted">{yard.code} · capacity {yard.capacity}</p>
-        <p className="muted">Device {state.deviceId.slice(-8)}</p>
-        <p className="muted">GPS captured on submit. Offline scans stay in the queue until the browser comes online.</p>
+        <div className="yard-meta"><span>{yard.code}</span><b>Capacity {yard.capacity}</b></div>
+        <div className="yard-device">
+          <span className="material-symbols-outlined">smartphone</span>
+          <span>Device {state.deviceId.slice(-8)}</span>
+        </div>
+        <p className="muted">GPS is captured on submit. Offline scans stay queued until the browser comes online.</p>
       </aside>
     </section>
   );
@@ -228,7 +289,7 @@ function VehicleCard({ vehicle, flags }) {
       </div>
       <div>
         <b>{flags.length ? "FLAGGED" : vehicle.currentStatus.toUpperCase()}</b>
-        <small>{new Date(vehicle.lastChangedAt).toLocaleString()}</small>
+        <small>{new Date(vehicle.lastChangedAt).toLocaleDateString("en-GB")}</small>
       </div>
     </article>
   );
