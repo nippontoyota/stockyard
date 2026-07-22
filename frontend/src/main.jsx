@@ -110,52 +110,66 @@ function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [session]);
 
-  useEffect(() => {
-    if (!session) return;
-    let mounted = true;
-    async function loadData() {
-      try {
-        const vehiclesData = await getVehicles();
-        if (!mounted) return;
-        
-        const mappedVehicles = {};
-        vehiclesData.forEach(v => {
-          mappedVehicles[v.vin] = {
-            vin: v.vin,
-            model: v.model || "Unknown",
-            variant: "Standard",
-            colour: "Not set",
-            vinValid: v.vin_valid,
-            currentStatus: v.current_status,
-            currentYardId: v.current_yard_id,
-            lastChangedAt: v.last_changed_at,
-          };
-        });
-        
-        let mappedFlags = [];
-        if (session.role === "admin") {
-          const flagsData = await getFlags();
-          mappedFlags = flagsData.map(f => ({
-            id: f.id,
-            vin: f.vin,
-            type: f.flag_type,
-            message: f.message,
-            resolved: f.resolved,
-          }));
-        }
-        
-        setState(s => ({
-          ...s,
-          vehicles: mappedVehicles,
-          flags: session.role === "admin" ? mappedFlags : s.flags
+  const fetchServerData = useCallback(async () => {
+    if (!session || !online) return;
+    try {
+      const vehiclesData = await getVehicles();
+      
+      const mappedVehicles = {};
+      vehiclesData.forEach(v => {
+        mappedVehicles[v.vin] = {
+          vin: v.vin,
+          model: v.model || "Unknown",
+          variant: "Standard",
+          colour: "Not set",
+          vinValid: v.vin_valid,
+          currentStatus: v.current_status,
+          currentYardId: v.current_yard_id,
+          lastChangedAt: v.last_changed_at,
+        };
+      });
+      
+      let mappedFlags = [];
+      if (session.role === "admin") {
+        const flagsData = await getFlags();
+        mappedFlags = flagsData.map(f => ({
+          id: f.id,
+          vin: f.vin,
+          type: f.flag_type,
+          message: f.message,
+          resolved: f.resolved,
         }));
-      } catch (err) {
-        console.error("Failed to load backend data", err);
       }
+      
+      setState(s => ({
+        ...s,
+        vehicles: mappedVehicles,
+        flags: session.role === "admin" ? mappedFlags : s.flags
+      }));
+    } catch (err) {
+      console.error("Failed to load backend data", err);
     }
-    loadData();
-    return () => { mounted = false; };
-  }, [session, setState]);
+  }, [session, online, setState]);
+
+  useEffect(() => {
+    fetchServerData();
+    
+    const onFocus = () => fetchServerData();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") fetchServerData();
+    };
+
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("visibilitychange", onVisibilityChange);
+    
+    const intervalId = setInterval(fetchServerData, 60000);
+    
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("visibilitychange", onVisibilityChange);
+      clearInterval(intervalId);
+    };
+  }, [fetchServerData]);
 
   useEffect(() => {
     navigator.serviceWorker?.register("/sw.js").catch(() => {});
@@ -190,6 +204,9 @@ function App() {
             scans: current.scans.map((scan) => syncedIds.includes(scan.clientScanId) ? { ...scan, syncStatus: "synced" } : scan),
           };
         });
+        
+        // Immediately fetch the fresh state from the server now that our sync is accepted!
+        fetchServerData();
       } catch (err) {
         console.error("Background sync failed:", err);
       }
@@ -197,7 +214,7 @@ function App() {
     
     performSync();
     return () => { cancelled = true; };
-  }, [online, state.queue.length, state.scans]);
+  }, [online, state.queue.length, state.scans, fetchServerData]);
 
   const navigateTo = (nextView) => {
     setView(nextView);
