@@ -30,15 +30,6 @@ export function createInitialState(now = new Date().toISOString()) {
   const vehicles = {};
   const scans = [];
   const flags = [];
-  [
-    ["JTMBA38V70D123456", "in", "CO01B-1", "TOYOTA HILUX", "4X4 AT", "Super White"],
-    ["1FTEW1E4XNFA12345", "in", "CO01B-1", "FORD F-150", "Lariat", "Magnetic Gray"],
-    ["MMBKN1660MD123456", "out", "CO01A-1", "MITSUBISHI TRITON", "GLX", "Silver"],
-    ["JTDAR32100D123456", "in", "CO01B-2", "TOYOTA RAV4", "Hybrid", "Attitude Black"],
-  ].forEach(([vin, currentStatus, currentYardId, model, variant, colour], index) => {
-    vehicles[vin] = { vin, model, variant, colour, vinValid: true, currentStatus, currentYardId, lastChangedAt: new Date(Date.now() - index * 86400000).toISOString() };
-  });
-  flags.push({ id: crypto.randomUUID(), vin: "1FTEW1E4XNFA12345", type: "damage_reported", message: "Damage reported on last OUT scan.", resolved: false, createdAt: now });
   return { deviceId, vehicles, scans, flags, queue: [] };
 }
 
@@ -46,7 +37,7 @@ export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, gps, outRemark = "", damaged = false, damageRemark = "", online = true }) {
+export function createScan({ vin, type, yardId, gps, outRemark = "", damaged = false, damageRemark = "" }) {
   return {
     id: crypto.randomUUID(),
     clientScanId: createClientScanId(),
@@ -59,7 +50,7 @@ export function createScan({ vin, type, yardId, gps, outRemark = "", damaged = f
     damageRemark,
     deviceId: localStorage.getItem("yardDeviceId") || "unknown-device",
     scannedAt: new Date().toISOString(),
-    syncStatus: online ? "synced" : "queued",
+    syncStatus: "queued",
   };
 }
 
