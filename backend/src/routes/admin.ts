@@ -8,7 +8,10 @@ import { isValidVin, detectModel } from '../lib/vin.js';
 
 const router = Router();
 router.use(authenticate);
-router.use(requireRole('admin'));
+router.use((req, res, next) => {
+  if (req.path === '/flags' && req.method === 'GET') return next();
+  return requireRole('admin')(req, res, next);
+});
 
 // ─── GET /dashboard ──────────────────────────────────────────────────
 

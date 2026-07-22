@@ -129,22 +129,19 @@ function App() {
         };
       });
       
-      let mappedFlags = [];
-      if (session.role === "admin") {
-        const flagsData = await getFlags();
-        mappedFlags = flagsData.map(f => ({
-          id: f.id,
-          vin: f.vin,
-          type: f.flag_type,
-          message: f.message,
-          resolved: f.resolved,
-        }));
-      }
+      const flagsData = await getFlags();
+      let mappedFlags = flagsData.map(f => ({
+        id: f.id,
+        vin: f.vin,
+        type: f.flag_type,
+        message: f.message,
+        resolved: f.resolved,
+      }));
       
       setState(s => ({
         ...s,
         vehicles: mappedVehicles,
-        flags: session.role === "admin" ? mappedFlags : s.flags
+        flags: mappedFlags
       }));
     } catch (err) {
       console.error("Failed to load backend data", err);

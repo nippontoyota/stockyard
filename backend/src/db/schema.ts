@@ -12,7 +12,7 @@ import { relations } from 'drizzle-orm';
 
 // ─── yards ───────────────────────────────────────────────────────────
 export const yards = pgTable('yards', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: text('id').primaryKey(),
   code: text('code').notNull(),
   name: text('name').notNull(),
   city: text('city'),
@@ -51,7 +51,7 @@ export const scans = pgTable(
     vehicle_id: uuid('vehicle_id').notNull().references(() => vehicles.id),
     vin_raw: text('vin_raw').notNull(),
     scan_type: text('scan_type').notNull(), // 'in' | 'out'
-    yard_id: uuid('yard_id').notNull().references(() => yards.id),
+    yard_id: text('yard_id').notNull().references(() => yards.id),
     device_id: uuid('device_id').notNull().references(() => devices.id),
     scanned_at: timestamp('scanned_at', { withTimezone: true }).notNull(),
     received_at: timestamp('received_at', { withTimezone: true }).defaultNow().notNull(),
@@ -77,7 +77,7 @@ export const vehicleStatus = pgTable(
       .primaryKey()
       .references(() => vehicles.id),
     current_status: text('current_status').notNull(), // 'in' | 'out'
-    current_yard_id: uuid('current_yard_id').references(() => yards.id),
+    current_yard_id: text('current_yard_id').references(() => yards.id),
     last_in_scan_id: uuid('last_in_scan_id').references(() => scans.id),
     last_out_scan_id: uuid('last_out_scan_id').references(() => scans.id),
     last_changed_at: timestamp('last_changed_at', { withTimezone: true }).defaultNow().notNull(),
