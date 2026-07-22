@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as XLSX from "xlsx";
 import {
@@ -505,28 +505,88 @@ function ScanView({ state, setState, session, online }) {
   const [cameraError, setCameraError] = useState("");
   const [message, setMessage] = useState(null);
   const videoRef = useRef(null);
+  const fileInputRef = useRef(null);
   const yard = yards.find((item) => item.id === session.yardId) || yards[0];
+
+  const handleQrText = useCallback((text) => {
+    const scannedVin = normalizeVin(text);
+    if (scannedVin.length === 17) {
+      setVin(scannedVin);
+      setMessage({ kind: "ok", text: `VIN ${scannedVin} scanned.` });
+      setCameraOpen(false);
+      return true;
+    }
+    setCameraError("QR code found, but no valid VIN was inside it.");
+    return false;
+  }, []);
 
   useEffect(() => {
     if (!cameraOpen) return;
     let cancelled = false;
     let controls;
+    let stream;
+    let frameId;
+
+    const stopStream = () => stream?.getTracks().forEach((track) => track.stop());
+    const rearCamera = {
+      facingMode: { exact: "environment" },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      advanced: [{ focusMode: "continuous" }],
+    };
+    const fallbackCamera = {
+      facingMode: { ideal: "environment" },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      advanced: [{ focusMode: "continuous" }],
+    };
+
+    async function startNativeScanner() {
+      if (!("BarcodeDetector" in window)) return false;
+      if (window.BarcodeDetector.getSupportedFormats) {
+        const formats = await window.BarcodeDetector.getSupportedFormats();
+        if (!formats.includes("qr_code")) return false;
+      }
+
+      const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: rearCamera });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: fallbackCamera });
+      }
+
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+      setCameraError("");
+
+      const scanFrame = async () => {
+        if (cancelled || !videoRef.current) return;
+        try {
+          const codes = await detector.detect(videoRef.current);
+          if (!cancelled && codes[0]) handleQrText(codes[0].rawValue || "");
+        } catch {
+          // Keep scanning; some browsers throw while a camera frame is settling.
+        }
+        if (!cancelled) frameId = requestAnimationFrame(scanFrame);
+      };
+
+      frameId = requestAnimationFrame(scanFrame);
+      return true;
+    }
 
     async function openCamera() {
       try {
+        if (await startNativeScanner()) return;
         const { BrowserQRCodeReader } = await import("@zxing/browser");
         const reader = new BrowserQRCodeReader();
-        controls = await reader.decodeFromConstraints({ video: { facingMode: { ideal: "environment" } } }, videoRef.current, (result) => {
-          if (cancelled || !result) return;
-          const scannedVin = normalizeVin(result.getText());
-          if (scannedVin.length === 17) {
-            setVin(scannedVin);
-            setMessage({ kind: "ok", text: `VIN ${scannedVin} scanned.` });
-            setCameraOpen(false);
-            return;
-          }
-          setCameraError("QR code found, but no valid VIN was inside it.");
-        });
+        const onDecode = (result) => {
+          if (!cancelled && result) handleQrText(result.getText());
+        };
+        try {
+          controls = await reader.decodeFromConstraints({ video: rearCamera }, videoRef.current, onDecode);
+        } catch {
+          controls = await reader.decodeFromConstraints({ video: fallbackCamera }, videoRef.current, onDecode);
+        }
         setCameraError("");
       } catch {
         setCameraError("Camera access blocked. Allow camera permission and try again.");
@@ -537,9 +597,42 @@ function ScanView({ state, setState, session, online }) {
     openCamera();
     return () => {
       cancelled = true;
+      cancelAnimationFrame(frameId);
+      stopStream();
       controls?.stop();
     };
-  }, [cameraOpen]);
+  }, [cameraOpen, handleQrText]);
+
+  async function uploadQr(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setCameraOpen(false);
+    setCameraError("");
+    const url = URL.createObjectURL(file);
+
+    try {
+      if ("BarcodeDetector" in window && "createImageBitmap" in window) {
+        const bitmap = await createImageBitmap(file);
+        try {
+          const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+          const codes = await detector.detect(bitmap);
+          if (codes[0] && handleQrText(codes[0].rawValue || "")) return;
+        } finally {
+          bitmap.close?.();
+        }
+      }
+
+      const { BrowserQRCodeReader } = await import("@zxing/browser");
+      const result = await new BrowserQRCodeReader().decodeFromImageUrl(url);
+      handleQrText(result.getText());
+    } catch {
+      setCameraError("No QR code found in that image.");
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
 
   function submit(event) {
     event.preventDefault();
@@ -582,6 +675,8 @@ function ScanView({ state, setState, session, online }) {
           <p>{cameraOpen ? "Point the camera at the vehicle QR code." : "Tap the QR grid to open camera scanner."}</p>
           {cameraError && <p className="camera-error">{cameraError}</p>}
           {cameraOpen && <button type="button" className="ghost" onClick={() => setCameraOpen(false)}>Close camera</button>}
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={uploadQr} style={{ display: "none" }} />
+          <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()}><span className="material-symbols-outlined">upload_file</span> Upload QR</button>
           <button type="button" onClick={() => setVin("JTMBA38V70D123456")}><span className="material-symbols-outlined">barcode_scanner</span> Demo Scan</button>
         </div>
         <label htmlFor="vin">Manual VIN entry</label>
