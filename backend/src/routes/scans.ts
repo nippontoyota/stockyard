@@ -114,11 +114,11 @@ async function processScanIn(body: ScanIn, yardId: string) {
   const deviceId = await findOrCreateDevice(body.device_fingerprint);
   const [currentStatus] = await db.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
-  if (currentStatus?.current_status === 'in') {
+  if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id === yardId) {
     const [scan] = await db.insert(scans).values({
       client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), status: 'rejected',
     }).returning();
-    return { scan_id: scan.id, status: 'rejected', error: 'Vehicle is already marked IN' };
+    return { scan_id: scan.id, status: 'rejected', error: 'Vehicle is already marked IN at this yard' };
   }
 
   const [scan] = await db.insert(scans).values({
@@ -133,10 +133,21 @@ async function processScanIn(body: ScanIn, yardId: string) {
 
   const flagsList: string[] = [];
   if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`); flagsList.push('invalid_vin'); }
+  
   if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id !== yardId) {
-    await createFlag(vehicleId, scan.id, 'duplicate_yard_status', `Vehicle was IN at yard ${currentStatus.current_yard_id}, now scanned IN at ${yardId}`);
+    let oldYardCode = String(currentStatus.current_yard_id);
+    if (currentStatus.current_yard_id) {
+      const [oldY] = await db.select({ code: yards.code }).from(yards).where(eq(yards.id, currentStatus.current_yard_id));
+      if (oldY) oldYardCode = oldY.code;
+    }
+    let newYardCode = yardId;
+    const [newY] = await db.select({ code: yards.code }).from(yards).where(eq(yards.id, yardId));
+    if (newY) newYardCode = newY.code;
+
+    await createFlag(vehicleId, scan.id, 'duplicate_yard_status', `Vehicle was IN at yard ${oldYardCode}, now scanned IN at ${newYardCode}`);
     flagsList.push('duplicate_yard_status');
   }
+  
   await checkGps(yardId, body.latitude, body.longitude, vehicleId, scan.id);
   await checkCapacity(yardId, vehicleId, scan.id);
 
