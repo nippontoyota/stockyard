@@ -126,7 +126,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   background: #fff; border-radius: 8px; box-shadow: 0 22px 36px rgba(0, 0, 0, .22);
 }
 .scan-box:focus-visible { outline: 3px solid #EB0A1E; outline-offset: 4px; }
-.scan-box video { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; transform: none !important; }
+.scan-box video { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
 .scan-box.live { overflow: hidden; background: #000; }
 .qr-pattern {
   width: 72%; aspect-ratio: 1; display: block;
