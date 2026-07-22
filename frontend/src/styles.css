@@ -405,12 +405,19 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   background: #0f8b6d; color: #fff; font-size: 18px;
 }
 .rail-menu { display: grid; gap: 6px; }
-.rail-menu span {
-  min-height: 34px; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; gap: 8px;
-  color: #64748b; font-size: 12px; font-weight: 700;
+.rail-menu button {
+  min-height: 38px; padding: 0 10px; border-radius: 6px; border: 0; background: transparent;
+  display: flex; align-items: center; gap: 8px; color: #64748b; font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s ease; text-align: left; width: 100%; position: relative;
 }
-.rail-menu .material-symbols-outlined { font-size: 18px; }
-.rail-menu .active { background: #0f8b6d; color: #fff; }
+.rail-menu button:hover { background: #e2e8f0; color: #020617; }
+.rail-menu button.active { background: #0f8b6d; color: #fff; }
+.rail-menu button .material-symbols-outlined { font-size: 18px; }
+.rail-badge {
+  margin-left: auto; background: #EB0A1E; color: #fff; font-size: 10px; font-weight: 800;
+  padding: 2px 6px; border-radius: 999px; line-height: 1;
+}
+.rail-menu button.active .rail-badge { background: #fff; color: #EB0A1E; }
 .rail-note {
   margin-top: auto; padding: 14px; min-height: 108px; border-radius: 8px;
   background: linear-gradient(145deg, #0f8b6d, #002046); color: #fff;
@@ -427,15 +434,16 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 }
 .dashboard-header h1 { margin: 2px 0 0; font-size: 22px; line-height: 1.15; color: #020617; text-transform: none; }
 .dashboard-actions { display: flex; align-items: center; gap: 8px; }
-.dashboard-actions > button {
+.dashboard-actions .action-icon-btn {
   width: 38px; height: 38px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; color: #334155;
-  display: grid; place-items: center;
+  display: grid; place-items: center; cursor: pointer; transition: all 0.2s ease;
 }
-.dashboard-actions > button .material-symbols-outlined { font-size: 19px; }
+.dashboard-actions .action-icon-btn:hover { background: #f1f5f9; color: #002046; border-color: #cbd5e1; }
+.dashboard-actions .action-icon-btn.active { background: #002046; color: #fff; border-color: #002046; }
 .dashboard-actions .segmented {
-  width: 220px; background: #e8f1ff; border: 1px solid #cfe0ff; border-radius: 8px;
+  width: 260px; background: #e8f1ff; border: 1px solid #cfe0ff; border-radius: 8px; display: grid; grid-template-columns: repeat(3, 1fr);
 }
-.dashboard-actions .segmented button { min-height: 38px; font-size: 13px; }
+.dashboard-actions .segmented button { min-height: 38px; font-size: 12px; font-weight: 700; border: 0; background: transparent; color: #475569; border-radius: 6px; }
 .dashboard-actions .segmented .active { background: #002046; color: #fff; }
 .dashboard-spotlight {
   min-height: 70px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px;
