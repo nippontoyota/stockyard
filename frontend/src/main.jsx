@@ -109,7 +109,11 @@ function App() {
 
   useEffect(() => {
     if (!online || state.queue.length === 0) return;
-    setState((current) => ({ ...current, queue: [] }));
+    setState((current) => ({
+      ...current,
+      queue: [],
+      scans: current.scans.map((scan) => current.queue.includes(scan.clientScanId) ? { ...scan, syncStatus: "synced" } : scan),
+    }));
   }, [online, state.queue.length]);
 
   const navigateTo = (nextView) => {
@@ -503,22 +507,52 @@ function ScanView({ state, setState, session, online }) {
   const [damageRemark, setDamageRemark] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [scanSuccess, setScanSuccess] = useState(null);
+  const [cameraCaps, setCameraCaps] = useState({ zoom: null, torch: false });
+  const [zoom, setZoom] = useState(1);
+  const [torchOn, setTorchOn] = useState(false);
   const [message, setMessage] = useState(null);
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
+  const trackRef = useRef(null);
+  const scanLockedRef = useRef(false);
   const yard = yards.find((item) => item.id === session.yardId) || yards[0];
+
+  const signalScanSuccess = useCallback(() => {
+    navigator.vibrate?.([200]);
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const context = new AudioContext();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "square";
+      oscillator.frequency.value = 1400;
+      gain.gain.setValueAtTime(0.001, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.25, context.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.14);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.16);
+      oscillator.onended = () => context.close();
+    } catch {}
+  }, []);
 
   const handleQrText = useCallback((text) => {
     const scannedVin = normalizeVin(text);
     if (scannedVin.length === 17) {
+      if (scanLockedRef.current) return true;
+      scanLockedRef.current = true;
       setVin(scannedVin);
+      setScanSuccess(scannedVin);
       setMessage({ kind: "ok", text: `VIN ${scannedVin} scanned.` });
       setCameraOpen(false);
+      signalScanSuccess();
       return true;
     }
     setCameraError("QR code found, but no valid VIN was inside it.");
     return false;
-  }, []);
+  }, [signalScanSuccess]);
 
   useEffect(() => {
     if (!cameraOpen) return;
@@ -541,6 +575,22 @@ function ScanView({ state, setState, session, online }) {
       advanced: [{ focusMode: "continuous" }],
     };
 
+    const bindCameraControls = () => {
+      const track = stream?.getVideoTracks?.()[0] || videoRef.current?.srcObject?.getVideoTracks?.()[0];
+      if (!track) return;
+      trackRef.current = track;
+      const caps = track.getCapabilities?.() || {};
+      const settings = track.getSettings?.() || {};
+      const zoomCaps = caps.zoom ? {
+        min: caps.zoom.min,
+        max: caps.zoom.max,
+        step: caps.zoom.step || 0.1,
+      } : null;
+      setCameraCaps({ zoom: zoomCaps, torch: Boolean(caps.torch) });
+      setZoom(settings.zoom || zoomCaps?.min || 1);
+      setTorchOn(false);
+    };
+
     async function startNativeScanner() {
       if (!("BarcodeDetector" in window)) return false;
       if (window.BarcodeDetector.getSupportedFormats) {
@@ -557,6 +607,7 @@ function ScanView({ state, setState, session, online }) {
 
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
+      bindCameraControls();
       setCameraError("");
 
       const scanFrame = async () => {
@@ -587,6 +638,7 @@ function ScanView({ state, setState, session, online }) {
         } catch {
           controls = await reader.decodeFromConstraints({ video: fallbackCamera }, videoRef.current, onDecode);
         }
+        bindCameraControls();
         setCameraError("");
       } catch {
         setCameraError("Camera access blocked. Allow camera permission and try again.");
@@ -600,14 +652,38 @@ function ScanView({ state, setState, session, online }) {
       cancelAnimationFrame(frameId);
       stopStream();
       controls?.stop();
+      trackRef.current = null;
+      setCameraCaps({ zoom: null, torch: false });
+      setTorchOn(false);
     };
   }, [cameraOpen, handleQrText]);
+
+  async function setCameraZoom(value) {
+    const nextZoom = Number(value);
+    setZoom(nextZoom);
+    try {
+      await trackRef.current?.applyConstraints({ advanced: [{ zoom: nextZoom }] });
+    } catch {
+      setCameraError("Zoom is not available on this camera.");
+    }
+  }
+
+  async function toggleTorch() {
+    const nextTorch = !torchOn;
+    try {
+      await trackRef.current?.applyConstraints({ advanced: [{ torch: nextTorch }] });
+      setTorchOn(nextTorch);
+    } catch {
+      setCameraError("Flash is not available on this camera.");
+    }
+  }
 
   async function uploadQr(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
 
+    scanLockedRef.current = false;
     setCameraOpen(false);
     setCameraError("");
     const url = URL.createObjectURL(file);
@@ -646,6 +722,8 @@ function ScanView({ state, setState, session, online }) {
     setState(result.state);
     setMessage({ kind: result.accepted ? "ok" : "error", text: result.message });
     setVin("");
+    setScanSuccess(null);
+    scanLockedRef.current = false;
   }
 
   return (
@@ -664,7 +742,10 @@ function ScanView({ state, setState, session, online }) {
           <button type="button" className={type === "out" ? "active out" : ""} onClick={() => setType("out")}>Vehicle OUT</button>
         </div>
         <div className="camera">
-          <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => setCameraOpen(true)} aria-label="Open camera scanner">
+          <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => {
+            scanLockedRef.current = false;
+            setCameraOpen(true);
+          }} aria-label="Open camera scanner">
             {cameraOpen && <video ref={videoRef} autoPlay muted playsInline />}
             <span className="corner top-left"></span>
             <span className="corner top-right"></span>
@@ -675,13 +756,48 @@ function ScanView({ state, setState, session, online }) {
           <p>{cameraOpen ? "Point the camera at the vehicle QR code." : "Tap the QR grid to open camera scanner."}</p>
           {cameraError && <p className="camera-error">{cameraError}</p>}
           {cameraOpen && <button type="button" className="ghost" onClick={() => setCameraOpen(false)}>Close camera</button>}
+          {cameraOpen && (cameraCaps.zoom || cameraCaps.torch) && (
+            <div className="camera-tools">
+              {cameraCaps.zoom && (
+                <label>
+                  Zoom {Number(zoom).toFixed(1)}x
+                  <input type="range" min={cameraCaps.zoom.min} max={cameraCaps.zoom.max} step={cameraCaps.zoom.step} value={zoom} onChange={(event) => setCameraZoom(event.target.value)} />
+                </label>
+              )}
+              {cameraCaps.torch && (
+                <button type="button" className={torchOn ? "" : "ghost"} onClick={toggleTorch}>
+                  <span className="material-symbols-outlined">{torchOn ? "flash_on" : "flashlight_on"}</span>
+                  {torchOn ? "Flash on" : "Flash"}
+                </button>
+              )}
+            </div>
+          )}
           <input ref={fileInputRef} type="file" accept="image/*" onChange={uploadQr} style={{ display: "none" }} />
           <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()}><span className="material-symbols-outlined">upload_file</span> Upload QR</button>
-          <button type="button" onClick={() => setVin("JTMBA38V70D123456")}><span className="material-symbols-outlined">barcode_scanner</span> Demo Scan</button>
+          <button type="button" onClick={() => {
+            scanLockedRef.current = false;
+            handleQrText("JTMBA38V70D123456");
+          }}><span className="material-symbols-outlined">barcode_scanner</span> Demo Scan</button>
         </div>
+        {scanSuccess && (
+          <div className="scan-success" role="status" aria-live="assertive">
+            <span>Scanned successfully</span>
+            <b>{scanSuccess}</b>
+            <button type="button" onClick={() => {
+              setVin("");
+              setScanSuccess(null);
+              setMessage(null);
+              scanLockedRef.current = false;
+              setCameraOpen(true);
+            }}>Scan next</button>
+          </div>
+        )}
         <label htmlFor="vin">Manual VIN entry</label>
         <div className="inline-form">
-          <input id="vin" value={vin} onChange={(event) => setVin(event.target.value.toUpperCase())} placeholder="Enter VIN" />
+          <input id="vin" value={vin} onChange={(event) => {
+            setVin(event.target.value.toUpperCase());
+            setScanSuccess(null);
+          }} placeholder="Enter VIN" />
           <button className="primary">Submit</button>
         </div>
         {type === "out" && (
