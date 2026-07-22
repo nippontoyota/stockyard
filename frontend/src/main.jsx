@@ -32,12 +32,40 @@ const loadState = () => {
   }
 };
 
+function getRoutePath(viewName, role) {
+  if (role === "admin") {
+    if (viewName === "dashboard") return "/dashboard";
+    if (viewName === "stock") return "/stock";
+    if (viewName === "delivered") return "/delivered";
+    if (viewName === "admin") return "/admin";
+    return "/dashboard";
+  }
+  if (viewName === "dashboard") return "/dash";
+  if (viewName === "stock") return "/stock";
+  return "/scan";
+}
+
+function getViewFromPath(pathname, role) {
+  const path = (pathname || "").toLowerCase();
+  if (role === "admin") {
+    if (path === "/admin") return "admin";
+    if (path === "/delivered") return "delivered";
+    if (path === "/stock") return "stock";
+    if (path === "/dashboard" || path === "/dash") return "dashboard";
+    return "dashboard";
+  }
+  if (path === "/stock") return "stock";
+  if (path === "/dash" || path === "/dashboard") return "dashboard";
+  return "scan";
+}
+
 function App() {
   const [state, setState] = useState(loadState);
   const [session, setSession] = useState(() => JSON.parse(localStorage.getItem("yardSession") || "null"));
   const [view, setView] = useState(() => {
     const savedSession = JSON.parse(localStorage.getItem("yardSession") || "null");
-    return savedSession?.role === "admin" ? "dashboard" : "scan";
+    if (!savedSession) return "scan";
+    return getViewFromPath(window.location.pathname, savedSession.role);
   });
   const [online, setOnline] = useState(navigator.onLine);
 
@@ -47,6 +75,23 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem("yardSession", JSON.stringify(session));
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    const targetPath = getRoutePath(view, session.role);
+    if (window.location.pathname !== targetPath) {
+      window.history.replaceState(null, "", targetPath);
+    }
+  }, [view, session]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (!session) return;
+      setView(getViewFromPath(window.location.pathname, session.role));
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [session]);
 
   useEffect(() => {
@@ -66,9 +111,19 @@ function App() {
     setState((current) => ({ ...current, queue: [] }));
   }, [online, state.queue.length]);
 
+  const navigateTo = (nextView) => {
+    setView(nextView);
+    if (session) {
+      const nextPath = getRoutePath(nextView, session.role);
+      window.history.pushState(null, "", nextPath);
+    }
+  };
+
   if (!session) return <Login onLogin={(nextSession) => {
     setSession(nextSession);
-    setView(nextSession.role === "admin" ? "dashboard" : "scan");
+    const initialView = nextSession.role === "admin" ? "dashboard" : "scan";
+    setView(initialView);
+    window.history.replaceState(null, "", getRoutePath(initialView, nextSession.role));
   }} />;
 
   const isAdmin = session.role === "admin";
@@ -76,7 +131,10 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Header session={session} online={online} pending={state.queue.length} onLogout={() => setSession(null)} />
+      <Header session={session} online={online} pending={state.queue.length} onLogout={() => {
+        setSession(null);
+        window.history.replaceState(null, "", "/");
+      }} />
       <main className="content">
         {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} />}
         {view === "stock" && <StockView state={state} session={session} />}
@@ -85,11 +143,11 @@ function App() {
         {view === "admin" && isAdmin && <AdminView state={state} setState={setState} />}
       </main>
       <nav className="bottom-nav">
-        {!isAdmin && <NavButton icon="barcode_scanner" label="Scan" active={view === "scan"} onClick={() => setView("scan")} />}
-        <NavButton icon="inventory_2" label="Stock" active={view === "stock"} onClick={() => setView("stock")} />
-        <NavButton icon="dashboard" label="Dash" active={view === "dashboard"} onClick={() => setView("dashboard")} />
-        {isAdmin && <NavButton icon="upload_file" label="Delivered" active={view === "delivered"} onClick={() => setView("delivered")} />}
-        {isAdmin && <NavButton icon="admin_panel_settings" label="Admin" active={view === "admin"} onClick={() => setView("admin")} />}
+        {!isAdmin && <NavButton icon="barcode_scanner" label="Scan" active={view === "scan"} onClick={() => navigateTo("scan")} />}
+        <NavButton icon="inventory_2" label="Stock" active={view === "stock"} onClick={() => navigateTo("stock")} />
+        <NavButton icon="dashboard" label="Dash" active={view === "dashboard"} onClick={() => navigateTo("dashboard")} />
+        {isAdmin && <NavButton icon="upload_file" label="Delivered" active={view === "delivered"} onClick={() => navigateTo("delivered")} />}
+        {isAdmin && <NavButton icon="admin_panel_settings" label="Admin" active={view === "admin"} onClick={() => navigateTo("admin")} />}
       </nav>
     </div>
   );
@@ -769,7 +827,9 @@ function DashboardView({ state, stats, session, setState }) {
                   <b>{flag.vin}</b>
                   <small>{flag.message}</small>
                 </span>
-                <button onClick={() => setState(resolveFlag(state, flag.id))}>Resolve</button>
+                {session.role === "admin" && (
+                  <button onClick={() => setState(resolveFlag(state, flag.id))}>Resolve</button>
+                )}
               </div>
             ))
           )}
