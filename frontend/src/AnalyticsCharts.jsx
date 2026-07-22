@@ -32,7 +32,7 @@ export function ExecutiveKpiCards({ stats }) {
           <span className="kpi-tag info">Utilization</span>
         </div>
         <div className="kpi-value">{stats.overallUtilization}%</div>
-        <div className="kpi-subtext">Across {stats.yards.length} stockyards</div>
+        <div className="kpi-subtext">{stats.yards.length === 1 ? "This stockyard" : `Across ${stats.yards.length} stockyards`}</div>
         <div className="kpi-badge-row">
           {stats.highRiskYards > 0 ? (
             <span className="badge warn">{stats.highRiskYards} yard(s) near limit</span>
@@ -169,13 +169,14 @@ export function ModelDonutChart({ models = [] }) {
 export function YardCapacityBarChart({ yards = [] }) {
   const [filter, setFilter] = useState("all"); // 'all' | 'high'
   const displayYards = filter === "high" ? yards.filter((y) => y.utilization >= 75) : yards;
+  const allLabel = yards.length === 1 ? "This Yard" : `All Yards (${yards.length})`;
 
   return (
     <div className="chart-container stack">
       <div className="chart-toolbar">
         <span className="chart-subtitle">Comparing vehicles parked vs maximum space</span>
         <div className="pill-toggle">
-          <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>All Yards ({yards.length})</button>
+          <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>{allLabel}</button>
           <button className={filter === "high" ? "active" : ""} onClick={() => setFilter("high")}>High Utilization</button>
         </div>
       </div>

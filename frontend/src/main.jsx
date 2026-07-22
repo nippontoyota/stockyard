@@ -71,8 +71,8 @@ function App() {
     setView(nextSession.role === "admin" ? "dashboard" : "scan");
   }} />;
 
-  const stats = dashboard(state);
   const isAdmin = session.role === "admin";
+  const stats = dashboard(state, isAdmin ? null : session.yardId);
 
   return (
     <div className="app-shell">
@@ -80,7 +80,7 @@ function App() {
       <main className="content">
         {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} />}
         {view === "stock" && <StockView state={state} session={session} />}
-        {view === "dashboard" && (isAdmin ? <AdminHome stats={stats} state={state} setState={setState} /> : <DashboardView state={state} stats={stats} setState={setState} />)}
+        {view === "dashboard" && (isAdmin ? <AdminHome stats={stats} state={state} setState={setState} /> : <DashboardView state={state} stats={stats} session={session} setState={setState} />)}
         {view === "delivered" && isAdmin && <DeliveredUpload state={state} setState={setState} />}
         {view === "admin" && isAdmin && <AdminView state={state} setState={setState} />}
       </main>
@@ -716,8 +716,9 @@ function VehicleCard({ vehicle, flags }) {
   );
 }
 
-function DashboardView({ state, stats, setState }) {
+function DashboardView({ state, stats, session, setState }) {
   const [tab, setTab] = useState("charts");
+  const activeFlags = state.flags.filter((flag) => !flag.resolved && state.vehicles[flag.vin]?.currentYardId === session.yardId);
 
   return (
     <section className="stack">
@@ -725,7 +726,7 @@ function DashboardView({ state, stats, setState }) {
 
       <div className="segmented">
         <button type="button" className={tab === "charts" ? "active" : ""} onClick={() => setTab("charts")}>Analytics Charts</button>
-        <button type="button" className={tab === "flags" ? "active" : ""} onClick={() => setTab("flags")}>Open Flags ({stats.openFlags})</button>
+        <button type="button" className={tab === "flags" ? "active" : ""} onClick={() => setTab("flags")}>Open Flags ({activeFlags.length})</button>
       </div>
 
       {tab === "charts" && (
@@ -759,10 +760,10 @@ function DashboardView({ state, stats, setState }) {
       {tab === "flags" && (
         <section className="panel stack">
           <h2>Active Flags & Exceptions</h2>
-          {state.flags.filter((flag) => !flag.resolved).length === 0 ? (
+          {activeFlags.length === 0 ? (
             <p className="notice ok">All operational flags resolved. Zero active exceptions.</p>
           ) : (
-            state.flags.filter((flag) => !flag.resolved).map((flag) => (
+            activeFlags.map((flag) => (
               <div className="flag-row" key={flag.id}>
                 <span>
                   <b>{flag.vin}</b>

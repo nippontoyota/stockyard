@@ -11,6 +11,22 @@ router.use(authenticate);
 
 router.get('/', async (req, res, next) => {
   try {
+    if (req.user!.role === 'stockyard') {
+      if (!req.user!.yard_id) {
+        res.status(400).json({ error: 'User is not assigned to a yard' });
+        return;
+      }
+
+      const rows = await db
+        .select()
+        .from(yards)
+        .where(and(eq(yards.active, true), eq(yards.id, req.user!.yard_id)))
+        .orderBy(yards.code, yards.name);
+
+      res.json(rows);
+      return;
+    }
+
     const rows = await db
       .select()
       .from(yards)
@@ -60,6 +76,11 @@ router.get('/:id/stock', async (req, res, next) => {
 
 router.get('/:id/utilization', async (req, res, next) => {
   try {
+    if (req.user!.role === 'stockyard' && req.user!.yard_id !== req.params.id) {
+      res.status(403).json({ error: 'Access denied to this yard' });
+      return;
+    }
+
     const [yard] = await db
       .select({ capacity: yards.capacity, name: yards.name, code: yards.code })
       .from(yards)
