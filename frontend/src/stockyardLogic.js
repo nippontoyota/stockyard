@@ -155,16 +155,19 @@ function distanceMeters(lat1, lon1, lat2, lon2) {
   return earth * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export function dashboard(state) {
+export function dashboard(state, yardId = null) {
+  const visibleYardIds = yardId ? [yardId] : yards.map((yard) => yard.id);
+  const visibleYards = yards.filter((yard) => visibleYardIds.includes(yard.id));
   const allVehicles = Object.values(state.vehicles);
-  const inVehicles = allVehicles.filter((vehicle) => vehicle.currentStatus === "in");
+  const visibleVehicles = allVehicles.filter((vehicle) => !yardId || vehicle.currentYardId === yardId);
+  const inVehicles = visibleVehicles.filter((vehicle) => vehicle.currentStatus === "in");
   const models = Object.entries(groupCount(inVehicles, "model")).map(([model, count]) => ({
     model,
     count,
     pct: inVehicles.length > 0 ? Math.round((count / inVehicles.length) * 100) : 0,
   }));
 
-  const yardsData = yards.map((yard) => {
+  const yardsData = visibleYards.map((yard) => {
     const count = inVehicles.filter((vehicle) => vehicle.currentYardId === yard.id).length;
     const utilization = Math.round((count / yard.capacity) * 100);
     return {
@@ -213,7 +216,11 @@ export function dashboard(state) {
   }));
 
   // Flag breakdown
-  const openFlagItems = state.flags.filter((f) => !f.resolved);
+  const openFlagItems = state.flags.filter((f) => {
+    if (f.resolved) return false;
+    if (!yardId) return true;
+    return state.vehicles[f.vin]?.currentYardId === yardId;
+  });
   const flagTypeCounts = {};
   openFlagItems.forEach((f) => {
     const type = f.type || "other";
@@ -226,13 +233,13 @@ export function dashboard(state) {
     count,
   }));
 
-  const totalCapacity = yards.reduce((sum, y) => sum + y.capacity, 0);
+  const totalCapacity = visibleYards.reduce((sum, y) => sum + y.capacity, 0);
   const overallUtilization = totalCapacity > 0 ? Math.round((inVehicles.length / totalCapacity) * 100) : 0;
   const highRiskYards = yardsData.filter((y) => y.utilization >= 85).length;
 
   return {
     currentStock: inVehicles.length,
-    totalVehiclesTracked: allVehicles.length,
+    totalVehiclesTracked: visibleVehicles.length,
     totalCapacity,
     overallUtilization,
     highRiskYards,

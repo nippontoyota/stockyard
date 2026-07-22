@@ -103,12 +103,21 @@ router.get('/:vin', async (req, res, next) => {
 router.get('/:vin/history', async (req, res, next) => {
   try {
     const [vehicle] = await db
-      .select({ id: vehicles.id })
+      .select({ id: vehicles.id, current_yard_id: vehicleStatus.current_yard_id })
       .from(vehicles)
+      .leftJoin(vehicleStatus, eq(vehicles.id, vehicleStatus.vehicle_id))
       .where(eq(vehicles.vin, req.params.vin.toUpperCase()));
 
     if (!vehicle) {
       res.status(404).json({ error: 'Vehicle not found' });
+      return;
+    }
+
+    if (
+      req.user!.role === 'stockyard' &&
+      vehicle.current_yard_id !== req.user!.yard_id
+    ) {
+      res.status(403).json({ error: 'Vehicle is not at your yard' });
       return;
     }
 
@@ -126,7 +135,11 @@ router.get('/:vin/history', async (req, res, next) => {
         longitude: scans.longitude,
       })
       .from(scans)
-      .where(eq(scans.vehicle_id, vehicle.id))
+      .where(
+        req.user!.role === 'stockyard'
+          ? and(eq(scans.vehicle_id, vehicle.id), eq(scans.yard_id, req.user!.yard_id!))
+          : eq(scans.vehicle_id, vehicle.id)
+      )
       .orderBy(desc(scans.scanned_at));
 
     res.json(history);

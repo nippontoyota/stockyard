@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { applyScan, createInitialState, parseDeliveredVins, removeDeliveredVehicles } from "./stockyardLogic.js";
+import { applyScan, createInitialState, dashboard, parseDeliveredVins, removeDeliveredVehicles } from "./stockyardLogic.js";
 
 globalThis.localStorage = {
   data: {},
@@ -40,5 +40,19 @@ assert.deepEqual(deliveredVins, ["JTMBA38V70D123456"]);
 const deliveredState = removeDeliveredVehicles(createInitialState(), deliveredVins);
 assert.equal(deliveredState.vehicles.JTMBA38V70D123456, undefined);
 assert.equal(deliveredState.delivered.length, 1);
+
+const globalStats = dashboard(createInitialState());
+assert.equal(globalStats.currentStock, 3);
+assert.equal(globalStats.yards.length, 21);
+
+const yardStats = dashboard(createInitialState(), "CO01B-1");
+assert.equal(yardStats.currentStock, 2);
+assert.equal(yardStats.totalCapacity, 200);
+assert.equal(yardStats.yards.length, 1);
+assert.equal(yardStats.openFlags, 1);
+
+const otherYardStats = dashboard(createInitialState(), "CO01B-2");
+assert.equal(otherYardStats.currentStock, 1);
+assert.equal(otherYardStats.openFlags, 0);
 
 console.log("stockyard logic ok");
