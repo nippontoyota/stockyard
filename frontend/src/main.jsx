@@ -311,6 +311,7 @@ function ScanView({ state, setState, session, online }) {
   const [outRemark, setOutRemark] = useState("");
   const [damaged, setDamaged] = useState(false);
   const [damageRemark, setDamageRemark] = useState("");
+  const [mirrored, setMirrored] = useState(true);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [message, setMessage] = useState(null);
@@ -326,7 +327,6 @@ function ScanView({ state, setState, session, online }) {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.style.transform = "none";
         }
         setCameraError("");
       } catch {
@@ -370,7 +370,7 @@ function ScanView({ state, setState, session, online }) {
         </div>
         <div className="camera">
           <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => setCameraOpen(true)} aria-label="Open camera scanner">
-            {cameraOpen && <video ref={videoRef} autoPlay muted playsInline style={{ transform: "none" }} />}
+            {cameraOpen && <video ref={videoRef} autoPlay muted playsInline style={{ transform: mirrored ? "scaleX(-1)" : "none" }} />}
             <span className="corner top-left"></span>
             <span className="corner top-right"></span>
             <span className="corner bottom-left"></span>
@@ -379,7 +379,14 @@ function ScanView({ state, setState, session, online }) {
           </button>
           <p>{cameraOpen ? "Point the camera at the vehicle QR code." : "Tap the QR grid to open camera scanner."}</p>
           {cameraError && <p className="camera-error">{cameraError}</p>}
-          {cameraOpen && <button type="button" className="ghost" onClick={() => setCameraOpen(false)}>Close camera</button>}
+          {cameraOpen && (
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button type="button" className="ghost" onClick={() => setMirrored(!mirrored)}>
+                <span className="material-symbols-outlined">flip</span> {mirrored ? "Unmirror View" : "Mirror View"}
+              </button>
+              <button type="button" className="ghost" onClick={() => setCameraOpen(false)}>Close camera</button>
+            </div>
+          )}
           <button type="button" onClick={() => setVin("JTMBA38V70D123456")}><span className="material-symbols-outlined">barcode_scanner</span> Demo Scan</button>
         </div>
         <label htmlFor="vin">Manual VIN entry</label>
