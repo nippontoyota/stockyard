@@ -97,6 +97,7 @@ export const flags = pgTable(
     scan_id: uuid('scan_id').references(() => scans.id),
     flag_type: text('flag_type').notNull(),
     message: text('message').notNull(),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     resolved: boolean('resolved').default(false).notNull(),
     resolved_by: text('resolved_by'),
     resolved_at: timestamp('resolved_at', { withTimezone: true }),
