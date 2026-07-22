@@ -966,7 +966,7 @@ function StockView({ state, session }) {
     .filter((vehicle) => colour === "all" || vehicle.colour === colour)
     .filter((vehicle) => yardId === "all" || vehicle.currentYardId === yardId)
     .filter((vehicle) => `${vehicle.vin} ${vehicle.model} ${vehicle.variant || ""} ${vehicle.colour || ""}`.toLowerCase().includes(query.toLowerCase()))
-    .sort((a, b) => b.lastChangedAt.localeCompare(a.lastChangedAt));
+    .sort((a, b) => String(b.lastChangedAt || "").localeCompare(String(a.lastChangedAt || "")));
 
   return (
     <section className="stack stock-container">
