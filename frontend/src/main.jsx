@@ -135,6 +135,7 @@ function App() {
         vin: f.vin,
         type: f.flag_type,
         message: f.message,
+        createdAt: f.created_at,
         resolved: f.resolved,
       }));
       
@@ -584,7 +585,10 @@ function AdminHome({ stats, state, setState }) {
                 <div className="flag-row" key={flag.id}>
                   <span>
                     <b>{flag.vin}</b>
-                    <small><strong className="flag-kind">{flagLabel(flag.type)}</strong>{flag.message}</small>
+                    <small>
+                      {flag.createdAt && <span className="flag-time">{new Date(flag.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}{" · "}
+                      <strong className="flag-kind">{flagLabel(flag.type)}</strong> {flag.message}
+                    </small>
                   </span>
                   {setState && (
                     <button onClick={async () => {
@@ -1192,7 +1196,10 @@ function DashboardView({ state, stats, session, setState }) {
               <div className="flag-row" key={flag.id}>
                 <span>
                   <b>{flag.vin}</b>
-                  <small><strong className="flag-kind">{flagLabel(flag.type)}</strong>{flag.message}</small>
+                  <small>
+                    {flag.createdAt && <span className="flag-time">{new Date(flag.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}{" · "}
+                    <strong className="flag-kind">{flagLabel(flag.type)}</strong> {flag.message}
+                  </small>
                 </span>
                 {session.role === "admin" && (
                   <button onClick={async () => {
