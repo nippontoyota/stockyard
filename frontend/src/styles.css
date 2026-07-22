@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   color: #0b1c30;
   background: #f8f9ff;
   font-family: "Tenor Sans", system-ui, sans-serif;
@@ -586,5 +586,4 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   .vehicle-yard small { white-space: normal; }
   .vehicle-state small { margin-top: 0; }
 }
-. f l a g - t i m e   {   c o l o r :   # 6 6 6 ;   f o n t - w e i g h t :   n o r m a l ;   m a r g i n - r i g h t :   4 p x ;   }  
- 
+.flag-time { color: #666; font-weight: normal; margin-right: 4px; }
