@@ -143,6 +143,7 @@ router.get('/flags', async (req, res, next) => {
         resolved: flags.resolved,
         resolved_by: flags.resolved_by,
         resolved_at: flags.resolved_at,
+        created_at: flags.created_at,
         vin: vehicles.vin,
         model: vehicles.model,
       })
