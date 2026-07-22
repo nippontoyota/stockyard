@@ -20,12 +20,14 @@ const baseScan = {
 };
 
 const duplicate = applyScan(createInitialState(), baseScan);
-assert.equal(duplicate.accepted, false);
+assert.equal(duplicate.accepted, true);
 assert.equal(duplicate.state.vehicles.JTMBA38V70D123456.currentYardId, "CO01B-1");
+assert.equal(duplicate.state.flags.some((flag) => flag.type === "duplicate_yard_status" && flag.message.includes("single location")), true);
 
 const transferConflict = applyScan(createInitialState(), { ...baseScan, clientScanId: "client-2", yardId: "CO01A-1", gps: { latitude: 9.9369, longitude: 76.3149 } });
 assert.equal(transferConflict.accepted, true);
 assert.equal(transferConflict.state.flags.some((flag) => flag.type === "duplicate_yard_status"), true);
+assert.equal(transferConflict.state.flags.some((flag) => flag.type === "duplicate_yard_status" && flag.message.includes("multiple locations")), true);
 
 const outNoIn = applyScan(createInitialState(), { ...baseScan, clientScanId: "client-3", vinRaw: "AAAAAAAAAAAAAAAAA", type: "out", outRemark: "customer_acquisition" });
 assert.equal(outNoIn.accepted, true);

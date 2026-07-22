@@ -36,6 +36,18 @@ const loadState = () => {
   }
 };
 
+function flagLabel(type) {
+  return {
+    damage_reported: "Damage Reported",
+    gps_outside_yard: "GPS Radius Violation",
+    unverified_in: "Unverified OUT",
+    yard_capacity_exceeded: "Capacity Exceeded",
+    duplicate_yard_status: "Duplicate Status",
+    invalid_vin: "Invalid VIN Format",
+    manual_admin_override: "Admin Override",
+  }[type] || String(type || "Flag").replace(/_/g, " ");
+}
+
 function getRoutePath(viewName, role) {
   if (role === "admin") {
     if (viewName === "dashboard") return "/dashboard";
@@ -553,7 +565,7 @@ function AdminHome({ stats, state, setState }) {
                 <div className="flag-row" key={flag.id}>
                   <span>
                     <b>{flag.vin}</b>
-                    <small>{flag.message}</small>
+                    <small><strong className="flag-kind">{flagLabel(flag.type)}</strong>{flag.message}</small>
                   </span>
                   {setState && (
                     <button onClick={async () => {
@@ -585,6 +597,8 @@ function ScanView({ state, setState, session, online }) {
   const [damageRemark, setDamageRemark] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [torchOn, setTorchOn] = useState(false);
+  const [supportsTorch, setSupportsTorch] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(null);
   const [message, setMessage] = useState(null);
   const videoRef = useRef(null);
@@ -622,6 +636,7 @@ function ScanView({ state, setState, session, online }) {
       setScanSuccess(scannedVin);
       setMessage({ kind: "ok", text: `VIN ${scannedVin} scanned.` });
       setCameraOpen(false);
+      setTorchOn(false);
       signalScanSuccess();
       return true;
     }
@@ -643,7 +658,8 @@ function ScanView({ state, setState, session, online }) {
       if (!track) return;
       trackRef.current = track;
       const caps = track.getCapabilities?.() || {};
-      if (caps.torch) track.applyConstraints({ advanced: [{ torch: true }] }).catch(() => {});
+      setSupportsTorch(Boolean(caps.torch));
+      if (caps.torch) track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
     };
 
     async function startNativeScanner() {
@@ -733,11 +749,22 @@ function ScanView({ state, setState, session, online }) {
       stopStream();
       controls?.stop();
       trackRef.current = null;
+      setSupportsTorch(false);
     };
   }, [cameraOpen, handleQrText]);
 
   function closeCamera() {
+    trackRef.current?.applyConstraints?.({ advanced: [{ torch: false }] }).catch(() => {});
+    setTorchOn(false);
     setCameraOpen(false);
+  }
+
+  function toggleTorch() {
+    const next = !torchOn;
+    trackRef.current?.applyConstraints?.({ advanced: [{ torch: next }] }).then(() => setTorchOn(next)).catch(() => {
+      setSupportsTorch(false);
+      setTorchOn(false);
+    });
   }
 
   async function uploadQr(event) {
@@ -807,6 +834,7 @@ function ScanView({ state, setState, session, online }) {
           <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => {
             scanLockedRef.current = false;
             setScanSuccess(null);
+            setTorchOn(false);
             setCameraOpen(true);
           }} aria-label="Open camera scanner">
             {cameraOpen && <video ref={videoRef} autoPlay muted playsInline />}
@@ -816,33 +844,35 @@ function ScanView({ state, setState, session, online }) {
             <span className="corner bottom-right"></span>
             {!cameraOpen && <span className="qr-pattern" aria-hidden="true"></span>}
           </button>
+          {cameraOpen && supportsTorch && (
+            <button type="button" className="torch-toggle" aria-pressed={torchOn} onClick={toggleTorch}>
+              <span className="material-symbols-outlined">{torchOn ? "flashlight_off" : "flashlight_on"}</span>
+              Flash {torchOn ? "Off" : "On"}
+            </button>
+          )}
           <p>{cameraOpen ? "Point the camera at the vehicle QR code." : "Tap the QR grid to open camera scanner."}</p>
           {cameraError && <p className="camera-error">{cameraError}</p>}
           {cameraOpen && <button type="button" className="ghost" onClick={closeCamera}>Close camera</button>}
           <input ref={fileInputRef} type="file" accept="image/*" onChange={uploadQr} style={{ display: "none" }} />
           <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()}><span className="material-symbols-outlined">upload_file</span> Upload QR</button>
-          {scanSuccess && (
-            <div className="scan-success" role="status" aria-live="assertive">
-              <button className="scan-success-close" type="button" aria-label="Close success message" onClick={() => setScanSuccess(null)}>X</button>
-              <span>Scanned successfully</span>
-              <b>{scanSuccess}</b>
-              <button type="button" className="scan-success-next" onClick={() => {
-                setVin("");
-                setScanSuccess(null);
-                setMessage(null);
-                scanLockedRef.current = false;
-                setCameraOpen(true);
-              }}>Scan next</button>
-            </div>
-          )}
         </div>
-        <label htmlFor="vin">Manual VIN entry</label>
-        <div className="inline-form">
+        <label htmlFor="vin">{scanSuccess ? "Scanned VIN" : "Manual VIN entry"}</label>
+        <div className={scanSuccess ? "vin-submit-panel" : "inline-form"}>
           <input id="vin" value={vin} onChange={(event) => {
             setVin(event.target.value.toUpperCase());
             setScanSuccess(null);
-          }} placeholder="Enter VIN" />
+          }} placeholder="Enter VIN" aria-live={scanSuccess ? "polite" : undefined} />
           <button className="primary">Submit</button>
+          {scanSuccess && (
+            <button type="button" className="scan-next-button" onClick={() => {
+              setVin("");
+              setScanSuccess(null);
+              setMessage(null);
+              scanLockedRef.current = false;
+              setTorchOn(false);
+              setCameraOpen(true);
+            }}>Scan next</button>
+          )}
         </div>
         {type === "out" && (
           <div className="stack">
@@ -1094,7 +1124,7 @@ function DashboardView({ state, stats, session, setState }) {
               <div className="flag-row" key={flag.id}>
                 <span>
                   <b>{flag.vin}</b>
-                  <small>{flag.message}</small>
+                  <small><strong className="flag-kind">{flagLabel(flag.type)}</strong>{flag.message}</small>
                 </span>
                 {session.role === "admin" && (
                   <button onClick={async () => {
