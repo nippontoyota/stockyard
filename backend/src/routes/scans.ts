@@ -15,9 +15,9 @@ router.use(authenticate);
 const scanInBody = z.object({
   vin: z.string().min(1),
   scanned_at: z.string().datetime(),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
-  gps_accuracy_meters: z.number().optional(),
+  latitude: z.number().nullish(),
+  longitude: z.number().nullish(),
+  gps_accuracy_meters: z.number().nullish(),
   device_fingerprint: z.string().min(1),
   client_scan_id: z.string().min(1),
 });
