@@ -675,8 +675,10 @@ function ScanView({ state, setState, session, online }) {
       if (!track) return;
       trackRef.current = track;
       const caps = track.getCapabilities?.() || {};
-      setSupportsTorch(Boolean(caps.torch));
-      if (caps.torch) track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+      const supportedConstraints = navigator.mediaDevices?.getSupportedConstraints?.() || {};
+      const canUseTorch = Boolean(caps.torch || supportedConstraints.torch);
+      setSupportsTorch(canUseTorch);
+      if (canUseTorch) track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
     };
 
     async function startNativeScanner() {
@@ -751,6 +753,7 @@ function ScanView({ state, setState, session, online }) {
         }
 
         bindCameraControls();
+        setTimeout(bindCameraControls, 250);
         setCameraError("");
       } catch (err) {
         console.warn("Camera init failed:", err);
@@ -777,6 +780,7 @@ function ScanView({ state, setState, session, online }) {
   }
 
   function toggleTorch() {
+    if (!trackRef.current) return setSupportsTorch(false);
     const next = !torchOn;
     trackRef.current?.applyConstraints?.({ advanced: [{ torch: next }] }).then(() => setTorchOn(next)).catch(() => {
       setSupportsTorch(false);
@@ -851,6 +855,7 @@ function ScanView({ state, setState, session, online }) {
           <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => {
             scanLockedRef.current = false;
             setScanSuccess(null);
+            setMessage(null);
             setTorchOn(false);
             setCameraOpen(true);
           }} aria-label="Open camera scanner">
@@ -861,10 +866,15 @@ function ScanView({ state, setState, session, online }) {
             <span className="corner bottom-right"></span>
             {!cameraOpen && <span className="qr-pattern" aria-hidden="true"></span>}
           </button>
+          {scanSuccess && (
+            <div className="scan-result-popover" role="status" aria-live="polite">
+              <span className="material-symbols-outlined">check_circle</span>
+              <b>VIN {scanSuccess} scanned.</b>
+            </div>
+          )}
           {cameraOpen && supportsTorch && (
-            <button type="button" className="torch-toggle" aria-pressed={torchOn} onClick={toggleTorch}>
+            <button type="button" className="torch-toggle" aria-label={torchOn ? "Turn flash off" : "Turn flash on"} aria-pressed={torchOn} onClick={toggleTorch}>
               <span className="material-symbols-outlined">{torchOn ? "flashlight_off" : "flashlight_on"}</span>
-              Flash {torchOn ? "Off" : "On"}
             </button>
           )}
           <p>{cameraOpen ? "Point the camera at the vehicle QR code." : "Tap the QR grid to open camera scanner."}</p>
@@ -903,7 +913,7 @@ function ScanView({ state, setState, session, online }) {
             {damaged && <textarea value={damageRemark} onChange={(event) => setDamageRemark(event.target.value)} rows="3" placeholder="Damage remark" />}
           </div>
         )}
-        {message && <p className={`notice ${message.kind}`}>{message.text}</p>}
+        {message && !scanSuccess && <p className={`notice ${message.kind}`}>{message.text}</p>}
       </form>
       <aside className="panel yard-card">
         <span className="eyebrow">Assigned yard</span>
