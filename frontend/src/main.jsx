@@ -508,9 +508,6 @@ function ScanView({ state, setState, session, online }) {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [scanSuccess, setScanSuccess] = useState(null);
-  const [cameraCaps, setCameraCaps] = useState({ zoom: null, torch: false });
-  const [zoom, setZoom] = useState(1);
-  const [torchOn, setTorchOn] = useState(false);
   const [message, setMessage] = useState(null);
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -519,7 +516,7 @@ function ScanView({ state, setState, session, online }) {
   const yard = yards.find((item) => item.id === session.yardId) || yards[0];
 
   const signalScanSuccess = useCallback(() => {
-    navigator.vibrate?.([200]);
+    if (navigator.vibrate?.([200])) return;
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (!AudioContext) return;
@@ -568,15 +565,7 @@ function ScanView({ state, setState, session, online }) {
       if (!track) return;
       trackRef.current = track;
       const caps = track.getCapabilities?.() || {};
-      const settings = track.getSettings?.() || {};
-      const zoomCaps = caps.zoom ? {
-        min: caps.zoom.min,
-        max: caps.zoom.max,
-        step: caps.zoom.step || 0.1,
-      } : null;
-      setCameraCaps({ zoom: zoomCaps, torch: Boolean(caps.torch) });
-      setZoom(settings.zoom || zoomCaps?.min || 1);
-      setTorchOn(false);
+      if (caps.torch) track.applyConstraints({ advanced: [{ torch: true }] }).catch(() => {});
     };
 
     async function startNativeScanner() {
@@ -666,29 +655,11 @@ function ScanView({ state, setState, session, online }) {
       stopStream();
       controls?.stop();
       trackRef.current = null;
-      setCameraCaps({ zoom: null, torch: false });
-      setTorchOn(false);
     };
   }, [cameraOpen, handleQrText]);
 
-  async function setCameraZoom(value) {
-    const nextZoom = Number(value);
-    setZoom(nextZoom);
-    try {
-      await trackRef.current?.applyConstraints({ advanced: [{ zoom: nextZoom }] });
-    } catch {
-      setCameraError("Zoom is not available on this camera.");
-    }
-  }
-
-  async function toggleTorch() {
-    const nextTorch = !torchOn;
-    try {
-      await trackRef.current?.applyConstraints({ advanced: [{ torch: nextTorch }] });
-      setTorchOn(nextTorch);
-    } catch {
-      setCameraError("Flash is not available on this camera.");
-    }
+  function closeCamera() {
+    setCameraOpen(false);
   }
 
   async function uploadQr(event) {
@@ -757,6 +728,7 @@ function ScanView({ state, setState, session, online }) {
         <div className="camera">
           <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => {
             scanLockedRef.current = false;
+            setScanSuccess(null);
             setCameraOpen(true);
           }} aria-label="Open camera scanner">
             {cameraOpen && <video ref={videoRef} autoPlay muted playsInline />}
@@ -768,43 +740,24 @@ function ScanView({ state, setState, session, online }) {
           </button>
           <p>{cameraOpen ? "Point the camera at the vehicle QR code." : "Tap the QR grid to open camera scanner."}</p>
           {cameraError && <p className="camera-error">{cameraError}</p>}
-          {cameraOpen && <button type="button" className="ghost" onClick={() => setCameraOpen(false)}>Close camera</button>}
-          {cameraOpen && (cameraCaps.zoom || cameraCaps.torch) && (
-            <div className="camera-tools">
-              {cameraCaps.zoom && (
-                <label>
-                  Zoom {Number(zoom).toFixed(1)}x
-                  <input type="range" min={cameraCaps.zoom.min} max={cameraCaps.zoom.max} step={cameraCaps.zoom.step} value={zoom} onChange={(event) => setCameraZoom(event.target.value)} />
-                </label>
-              )}
-              {cameraCaps.torch && (
-                <button type="button" className={torchOn ? "" : "ghost"} onClick={toggleTorch}>
-                  <span className="material-symbols-outlined">{torchOn ? "flash_on" : "flashlight_on"}</span>
-                  {torchOn ? "Flash on" : "Flash"}
-                </button>
-              )}
-            </div>
-          )}
+          {cameraOpen && <button type="button" className="ghost" onClick={closeCamera}>Close camera</button>}
           <input ref={fileInputRef} type="file" accept="image/*" onChange={uploadQr} style={{ display: "none" }} />
           <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()}><span className="material-symbols-outlined">upload_file</span> Upload QR</button>
-          <button type="button" onClick={() => {
-            scanLockedRef.current = false;
-            handleQrText("JTMBA38V70D123456");
-          }}><span className="material-symbols-outlined">barcode_scanner</span> Demo Scan</button>
+          {scanSuccess && (
+            <div className="scan-success" role="status" aria-live="assertive">
+              <button className="scan-success-close" type="button" aria-label="Close success message" onClick={() => setScanSuccess(null)}>X</button>
+              <span>Scanned successfully</span>
+              <b>{scanSuccess}</b>
+              <button type="button" className="scan-success-next" onClick={() => {
+                setVin("");
+                setScanSuccess(null);
+                setMessage(null);
+                scanLockedRef.current = false;
+                setCameraOpen(true);
+              }}>Scan next</button>
+            </div>
+          )}
         </div>
-        {scanSuccess && (
-          <div className="scan-success" role="status" aria-live="assertive">
-            <span>Scanned successfully</span>
-            <b>{scanSuccess}</b>
-            <button type="button" onClick={() => {
-              setVin("");
-              setScanSuccess(null);
-              setMessage(null);
-              scanLockedRef.current = false;
-              setCameraOpen(true);
-            }}>Scan next</button>
-          </div>
-        )}
         <label htmlFor="vin">Manual VIN entry</label>
         <div className="inline-form">
           <input id="vin" value={vin} onChange={(event) => {
