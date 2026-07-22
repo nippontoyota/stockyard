@@ -82,21 +82,12 @@ export function applyScan(state, scan) {
   const existing = state.vehicles[vin];
   const yard = yards.find((item) => item.id === scan.yardId);
   const flags = [];
+  const duplicateIn = scan.type === "in" && existing?.currentStatus === "in";
 
   if (!vinValid) flags.push(flag(vin, "invalid_vin", "VIN format needs admin review."));
   if (gpsFlag(scan.gps, yard)) flags.push(flag(vin, "gps_outside_yard", "GPS missing or outside yard radius."));
 
-  if (scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId === scan.yardId) {
-    return {
-      state: { ...state, scans: [...state.scans, { ...scan, vin, status: "rejected" }], flags: [...state.flags, ...flags] },
-      accepted: false,
-      message: "Vehicle is already IN at this yard.",
-    };
-  }
-
-  if (scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId !== scan.yardId) {
-    flags.push(flag(vin, "duplicate_yard_status", "VIN scanned IN at another yard while still IN."));
-  }
+  if (duplicateIn) flags.push(flag(vin, "duplicate_yard_status", duplicateMessage(existing.currentYardId, scan.yardId)));
 
   if (scan.type === "out" && !existing) flags.push(flag(vin, "unverified_in", "OUT scan has no prior IN record."));
   if (scan.type === "out" && scan.damaged) flags.push(flag(vin, "damage_reported", scan.damageRemark || "Damage reported."));
@@ -108,7 +99,7 @@ export function applyScan(state, scan) {
     colour: existing?.colour || "Not set",
     vinValid,
     currentStatus: scan.type,
-    currentYardId: scan.type === "in" ? scan.yardId : existing?.currentYardId || scan.yardId,
+    currentYardId: duplicateIn ? existing.currentYardId : scan.type === "in" ? scan.yardId : existing?.currentYardId || scan.yardId,
     lastChangedAt: scan.scannedAt,
   };
   const next = {
@@ -123,6 +114,13 @@ export function applyScan(state, scan) {
 
 function flag(vin, type, message) {
   return { id: crypto.randomUUID(), vin, type, message, resolved: false, createdAt: new Date().toISOString() };
+}
+
+function duplicateMessage(currentYardId, scanYardId) {
+  const currentYard = yards.find((item) => item.id === currentYardId);
+  const scanYard = yards.find((item) => item.id === scanYardId);
+  const scope = currentYardId === scanYardId ? "single location" : "multiple locations";
+  return `Duplicate VIN entry (${scope}). Sources: existing IN at ${currentYard?.code || currentYardId} - ${currentYard?.name || "Unknown yard"}; new scan at ${scanYard?.code || scanYardId} - ${scanYard?.name || "Unknown yard"}.`;
 }
 
 function capacityFlags(state, scan, vin) {

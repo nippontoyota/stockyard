@@ -147,23 +147,26 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   background: #EB0A1E; color: #fff; font-weight: 800; display: flex; gap: 8px; align-items: center; box-shadow: 0 12px 22px rgba(0, 0, 0, .18);
 }
 .camera button.ghost { background: #fff; color: #000; box-shadow: none; }
-.scan-success {
-  position: absolute; z-index: 5; inset: 18px; display: grid; align-content: center; gap: 12px; padding: 20px; border-radius: 8px;
-  background: rgba(0, 0, 0, .96); color: #00ff66; border: 4px solid #00ff66; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.42);
+.camera .torch-toggle {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  min-height: 42px; padding: 8px 12px; border-radius: 999px;
+  background: rgba(255, 255, 255, .92); color: #000; box-shadow: 0 10px 24px rgba(0,0,0,.24);
 }
-.scan-success span { font-size: 22px; font-weight: 900; text-transform: uppercase; }
-.scan-success b { color: #fff; font-size: clamp(28px, 8vw, 46px); line-height: 1; letter-spacing: 0; overflow-wrap: anywhere; }
-.scan-success .scan-success-close {
-  position: absolute; top: 8px; right: 8px; width: 42px; height: 42px; padding: 0; display: grid; place-items: center;
-  background: #fff; color: #000; box-shadow: none; font-size: 18px;
-}
-.scan-success .scan-success-next {
-  justify-content: center; min-height: 54px; background: #00ff66; color: #000; box-shadow: none; font-size: 18px;
-}
+.camera .torch-toggle[aria-pressed="true"] { background: #EB0A1E; color: #fff; }
 .inline-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.vin-submit-panel { display: grid; gap: 10px; }
+.vin-submit-panel input { background: #fff; color: #000; font-weight: 800; }
+.scan-next-button {
+  min-height: 48px; border: 1px solid #EB0A1E; border-radius: 6px;
+  background: #fff; color: #EB0A1E; font-weight: 800;
+}
 .notice { padding: 12px; border-radius: 6px; margin: 0; }
-.notice.ok { background: #000; color: #00ff66; border: 2px solid #00ff66; font-size: 18px; font-weight: 900; }
+.notice.ok { background: #fff; color: #000; border: 2px solid #EB0A1E; font-size: 16px; font-weight: 800; }
 .notice.error { background: #ffdad6; color: #93000a; }
+.flag-kind {
+  display: inline-block; margin-right: 8px; padding: 2px 6px; border-radius: 4px;
+  background: #ffdad6; color: #93000a; font-size: 11px; text-transform: uppercase;
+}
 .pill { padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .ok { background: #dcfce7; color: #14532d; }
 .warn { background: #fff7ed; color: #9d4300; }
