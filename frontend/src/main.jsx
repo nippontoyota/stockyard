@@ -324,7 +324,10 @@ function ScanView({ state, setState, session, online }) {
     async function openCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        if (videoRef.current) videoRef.current.srcObject = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.style.transform = "none";
+        }
         setCameraError("");
       } catch {
         setCameraError("Camera access blocked. Allow camera permission and try again.");
@@ -367,7 +370,7 @@ function ScanView({ state, setState, session, online }) {
         </div>
         <div className="camera">
           <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => setCameraOpen(true)} aria-label="Open camera scanner">
-            {cameraOpen && <video ref={videoRef} autoPlay muted playsInline />}
+            {cameraOpen && <video ref={videoRef} autoPlay muted playsInline style={{ transform: "none" }} />}
             <span className="corner top-left"></span>
             <span className="corner top-right"></span>
             <span className="corner bottom-left"></span>
