@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { applyScan, createInitialState, dashboard, parseDeliveredVins, removeDeliveredVehicles } from "./stockyardLogic.js";
+import { applyScan, createInitialState, dashboard, normalizeVin, parseDeliveredVins, removeDeliveredVehicles } from "./stockyardLogic.js";
 
 globalThis.localStorage = {
   data: {},
@@ -34,6 +34,8 @@ assert.equal(outNoIn.state.flags.some((flag) => flag.type === "unverified_in"), 
 const invalid = applyScan(createInitialState(), { ...baseScan, clientScanId: "client-4", vinRaw: "BADVIN" });
 assert.equal(invalid.accepted, true);
 assert.equal(invalid.state.flags.some((flag) => flag.type === "invalid_vin"), true);
+
+assert.equal(normalizeVin("https://yard.example/car?vin=JTMBA38V70D123456"), "JTMBA38V70D123456");
 
 const deliveredVins = parseDeliveredVins("VIN\nJTMBA38V70D123456\nnot-a-vin\nJTMBA38V70D123456");
 assert.deepEqual(deliveredVins, ["JTMBA38V70D123456"]);
