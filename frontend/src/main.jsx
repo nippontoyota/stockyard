@@ -80,7 +80,7 @@ function App() {
       <main className="content">
         {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} />}
         {view === "stock" && <StockView state={state} session={session} />}
-        {view === "dashboard" && (isAdmin ? <AdminHome stats={stats} /> : <DashboardView state={state} stats={stats} setState={setState} />)}
+        {view === "dashboard" && (isAdmin ? <AdminHome stats={stats} state={state} setState={setState} /> : <DashboardView state={state} stats={stats} setState={setState} />)}
         {view === "delivered" && isAdmin && <DeliveredUpload state={state} setState={setState} />}
         {view === "admin" && isAdmin && <AdminView state={state} setState={setState} />}
       </main>
@@ -175,10 +175,54 @@ function NavButton({ icon, label, active, onClick }) {
   return <button className={active ? "active" : ""} onClick={onClick}><span className="material-symbols-outlined">{icon}</span><small>{label}</small></button>;
 }
 
-function AdminHome({ stats }) {
+function exportAnalyticsReport(stats) {
+  const yardSheet = XLSX.utils.json_to_sheet(
+    stats.yards.map((y) => ({
+      Code: y.code,
+      Name: y.name,
+      Capacity: y.capacity,
+      Occupied: y.count,
+      Utilization: `${y.utilization}%`,
+      Risk: y.risk.toUpperCase(),
+    }))
+  );
+
+  const modelSheet = XLSX.utils.json_to_sheet(
+    stats.models.map((m) => ({
+      Model: m.model,
+      Units: m.count,
+      Percentage: `${m.pct}%`,
+    }))
+  );
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, yardSheet, "Yard Capacity");
+  XLSX.utils.book_append_sheet(workbook, modelSheet, "Model Distribution");
+  XLSX.writeFile(workbook, `Stockyard_Analytics_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function AdminHome({ stats, state, setState }) {
   const [activeTab, setActiveTab] = useState("overview");
+  const [showFilterBar, setShowFilterBar] = useState(false);
+  const [riskFilter, setRiskFilter] = useState("all"); // 'all' | 'critical' | 'heavy'
+  const [toastMessage, setToastMessage] = useState("");
+
   const busiestYard = stats.yards.reduce((top, yard) => yard.count > top.count ? yard : top, stats.yards[0] || { count: 0, code: "-", name: "No yard" });
   const healthyYards = stats.yards.filter((yard) => yard.risk === "normal").length;
+
+  const filteredYards = stats.yards.filter((yard) => {
+    if (riskFilter === "critical") return yard.risk === "critical";
+    if (riskFilter === "heavy") return yard.risk === "critical" || yard.risk === "heavy";
+    return true;
+  });
+
+  const handleDownload = () => {
+    exportAnalyticsReport(stats);
+    setToastMessage("Analytics report exported to Excel!");
+    setTimeout(() => setToastMessage(""), 3000);
+  };
+
+  const activeFlagsList = state ? state.flags.filter((f) => !f.resolved) : [];
 
   return (
     <section className="dashboard-workspace">
@@ -188,9 +232,31 @@ function AdminHome({ stats }) {
           <strong>Nippon</strong>
         </div>
         <div className="rail-menu">
-          <span className="active"><span className="material-symbols-outlined">dashboard</span>Overview</span>
-          <span><span className="material-symbols-outlined">warehouse</span>Yards</span>
-          <span><span className="material-symbols-outlined">flag</span>Flags</span>
+          <button
+            type="button"
+            className={activeTab === "overview" ? "active" : ""}
+            onClick={() => setActiveTab("overview")}
+          >
+            <span className="material-symbols-outlined">dashboard</span>
+            <span>Overview</span>
+          </button>
+          <button
+            type="button"
+            className={activeTab === "yards" ? "active" : ""}
+            onClick={() => setActiveTab("yards")}
+          >
+            <span className="material-symbols-outlined">warehouse</span>
+            <span>Yards</span>
+          </button>
+          <button
+            type="button"
+            className={activeTab === "flags" ? "active" : ""}
+            onClick={() => setActiveTab("flags")}
+          >
+            <span className="material-symbols-outlined">flag</span>
+            <span>Flags</span>
+            {stats.openFlags > 0 && <span className="rail-badge">{stats.openFlags}</span>}
+          </button>
         </div>
         <div className="rail-note">
           <b>{healthyYards}/{stats.yards.length}</b>
@@ -205,14 +271,51 @@ function AdminHome({ stats }) {
             <h1>Admin Analytics Dashboard</h1>
           </div>
           <div className="dashboard-actions">
-            <button type="button"><span className="material-symbols-outlined">download</span></button>
-            <button type="button"><span className="material-symbols-outlined">tune</span></button>
+            <button
+              type="button"
+              className="action-icon-btn"
+              onClick={handleDownload}
+              title="Download Excel Analytics Report"
+              aria-label="Download Report"
+            >
+              <span className="material-symbols-outlined">download</span>
+            </button>
+            <button
+              type="button"
+              className={`action-icon-btn ${showFilterBar || riskFilter !== "all" ? "active" : ""}`}
+              onClick={() => setShowFilterBar(!showFilterBar)}
+              title="Tune Dashboard Filters"
+              aria-label="Tune Dashboard Filters"
+            >
+              <span className="material-symbols-outlined">tune</span>
+            </button>
             <div className="segmented">
               <button type="button" className={activeTab === "overview" ? "active" : ""} onClick={() => setActiveTab("overview")}>Overview</button>
               <button type="button" className={activeTab === "yards" ? "active" : ""} onClick={() => setActiveTab("yards")}>Yards</button>
+              <button type="button" className={activeTab === "flags" ? "active" : ""} onClick={() => setActiveTab("flags")}>Flags ({stats.openFlags})</button>
             </div>
           </div>
         </div>
+
+        {toastMessage && <div className="notice ok">{toastMessage}</div>}
+
+        {showFilterBar && (
+          <div className="filter-drawer analytics-filter-drawer">
+            <div className="filter-drawer-header">
+              <span>Dashboard Risk Filter</span>
+              {riskFilter !== "all" && (
+                <button type="button" className="clear-btn" onClick={() => setRiskFilter("all")}>Reset</button>
+              )}
+            </div>
+            <div className="filter-grid">
+              <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)}>
+                <option value="all">Show All Yards ({stats.yards.length})</option>
+                <option value="heavy">Show High Utilization (&ge;75%)</option>
+                <option value="critical">Show Critical Capacity (&ge;90%)</option>
+              </select>
+            </div>
+          </div>
+        )}
 
         <div className="dashboard-spotlight">
           <div>
@@ -233,7 +336,7 @@ function AdminHome({ stats }) {
                   <h2>Yard Capacity Utilization</h2>
                   <span className="pill info">Capacity vs Occupied</span>
                 </div>
-                <YardCapacityBarChart yards={stats.yards} />
+                <YardCapacityBarChart yards={filteredYards} />
               </section>
 
               <section className="panel chart-panel chart-panel-compact">
@@ -277,7 +380,7 @@ function AdminHome({ stats }) {
 
         {activeTab === "yards" && (
           <section className="yard-box-grid">
-            {stats.yards.map((yard) => {
+            {filteredYards.map((yard) => {
               const empty = Math.max(0, yard.capacity - yard.count);
               return (
                 <article className={`yard-box ${yard.risk === "critical" ? "risk-critical" : yard.risk === "heavy" ? "risk-heavy" : ""}`} key={yard.id}>
@@ -298,6 +401,34 @@ function AdminHome({ stats }) {
                 </article>
               );
             })}
+          </section>
+        )}
+
+        {activeTab === "flags" && (
+          <section className="panel stack">
+            <div className="chart-panel-header">
+              <h2>Active Operational Flags ({activeFlagsList.length})</h2>
+              <span className={activeFlagsList.length > 0 ? "pill bad" : "pill ok"}>
+                {activeFlagsList.length > 0 ? "Review Required" : "All Clear"}
+              </span>
+            </div>
+            {activeFlagsList.length === 0 ? (
+              <p className="notice ok">No open flags or exceptions. All stockyards operating smoothly.</p>
+            ) : (
+              activeFlagsList.map((flag) => (
+                <div className="flag-row" key={flag.id}>
+                  <span>
+                    <b>{flag.vin}</b>
+                    <small>{flag.message}</small>
+                  </span>
+                  {setState && (
+                    <button onClick={() => setState(resolveFlag(state, flag.id))}>
+                      Resolve
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
           </section>
         )}
       </div>
