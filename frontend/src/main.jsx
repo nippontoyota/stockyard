@@ -23,6 +23,9 @@ import {
   FlagDistributionChart,
   DwellByModelChart,
 } from "./AnalyticsCharts.jsx";
+import {
+  bulkSync, getVehicles, getAdminDashboard, getFlags, resolveFlag as apiResolveFlag, adminOverrideVehicle
+} from "./api.js";
 import "./styles.css";
 
 const loadState = () => {
@@ -96,6 +99,53 @@ function App() {
   }, [session]);
 
   useEffect(() => {
+    if (!session) return;
+    let mounted = true;
+    async function loadData() {
+      try {
+        const vehiclesData = await getVehicles();
+        if (!mounted) return;
+        
+        const mappedVehicles = {};
+        vehiclesData.forEach(v => {
+          mappedVehicles[v.vin] = {
+            vin: v.vin,
+            model: v.model || "Unknown",
+            variant: "Standard",
+            colour: "Not set",
+            vinValid: v.vin_valid,
+            currentStatus: v.current_status,
+            currentYardId: v.current_yard_id,
+            lastChangedAt: v.last_changed_at,
+          };
+        });
+        
+        let mappedFlags = [];
+        if (session.role === "admin") {
+          const flagsData = await getFlags();
+          mappedFlags = flagsData.map(f => ({
+            id: f.id,
+            vin: f.vin,
+            type: f.flag_type,
+            message: f.message,
+            resolved: f.resolved,
+          }));
+        }
+        
+        setState(s => ({
+          ...s,
+          vehicles: mappedVehicles,
+          flags: session.role === "admin" ? mappedFlags : s.flags
+        }));
+      } catch (err) {
+        console.error("Failed to load backend data", err);
+      }
+    }
+    loadData();
+    return () => { mounted = false; };
+  }, [session, setState]);
+
+  useEffect(() => {
     navigator.serviceWorker?.register("/sw.js").catch(() => {});
     const up = () => setOnline(true);
     const down = () => setOnline(false);
@@ -109,12 +159,33 @@ function App() {
 
   useEffect(() => {
     if (!online || state.queue.length === 0) return;
-    setState((current) => ({
-      ...current,
-      queue: [],
-      scans: current.scans.map((scan) => current.queue.includes(scan.clientScanId) ? { ...scan, syncStatus: "synced" } : scan),
-    }));
-  }, [online, state.queue.length]);
+    
+    let cancelled = false;
+    async function performSync() {
+      // Find all queued scans that haven't been synced yet
+      const scansToSync = state.scans.filter(s => state.queue.includes(s.clientScanId));
+      if (scansToSync.length === 0) return;
+      
+      try {
+        await bulkSync(scansToSync);
+        if (cancelled) return;
+        
+        setState((current) => {
+          const syncedIds = scansToSync.map(s => s.clientScanId);
+          return {
+            ...current,
+            queue: current.queue.filter(id => !syncedIds.includes(id)),
+            scans: current.scans.map((scan) => syncedIds.includes(scan.clientScanId) ? { ...scan, syncStatus: "synced" } : scan),
+          };
+        });
+      } catch (err) {
+        console.error("Background sync failed:", err);
+      }
+    }
+    
+    performSync();
+    return () => { cancelled = true; };
+  }, [online, state.queue.length, state.scans]);
 
   const navigateTo = (nextView) => {
     setView(nextView);
@@ -485,7 +556,14 @@ function AdminHome({ stats, state, setState }) {
                     <small>{flag.message}</small>
                   </span>
                   {setState && (
-                    <button onClick={() => setState(resolveFlag(state, flag.id))}>
+                    <button onClick={async () => {
+                      try {
+                        await apiResolveFlag(flag.id);
+                        setState(resolveFlag(state, flag.id));
+                      } catch (err) {
+                        alert(err.message);
+                      }
+                    }}>
                       Resolve
                     </button>
                   )}
@@ -1066,7 +1144,14 @@ function DashboardView({ state, stats, session, setState }) {
                   <small>{flag.message}</small>
                 </span>
                 {session.role === "admin" && (
-                  <button onClick={() => setState(resolveFlag(state, flag.id))}>Resolve</button>
+                  <button onClick={async () => {
+                    try {
+                      await apiResolveFlag(flag.id);
+                      setState(resolveFlag(state, flag.id));
+                    } catch (err) {
+                      alert(err.message);
+                    }
+                  }}>Resolve</button>
                 )}
               </div>
             ))
@@ -1095,12 +1180,21 @@ function AdminView({ state, setState }) {
   const [yardId, setYardId] = useState(yards[0].id);
   const [status, setStatus] = useState("out");
   const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
-    setState(updateVehicleAdmin(state, { vin, yardId, status, reason }));
-    setVin("");
-    setReason("");
+    setLoading(true);
+    try {
+      await adminOverrideVehicle(vin, status, reason, status === "in" ? yardId : null);
+      setState(updateVehicleAdmin(state, { vin, yardId, status, reason }));
+      setVin("");
+      setReason("");
+    } catch (err) {
+      alert("Failed to override: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -1114,7 +1208,7 @@ function AdminView({ state, setState }) {
         </select>
         {status === "in" && <select value={yardId} onChange={(event) => setYardId(event.target.value)}>{yards.map((yard) => <option value={yard.id} key={yard.id}>{yard.name}</option>)}</select>}
         <textarea required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Correction note" />
-        <button className="primary">Apply Correction</button>
+        <button className="primary" disabled={loading}>{loading ? "Applying..." : "Apply Correction"}</button>
       </form>
     </section>
   );

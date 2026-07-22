@@ -5,6 +5,7 @@
     "test": "node src/stockyardLogic.test.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.8",
     "@vitejs/plugin-react": "^4.3.4",
     "@zxing/browser": "^0.2.1",
     "react": "^19.0.0",

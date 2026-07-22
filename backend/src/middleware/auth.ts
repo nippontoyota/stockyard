@@ -34,6 +34,16 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     return;
   }
 
+  // Mock token support for local dev without Supabase
+  if (token === 'mock-admin') {
+    req.user = { id: 'mock-admin-id', role: 'admin', yard_id: null };
+    return next();
+  }
+  if (token.startsWith('mock-yard-')) {
+    req.user = { id: 'mock-yard-id', role: 'stockyard', yard_id: token.slice(10) };
+    return next();
+  }
+
   try {
     const { payload } = await jwtVerify(token, JWKS, {
       issuer: `${process.env.SUPABASE_URL}/auth/v1`,
