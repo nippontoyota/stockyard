@@ -81,8 +81,15 @@ export function applyScan(state, scan) {
   const vinValid = isValidVin(vin);
   const existing = state.vehicles[vin];
   const yard = yards.find((item) => item.id === scan.yardId);
+  if (scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId === scan.yardId) {
+    return { state, accepted: false, message: "Vehicle is already IN at this yard." };
+  }
+  if (scan.type === "out" && existing?.currentStatus === "out") {
+    return { state, accepted: false, message: "Vehicle is already marked OUT." };
+  }
+
   const flags = [];
-  const duplicateIn = scan.type === "in" && existing?.currentStatus === "in";
+  const duplicateIn = scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId !== scan.yardId;
 
   if (!vinValid) flags.push(flag(vin, "invalid_vin", "VIN format needs admin review."));
   if (gpsFlag(scan.gps, yard)) flags.push(flag(vin, "gps_outside_yard", "GPS missing or outside yard radius."));
