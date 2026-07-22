@@ -147,9 +147,25 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   background: #EB0A1E; color: #fff; font-weight: 800; display: flex; gap: 8px; align-items: center; box-shadow: 0 12px 22px rgba(0, 0, 0, .18);
 }
 .camera button.ghost { background: #fff; color: #000; box-shadow: none; }
+.camera-tools {
+  position: relative; z-index: 2; width: min(300px, 86%); display: grid; gap: 10px;
+  padding: 10px; background: rgba(0, 0, 0, .78); border-radius: 8px;
+}
+.camera-tools label { color: #fff; display: grid; gap: 6px; }
+.camera-tools input { min-height: 32px; padding: 0; accent-color: #00ff66; }
+.camera-tools button { justify-content: center; width: 100%; }
+.scan-success {
+  display: grid; gap: 10px; padding: 18px; border-radius: 8px;
+  background: #000; color: #00ff66; border: 4px solid #00ff66; text-align: center;
+}
+.scan-success span { font-size: 22px; font-weight: 900; text-transform: uppercase; }
+.scan-success b { color: #fff; font-size: clamp(28px, 8vw, 46px); line-height: 1; letter-spacing: 0; overflow-wrap: anywhere; }
+.scan-success button {
+  min-height: 54px; border: 0; border-radius: 8px; background: #00ff66; color: #000; font-weight: 900; font-size: 18px;
+}
 .inline-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .notice { padding: 12px; border-radius: 6px; margin: 0; }
-.notice.ok { background: #dcfce7; color: #14532d; }
+.notice.ok { background: #000; color: #00ff66; border: 2px solid #00ff66; font-size: 18px; font-weight: 900; }
 .notice.error { background: #ffdad6; color: #93000a; }
 .pill { padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .ok { background: #dcfce7; color: #14532d; }
