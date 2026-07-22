@@ -4,6 +4,7 @@ import { eq, and, sql, count, desc } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { vehicles, vehicleStatus, scans, yards, flags } from '../db/schema.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { isValidVin, detectModel } from '../lib/vin.js';
 
 const router = Router();
 router.use(authenticate);
@@ -185,8 +186,13 @@ router.patch('/flags/:id/resolve', async (req, res, next) => {
 const overrideBody = z.object({
   status: z.enum(['in', 'out']),
   yard_id: z.string().uuid().optional(),
+  yardId: z.string().uuid().optional(),
   reason: z.string().min(1),
-});
+}).transform((d) => ({
+  status: d.status,
+  yard_id: d.yard_id || d.yardId || undefined,
+  reason: d.reason,
+}));
 
 router.patch('/vehicles/:vin/status', async (req, res, next) => {
   try {
@@ -202,13 +208,23 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
       return;
     }
 
+    // Read existing status to preserve yard on force-OUT
+    const [existingStatus] = await db
+      .select({ current_yard_id: vehicleStatus.current_yard_id })
+      .from(vehicleStatus)
+      .where(eq(vehicleStatus.vehicle_id, vehicle.id));
+
+    const resolvedYardId = body.status === 'in'
+      ? body.yard_id ?? existingStatus?.current_yard_id ?? null
+      : existingStatus?.current_yard_id ?? null;
+
     // Upsert status
     await db
       .insert(vehicleStatus)
       .values({
         vehicle_id: vehicle.id,
         current_status: body.status,
-        current_yard_id: body.status === 'in' ? body.yard_id ?? null : null,
+        current_yard_id: resolvedYardId,
         last_changed_at: new Date(),
         override_reason: body.reason,
       })
@@ -216,7 +232,7 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
         target: vehicleStatus.vehicle_id,
         set: {
           current_status: body.status,
-          current_yard_id: body.status === 'in' ? body.yard_id ?? null : null,
+          current_yard_id: resolvedYardId,
           last_changed_at: new Date(),
           override_reason: body.reason,
         },
@@ -270,13 +286,12 @@ router.post('/import/vehicles', async (req, res, next) => {
         continue;
       }
 
-      const { isValidVin, detectModel } = await import('../lib/vin.js');
-      const vinValid = isValidVin(vin);
-      const model = v.model ?? detectModel(vin);
+      const vinValidCheck = isValidVin(vin);
+      const modelValue = v.model ?? detectModel(vin);
 
       const [vehicle] = await db
         .insert(vehicles)
-        .values({ vin, model, vin_valid: vinValid })
+        .values({ vin, model: modelValue, vin_valid: vinValidCheck })
         .returning({ id: vehicles.id });
 
       await db
