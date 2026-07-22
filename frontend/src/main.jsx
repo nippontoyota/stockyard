@@ -480,19 +480,19 @@ function AdminHome({ stats, state, setState }) {
           </div>
         )}
 
-        <div className="dashboard-spotlight">
-          <div>
-            <span>Highest occupied yard</span>
-            <strong>{busiestYard.name}</strong>
-          </div>
-          <b>{busiestYard.count}</b>
-          <small>{busiestYard.code}</small>
-        </div>
-
-        <ExecutiveKpiCards stats={stats} />
-
         {activeTab === "overview" && (
           <>
+            <div className="dashboard-spotlight">
+              <div>
+                <span>Highest occupied yard</span>
+                <strong>{busiestYard.name}</strong>
+              </div>
+              <b>{busiestYard.count}</b>
+              <small>{busiestYard.code}</small>
+            </div>
+
+            <ExecutiveKpiCards stats={stats} />
+
             <div className="analytics-grid-2col">
               <section className="panel chart-panel chart-panel-wide">
                 <div className="chart-panel-header">
@@ -542,38 +542,43 @@ function AdminHome({ stats, state, setState }) {
         )}
 
         {activeTab === "yards" && (
-          <section className="yard-box-grid">
-            {filteredYards.map((yard) => {
-              const empty = Math.max(0, yard.capacity - yard.count);
-              return (
-                <article className={`yard-box ${yard.risk === "critical" ? "risk-critical" : yard.risk === "heavy" ? "risk-heavy" : ""}`} key={yard.id}>
-                  <div>
-                    <span className="eyebrow">{yard.code}</span>
-                    <h2>{yard.name}</h2>
-                  </div>
-                  <div className="yard-count">{yard.count}</div>
-                  <div className="yard-box-metrics">
-                    <span><b>{yard.count}</b>Utilised</span>
-                    <span><b>{empty}</b>Empty</span>
-                    <span><b>{yard.capacity}</b>Capacity</span>
-                  </div>
-                  <div className="progress-wrapper">
-                    <progress max="100" value={Math.min(100, yard.utilization)} />
-                    <span className="progress-lbl">{yard.utilization}%</span>
-                  </div>
-                </article>
-              );
-            })}
-          </section>
+          <>
+            <div className="tab-summary">
+              <span className="eyebrow">Yard details</span>
+              <strong>{filteredYards.length} stockyard{filteredYards.length === 1 ? "" : "s"}</strong>
+            </div>
+            <section className="yard-box-grid">
+              {filteredYards.map((yard) => {
+                const empty = Math.max(0, yard.capacity - yard.count);
+                return (
+                  <article className={`yard-box ${yard.risk === "critical" ? "risk-critical" : yard.risk === "heavy" ? "risk-heavy" : ""}`} key={yard.id}>
+                    <div>
+                      <span className="eyebrow">{yard.code}</span>
+                      <h2>{yard.name}</h2>
+                    </div>
+                    <div className="yard-count">{yard.count}</div>
+                    <div className="yard-box-metrics">
+                      <span><b>{yard.count}</b>Utilised</span>
+                      <span><b>{empty}</b>Empty</span>
+                      <span><b>{yard.capacity}</b>Capacity</span>
+                    </div>
+                    <div className="progress-wrapper">
+                      <progress max="100" value={Math.min(100, yard.utilization)} />
+                      <span className="progress-lbl">{yard.utilization}%</span>
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
+          </>
         )}
 
         {activeTab === "flags" && (
-          <section className="panel stack">
-            <div className="chart-panel-header">
-              <h2>Active Operational Flags ({activeFlagsList.length})</h2>
-              <span className={activeFlagsList.length > 0 ? "pill bad" : "pill ok"}>
-                {activeFlagsList.length > 0 ? "Review Required" : "All Clear"}
-              </span>
+          <section className="panel stack flag-tab-panel">
+            <div className="tab-summary">
+              <span className="eyebrow">Flags</span>
+              <strong>{activeFlagsList.length} active operational flag{activeFlagsList.length === 1 ? "" : "s"}</strong>
+              <span className={activeFlagsList.length > 0 ? "pill bad" : "pill ok"}>{activeFlagsList.length > 0 ? "Review Required" : "All Clear"}</span>
             </div>
             {activeFlagsList.length === 0 ? (
               <p className="notice ok">No open flags or exceptions. All stockyards operating smoothly.</p>
@@ -607,7 +612,6 @@ function AdminHome({ stats, state, setState }) {
 }
 
 function ScanView({ state, setState, session, online }) {
-  const [type, setType] = useState("in");
   const [vin, setVin] = useState("");
   const [outRemark, setOutRemark] = useState("");
   const [damaged, setDamaged] = useState(false);
@@ -623,6 +627,8 @@ function ScanView({ state, setState, session, online }) {
   const trackRef = useRef(null);
   const scanLockedRef = useRef(false);
   const yard = yards.find((item) => item.id === session.yardId) || yards[0];
+  const pendingVin = normalizeVin(vin);
+  const scanType = state.vehicles[pendingVin]?.currentStatus === "in" ? "out" : "in";
 
   const signalScanSuccess = useCallback(() => {
     if (navigator.vibrate?.([200])) return;
@@ -823,15 +829,18 @@ function ScanView({ state, setState, session, online }) {
   function submit(event) {
     event.preventDefault();
     if (!vin.trim()) return setMessage({ kind: "error", text: "Enter or scan a VIN." });
-    if (type === "out" && !outRemark) return setMessage({ kind: "error", text: "Select an OUT reason." });
-    if (type === "out" && damaged && !damageRemark.trim()) return setMessage({ kind: "error", text: "Add the damage remark." });
+    if (scanType === "out" && !outRemark) return setMessage({ kind: "error", text: "Select an OUT reason." });
+    if (scanType === "out" && damaged && !damageRemark.trim()) return setMessage({ kind: "error", text: "Add the damage remark." });
 
     const gps = { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
-    const scan = createScan({ vin, type, yardId: yard.id, gps, outRemark, damaged, damageRemark, online });
+    const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, damaged, damageRemark, online });
     const result = applyScan(state, scan);
     setState(result.state);
     setMessage({ kind: result.accepted ? "ok" : "error", text: result.message });
     setVin("");
+    setOutRemark("");
+    setDamaged(false);
+    setDamageRemark("");
     setScanSuccess(null);
     scanLockedRef.current = false;
   }
@@ -840,16 +849,12 @@ function ScanView({ state, setState, session, online }) {
     <section className="scan-grid">
       <form className="scan-card stack" onSubmit={submit}>
         <div className="scan-ticket">
-          <span className={`scan-badge ${type}`}>{type.toUpperCase()}</span>
+          <span className={`scan-badge ${scanType}`}>{scanType.toUpperCase()}</span>
           <div>
             <h1>{yard.code}</h1>
             <p>{yard.name}</p>
           </div>
           <span className={online ? "status-dot ok" : "status-dot warn"}>{online ? "Online" : "Offline"}</span>
-        </div>
-        <div className="segmented big scan-toggle">
-          <button type="button" className={type === "in" ? "active" : ""} onClick={() => setType("in")}>Vehicle IN</button>
-          <button type="button" className={type === "out" ? "active out" : ""} onClick={() => setType("out")}>Vehicle OUT</button>
         </div>
         <div className="camera">
           <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => {
@@ -867,9 +872,45 @@ function ScanView({ state, setState, session, online }) {
             {!cameraOpen && <span className="qr-pattern" aria-hidden="true"></span>}
           </button>
           {scanSuccess && (
-            <div className="scan-result-popover" role="status" aria-live="polite">
+            <div className="scan-result-popover" aria-live="polite">
               <span className="material-symbols-outlined">check_circle</span>
-              <b>VIN {scanSuccess} scanned.</b>
+              <div>
+                <b>VIN {scanSuccess} scanned.</b>
+                <small>Ready for vehicle {scanType.toUpperCase()}.</small>
+              </div>
+              {scanType === "out" && (
+                <>
+                  <select value={outRemark} onChange={(event) => {
+                    setOutRemark(event.target.value);
+                    setMessage(null);
+                  }} aria-label="OUT reason">
+                    <option value="">Select OUT reason</option>
+                    <option value="customer_acquisition">Customer Acquisition</option>
+                    <option value="stockyard_transfer">Stockyard Transfer</option>
+                  </select>
+                  <label className="check scan-damage-check">
+                    <input type="checkbox" checked={damaged} onChange={(event) => {
+                      setDamaged(event.target.checked);
+                      if (!event.target.checked) setDamageRemark("");
+                      setMessage(null);
+                    }} />
+                    Damage reported
+                  </label>
+                  {damaged && (
+                    <textarea
+                      value={damageRemark}
+                      onChange={(event) => {
+                        setDamageRemark(event.target.value);
+                        setMessage(null);
+                      }}
+                      rows="2"
+                      placeholder="Damage remark"
+                    />
+                  )}
+                </>
+              )}
+              {message && <small className={`scan-popover-message ${message.kind}`}>{message.text}</small>}
+              <button className="primary scan-submit-button">Submit {scanType.toUpperCase()}</button>
             </div>
           )}
           {cameraOpen && supportsTorch && (
@@ -883,16 +924,19 @@ function ScanView({ state, setState, session, online }) {
           <input ref={fileInputRef} type="file" accept="image/*" onChange={uploadQr} style={{ display: "none" }} />
           <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()}><span className="material-symbols-outlined">upload_file</span> Upload QR</button>
         </div>
-        <label htmlFor="vin">{scanSuccess ? "Scanned VIN" : "Manual VIN entry"}</label>
-        <div className={scanSuccess ? "vin-submit-panel" : "inline-form"}>
+        {!scanSuccess && <label htmlFor="vin">Manual VIN entry</label>}
+        <div className={scanSuccess ? "vin-submit-panel scanned" : "inline-form"}>
           <input id="vin" value={vin} onChange={(event) => {
             setVin(event.target.value.toUpperCase());
             setScanSuccess(null);
           }} placeholder="Enter VIN" aria-live={scanSuccess ? "polite" : undefined} />
-          <button className="primary">Submit</button>
+          {!scanSuccess && <button className="primary">Submit {scanType.toUpperCase()}</button>}
           {scanSuccess && (
             <button type="button" className="scan-next-button" onClick={() => {
               setVin("");
+              setOutRemark("");
+              setDamaged(false);
+              setDamageRemark("");
               setScanSuccess(null);
               setMessage(null);
               scanLockedRef.current = false;
@@ -901,7 +945,7 @@ function ScanView({ state, setState, session, online }) {
             }}>Scan next</button>
           )}
         </div>
-        {type === "out" && (
+        {!scanSuccess && scanType === "out" && (
           <div className="stack">
             <label htmlFor="remark">OUT Reason</label>
             <select id="remark" value={outRemark} onChange={(event) => setOutRemark(event.target.value)}>

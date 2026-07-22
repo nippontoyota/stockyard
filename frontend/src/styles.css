@@ -109,9 +109,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .status-dot { padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
 .status-dot.ok { background: #000; color: #fff; }
 .status-dot.warn { background: #EB0A1E; color: #fff; }
-.scan-toggle { background: #ececec; border: 1px solid rgba(88, 89, 91, .18); }
-.scan-toggle .active { background: #000; color: #fff; }
-.scan-toggle .out { background: #58595B; }
 .camera {
   min-height: 360px; padding: 28px 18px; background: linear-gradient(180deg, #b9b9b9, #9d9d9d);
   border-radius: 8px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; overflow: hidden;
@@ -156,16 +153,32 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .camera .torch-toggle[aria-pressed="true"] { background: #EB0A1E; color: #fff; }
 .scan-result-popover {
   position: absolute; z-index: 3; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: min(360px, calc(100% - 32px)); min-height: 78px; padding: 14px 16px;
+  width: min(340px, calc(100% - 32px)); min-height: 78px; padding: 14px 16px;
   display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px;
   background: #fff; color: #000; border: 3px solid #EB0A1E; border-radius: 8px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, .26);
 }
 .scan-result-popover .material-symbols-outlined { color: #EB0A1E; font-size: 28px; }
 .scan-result-popover b { font-size: 16px; line-height: 1.25; overflow-wrap: anywhere; }
+.scan-result-popover small { display: block; margin-top: 4px; color: #58595B; font-size: 12px; font-weight: 700; }
+.scan-result-popover select,
+.scan-result-popover textarea,
+.scan-result-popover .scan-damage-check,
+.scan-result-popover .scan-submit-button,
+.scan-result-popover .scan-popover-message {
+  grid-column: 1 / -1;
+}
+.scan-result-popover select { min-height: 44px; }
+.scan-result-popover textarea { min-height: 64px; resize: vertical; }
+.scan-result-popover .scan-damage-check {
+  width: 100%; margin: 0; padding: 8px 0; color: #000; justify-content: flex-start;
+}
+.scan-result-popover .scan-submit-button { min-height: 46px; justify-content: center; box-shadow: none; }
+.scan-result-popover .scan-popover-message.error { color: #93000a; }
 .inline-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .vin-submit-panel { display: grid; gap: 10px; }
 .vin-submit-panel input { background: #fff; color: #000; font-weight: 800; }
+.vin-submit-panel.scanned input { display: none; }
 .scan-next-button {
   min-height: 48px; border: 1px solid #EB0A1E; border-radius: 6px;
   background: #fff; color: #EB0A1E; font-weight: 800;
@@ -264,6 +277,12 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .metric strong { font-size: 32px; color: #002046; }
 .metric.bad strong { color: #ba1a1a; }
 .yard-box-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.tab-summary {
+  padding: 14px; display: grid; gap: 6px;
+  background: #fff; border: 1px solid rgba(88, 89, 91, .16); border-radius: 8px;
+}
+.tab-summary strong { color: #000; font-size: 18px; line-height: 1.25; }
+.tab-summary .pill { width: fit-content; }
 .yard-box { min-height: 210px; padding: 14px; display: grid; gap: 12px; align-content: space-between; }
 .yard-box h2 { margin: 0; min-height: 48px; color: #000; font-size: 18px; line-height: 1.25; }
 .yard-count {
