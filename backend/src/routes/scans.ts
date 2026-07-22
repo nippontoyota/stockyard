@@ -73,7 +73,7 @@ async function findOrCreateVehicle(vinRaw: string): Promise<{ id: string; vinVal
     .values({ vin, model, vin_valid: vinValid })
     .onConflictDoUpdate({
       target: vehicles.vin,
-      set: { updated_at: new Date() },
+      set: { updated_at: new Date(), ...(model ? { model } : {}), vin_valid: vinValid },
     })
     .returning({ id: vehicles.id });
   return { id: result[0].id, vinValid };
@@ -125,11 +125,14 @@ async function processScanIn(body: ScanIn, yardId: string) {
     client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), status: 'accepted',
   }).returning();
 
-  await db.insert(vehicleStatus).values({
-    vehicle_id: vehicleId, current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: new Date(body.scanned_at),
-  }).onConflictDoUpdate({
-    target: vehicleStatus.vehicle_id, set: { current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: new Date(body.scanned_at), override_reason: null },
-  });
+  const scanTime = new Date(body.scanned_at);
+  if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
+    await db.insert(vehicleStatus).values({
+      vehicle_id: vehicleId, current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime,
+    }).onConflictDoUpdate({
+      target: vehicleStatus.vehicle_id, set: { current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, override_reason: null },
+    });
+  }
 
   const flagsList: string[] = [];
   if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`); flagsList.push('invalid_vin'); }
@@ -166,11 +169,14 @@ async function processScanOut(body: ScanOut, yardId: string) {
     client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), out_remark: body.out_remark, damaged: body.damaged, damage_remark: body.damage_remark, status: 'accepted',
   }).returning();
 
-  await db.insert(vehicleStatus).values({
-    vehicle_id: vehicleId, current_status: 'out', current_yard_id: null, last_out_scan_id: scan.id, last_changed_at: new Date(body.scanned_at),
-  }).onConflictDoUpdate({
-    target: vehicleStatus.vehicle_id, set: { current_status: 'out', current_yard_id: null, last_out_scan_id: scan.id, last_changed_at: new Date(body.scanned_at), override_reason: null },
-  });
+  const scanTime = new Date(body.scanned_at);
+  if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
+    await db.insert(vehicleStatus).values({
+      vehicle_id: vehicleId, current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime,
+    }).onConflictDoUpdate({
+      target: vehicleStatus.vehicle_id, set: { current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime, override_reason: null },
+    });
+  }
 
   const flagsList: string[] = [];
   if (!currentStatus || currentStatus.current_status !== 'in') { await createFlag(vehicleId, scan.id, 'unverified_in', 'OUT scan with no prior IN record'); flagsList.push('unverified_in'); }
@@ -217,14 +223,10 @@ router.post('/bulk-sync', async (req, res, next) => {
     const results: Array<{ client_scan_id: string; status: string; error?: string; flags?: string[] }> = [];
 
     for (const scanData of body.scans) {
-      try {
-        if (scanData.scan_type === 'in') {
-          results.push({ client_scan_id: scanData.client_scan_id, ...await processScanIn(scanData, yardId) });
-        } else {
-          results.push({ client_scan_id: scanData.client_scan_id, ...await processScanOut(scanData, yardId) });
-        }
-      } catch (scanErr) {
-        results.push({ client_scan_id: scanData.client_scan_id, status: 'error', error: scanErr instanceof Error ? scanErr.message : 'Unknown error' });
+      if (scanData.scan_type === 'in') {
+        results.push({ client_scan_id: scanData.client_scan_id, ...await processScanIn(scanData, yardId) });
+      } else {
+        results.push({ client_scan_id: scanData.client_scan_id, ...await processScanOut(scanData, yardId) });
       }
     }
     res.json({ results });
