@@ -8,6 +8,7 @@ import {
   createScan,
   dashboard,
   parseDeliveredVins,
+  normalizeVin,
   removeDeliveredVehicles,
   resolveFlag,
   STORAGE_KEY,
@@ -508,14 +509,24 @@ function ScanView({ state, setState, session, online }) {
 
   useEffect(() => {
     if (!cameraOpen) return;
-    let stream;
+    let cancelled = false;
+    let controls;
 
     async function openCamera() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
+        const { BrowserQRCodeReader } = await import("@zxing/browser");
+        const reader = new BrowserQRCodeReader();
+        controls = await reader.decodeFromConstraints({ video: { facingMode: { ideal: "environment" } } }, videoRef.current, (result) => {
+          if (cancelled || !result) return;
+          const scannedVin = normalizeVin(result.getText());
+          if (scannedVin.length === 17) {
+            setVin(scannedVin);
+            setMessage({ kind: "ok", text: `VIN ${scannedVin} scanned.` });
+            setCameraOpen(false);
+            return;
+          }
+          setCameraError("QR code found, but no valid VIN was inside it.");
+        });
         setCameraError("");
       } catch {
         setCameraError("Camera access blocked. Allow camera permission and try again.");
@@ -524,7 +535,10 @@ function ScanView({ state, setState, session, online }) {
     }
 
     openCamera();
-    return () => stream?.getTracks().forEach((track) => track.stop());
+    return () => {
+      cancelled = true;
+      controls?.stop();
+    };
   }, [cameraOpen]);
 
   function submit(event) {
