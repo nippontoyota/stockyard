@@ -562,18 +562,6 @@ function ScanView({ state, setState, session, online }) {
     let frameId;
 
     const stopStream = () => stream?.getTracks().forEach((track) => track.stop());
-    const rearCamera = {
-      facingMode: { exact: "environment" },
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-      advanced: [{ focusMode: "continuous" }],
-    };
-    const fallbackCamera = {
-      facingMode: { ideal: "environment" },
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-      advanced: [{ focusMode: "continuous" }],
-    };
 
     const bindCameraControls = () => {
       const track = stream?.getVideoTracks?.()[0] || videoRef.current?.srcObject?.getVideoTracks?.()[0];
@@ -594,16 +582,27 @@ function ScanView({ state, setState, session, online }) {
     async function startNativeScanner() {
       if (!("BarcodeDetector" in window)) return false;
       if (window.BarcodeDetector.getSupportedFormats) {
-        const formats = await window.BarcodeDetector.getSupportedFormats();
+        const formats = await window.BarcodeDetector.getSupportedFormats().catch(() => []);
         if (!formats.includes("qr_code")) return false;
       }
 
       const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: rearCamera });
-      } catch {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: fallbackCamera });
+      const constraints = [
+        { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        { facingMode: "environment" },
+        true
+      ];
+
+      for (const videoOpt of constraints) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: videoOpt });
+          if (stream) break;
+        } catch {
+          // Try next constraint set
+        }
       }
+
+      if (!stream || !videoRef.current) return false;
 
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
@@ -616,7 +615,7 @@ function ScanView({ state, setState, session, online }) {
           const codes = await detector.detect(videoRef.current);
           if (!cancelled && codes[0]) handleQrText(codes[0].rawValue || "");
         } catch {
-          // Keep scanning; some browsers throw while a camera frame is settling.
+          // Keep scanning
         }
         if (!cancelled) frameId = requestAnimationFrame(scanFrame);
       };
@@ -627,21 +626,35 @@ function ScanView({ state, setState, session, online }) {
 
     async function openCamera() {
       try {
-        if (await startNativeScanner()) return;
+        const nativeWorked = await startNativeScanner().catch(() => false);
+        if (nativeWorked) return;
+
         const { BrowserQRCodeReader } = await import("@zxing/browser");
         const reader = new BrowserQRCodeReader();
         const onDecode = (result) => {
           if (!cancelled && result) handleQrText(result.getText());
         };
-        try {
-          controls = await reader.decodeFromConstraints({ video: rearCamera }, videoRef.current, onDecode);
-        } catch {
-          controls = await reader.decodeFromConstraints({ video: fallbackCamera }, videoRef.current, onDecode);
+
+        const zxingConstraints = [
+          { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+          { video: { facingMode: "environment" } },
+          { video: true }
+        ];
+
+        for (const c of zxingConstraints) {
+          try {
+            controls = await reader.decodeFromConstraints(c, videoRef.current, onDecode);
+            if (controls) break;
+          } catch {
+            // Try next constraint set
+          }
         }
+
         bindCameraControls();
         setCameraError("");
-      } catch {
-        setCameraError("Camera access blocked. Allow camera permission and try again.");
+      } catch (err) {
+        console.warn("Camera init failed:", err);
+        setCameraError("Camera permission or constraints error. Try uploading a QR image.");
         setCameraOpen(false);
       }
     }
