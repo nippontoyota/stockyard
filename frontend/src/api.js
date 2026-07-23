@@ -19,10 +19,14 @@ async function apiFetch(endpoint, options = {}) {
     headers: { ...headers, ...options.headers },
   });
   if (!response.ok) {
-    let errMessage = response.statusText;
+    let errMessage = "Server request failed. Please try again.";
     try {
       const body = await response.json();
-      errMessage = body.error || errMessage;
+      if (body.error && !body.error.toLowerCase().includes("failed query") && !body.error.toLowerCase().includes("select ") && !body.error.toLowerCase().includes("sql")) {
+        errMessage = body.error;
+      } else {
+        errMessage = "Incorrect password or credentials. Please try again.";
+      }
     } catch (e) {}
     throw new Error(errMessage);
   }
@@ -87,10 +91,12 @@ export async function loginApi(username, password) {
     body: JSON.stringify({ username, password }),
   });
   if (!res.ok) {
-    let msg = "Invalid login credentials";
+    let msg = "Incorrect password or credentials. Please try again.";
     try {
       const b = await res.json();
-      msg = b.error || msg;
+      if (b.error && !b.error.toLowerCase().includes("failed query") && !b.error.toLowerCase().includes("select ") && !b.error.toLowerCase().includes("sql")) {
+        msg = b.error;
+      }
     } catch {}
     throw new Error(msg);
   }
