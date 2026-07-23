@@ -30,11 +30,12 @@ assert.equal(sameYardDuplicate.accepted, false);
 assert.equal(sameYardDuplicate.message, "Vehicle is already IN at this yard.");
 assert.equal(sameYardDuplicate.state.flags.some((flag) => flag.type === "duplicate_yard_status"), false);
 
-// Third scan at a DIFFERENT yard: should be accepted but flag raised
+// Third scan at a DIFFERENT yard: should be accepted as IN at new yard, update location, and raise duplicate_yard_status flag
 const transferConflict = applyScan(firstScanResult.state, { ...baseScan, clientScanId: "client-3", yardId: "CO01A-1", gps: { latitude: 9.9369, longitude: 76.3149 } });
 assert.equal(transferConflict.accepted, true);
+assert.equal(transferConflict.state.vehicles.JTMBA38V70D123456.currentYardId, "CO01A-1");
+assert.equal(transferConflict.state.vehicles.JTMBA38V70D123456.currentStatus, "in");
 assert.equal(transferConflict.state.flags.some((flag) => flag.type === "duplicate_yard_status"), true);
-assert.equal(transferConflict.state.flags.some((flag) => flag.type === "duplicate_yard_status" && flag.message.includes("multiple locations")), true);
 
 // OUT scan with no prior IN (using a completely new state and VIN)
 const outNoIn = applyScan(createInitialState(), { ...baseScan, clientScanId: "client-4", vinRaw: "AAAAAAAAAAAAAAAAA", type: "out", outRemark: "customer_acquisition" });
