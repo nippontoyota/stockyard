@@ -189,8 +189,8 @@ router.patch('/flags/:id/resolve', async (req, res, next) => {
 
 const overrideBody = z.object({
   status: z.enum(['in', 'out']),
-  yard_id: z.string().uuid().optional(),
-  yardId: z.string().uuid().optional(),
+  yard_id: z.string().optional(),
+  yardId: z.string().optional(),
   reason: z.string().min(1),
 }).transform((d) => ({
   status: d.status,
