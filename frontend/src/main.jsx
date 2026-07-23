@@ -304,12 +304,20 @@ function Login({ onLogin }) {
       if (cleanUsername.endsWith("@nippon.com")) {
         const extractedYardCode = cleanUsername.replace("@nippon.com", "");
         const yard = yards.find((y) => y.id === extractedYardCode || y.code === extractedYardCode);
-        if (yard && (cleanPassword === cleanUsername || cleanPassword === extractedYardCode)) {
+        if (
+          yard &&
+          (cleanPassword === cleanUsername ||
+            cleanPassword === extractedYardCode ||
+            cleanPassword === yard.code ||
+            cleanPassword === `${yard.code}@nippon.com`)
+        ) {
           onLogin({ role: "stockyard", yardId: yard.id, name: yard.name });
           return;
         }
       }
-      setErrorMsg(err.message || "Incorrect password. Please try again.");
+
+      const isRawDbError = err.message && (err.message.includes("Failed query") || err.message.includes("select ") || err.message.includes("params:"));
+      setErrorMsg(isRawDbError ? "Incorrect password. Please try again." : err.message || "Incorrect password. Please try again.");
     } finally {
       setIsLoading(false);
     }
