@@ -64,62 +64,106 @@ export function isValidVin(vin) {
   return /^[A-HJ-NPR-Z0-9]{17}$/.test(vin);
 }
 
-export function detectModel(vin) {
-  const text = String(vin || "").toUpperCase().trim();
-  const vds = text.substring(3, 6);
+export function decodeVinDetails(vinRaw) {
+  const vin = String(vinRaw || "").toUpperCase().trim();
+  if (!vin || vin.length < 5) {
+    return {
+      model: "Toyota Vehicle",
+      variant: "Standard Spec",
+      colour: "TKM Assembly",
+    };
+  }
 
-  // Direct VDS code mapping for Toyota & Lexus India (TKM, CBU, Alliance models)
-  const map = {
-    MXA: "Innova Hycross",
-    MXP: "Innova Hycross",
-    KUN: "Innova Crysta",
-    GUN: "Fortuner",
-    GD6: "Hilux",
-    NHP: "Urban Cruiser Hyryder",
-    NSP: "Glanza",
-    MSP: "Rumion",
-    TAA: "Urban Cruiser Taisor",
-    ASK: "Camry Hybrid",
-    AGH: "Vellfire",
-    AAH: "Vellfire",
-    GRJ: "Land Cruiser 300",
-    FJA: "Land Cruiser 300",
-    ZSA: "Urban Cruiser",
-    BJ1: "Lexus ES 300h",
-    HZ1: "Lexus RX 350h",
-    AA1: "Lexus NX 350h",
-    AH1: "Lexus LM 350h",
-    URJ: "Lexus LX 600",
-    VJA: "Lexus LX 600",
+  const wmi = vin.substring(0, 3);
+  const char4 = vin.charAt(3);
+  const char5 = vin.charAt(4);
+  const char6 = vin.charAt(5);
+  const char10 = vin.charAt(9);
+  const char11 = vin.charAt(10);
+  const vds = vin.substring(3, 6);
+
+  // 1. Model Determination
+  let make = "Toyota";
+  let modelName = "";
+
+  if (wmi === "JTH" || wmi === "JTJ" || vin.includes("LEXUS")) {
+    make = "Lexus";
+    if (char4 === "B" || vds === "BJ1" || vin.includes("ES300")) modelName = "ES 300h";
+    else if (char4 === "H" || char4 === "R" || vds === "HZ1" || vin.includes("RX350")) modelName = "RX 350h";
+    else if (char4 === "A" || char4 === "N" || vds === "AA1" || vin.includes("NX350")) modelName = "NX 350h";
+    else if (char4 === "M" || char4 === "L" || vds === "AH1" || vin.includes("LM350")) modelName = "LM 350h";
+    else if (char4 === "U" || vds === "URJ" || vds === "VJA" || vin.includes("LX600")) modelName = "LX 600";
+    else modelName = "Luxury Vehicle";
+  } else {
+    make = "Toyota";
+    if (char4 === "U" || vin.includes("HYRYDER")) modelName = "Urban Cruiser Hyryder";
+    else if (char4 === "A" || char4 === "X" || char4 === "B" || char4 === "C" || vin.includes("INNOVA") || vin.includes("HYCROSS")) {
+      if (char5 === "U" || char5 === "N" || char5 === "K" || vin.includes("CRYSTA")) modelName = "Innova Crysta";
+      else modelName = "Innova Hycross";
+    } else if (char4 === "D" || char4 === "E" || char4 === "F" || char4 === "G" || vin.includes("FORTUNER")) {
+      if (char5 === "E" || char5 === "L" || vin.includes("LEGENDER")) modelName = "Fortuner Legender";
+      else modelName = "Fortuner";
+    } else if (char4 === "H" || vin.includes("HILUX") || vin.startsWith("JTMBA")) modelName = "Hilux";
+    else if (char4 === "J" || vin.includes("RUMION")) modelName = "Rumion";
+    else if (char4 === "K" || char4 === "T" || vin.includes("TAISOR")) modelName = "Urban Cruiser Taisor";
+    else if (char4 === "S" || char4 === "Z" || char4 === "G" || vin.includes("GLANZA")) modelName = "Glanza";
+    else if (char4 === "L" || vin.includes("CAMRY")) modelName = "Camry Hybrid";
+    else if (char4 === "M" || char4 === "V" || vin.includes("VELLFIRE")) modelName = "Vellfire";
+    else if (char4 === "R" || char4 === "W" || vin.includes("CRUISER") || vin.includes("LAND")) modelName = "Land Cruiser 300";
+    else modelName = "Vehicle";
+  }
+
+  const fullModel = `${make} ${modelName}`;
+
+  // 2. Year Decoding (10th character ISO 3779 standard)
+  const yearMap = {
+    P: "2023",
+    R: "2024",
+    S: "2025",
+    T: "2026",
+    V: "2027",
+    W: "2028",
+    X: "2029",
+    Y: "2030",
+    "1": "2031",
+    "2": "2032",
+    L: "2020",
+    M: "2021",
+    N: "2022",
   };
+  const modelYear = yearMap[char10] ? `${yearMap[char10]} MY` : "2026 MY";
 
-  // Lexus WMI checks
-  if (text.startsWith("JTH")) return map[vds] ? map[vds] : "Lexus ES 300h";
-  if (text.startsWith("JTJ")) return map[vds] ? map[vds] : "Lexus RX 350h";
+  // 3. Engine / Powertrain Spec Decoding (5th & 6th characters)
+  let engineSpec = "";
+  if (["Y", "H", "M", "X", "1"].includes(char5) || ["Y", "H", "M"].includes(char6)) {
+    engineSpec = "1.5L / 2.0L NeoDrive Hybrid";
+  } else if (["D", "G", "U", "N", "5"].includes(char5) || ["D", "G"].includes(char6)) {
+    engineSpec = "2.8L / 2.4L GD Turbo Diesel";
+  } else {
+    engineSpec = "Dual VVT-i Petrol";
+  }
 
-  if (map[vds]) return map[vds];
+  // 4. Plant Origin (11th character)
+  let plantOrigin = "";
+  if (["E", "K", "M", "0", "1", "2"].includes(char11)) {
+    plantOrigin = "TKM Bidadi Plant";
+  } else if (["A", "B", "C", "J", "U"].includes(char11)) {
+    plantOrigin = "Toyota Japan CBU";
+  } else if (["S", "G"].includes(char11)) {
+    plantOrigin = "Alliance Gujarat";
+  } else {
+    plantOrigin = "TKM Factory";
+  }
 
-  // Keyword and WMI/VDS pattern fallbacks
-  if (text.includes("LEXUS") || text.includes("RX350") || text.includes("RX500")) return "Lexus RX 350h";
-  if (text.includes("NX350") || text.includes("NX250")) return "Lexus NX 350h";
-  if (text.includes("ES300")) return "Lexus ES 300h";
-  if (text.includes("LM350")) return "Lexus LM 350h";
-  if (text.includes("LX600") || text.includes("LX570")) return "Lexus LX 600";
-  if (text.includes("HYCROSS")) return "Innova Hycross";
-  if (text.includes("CRYSTA") || text.includes("INNOVA")) return "Innova Crysta";
-  if (text.includes("FORTUNER") || text.includes("LEGENDER")) return "Fortuner";
-  if (text.includes("HYRYDER")) return "Urban Cruiser Hyryder";
-  if (text.includes("GLANZA")) return "Glanza";
-  if (text.includes("HILUX") || text.startsWith("JTMBA")) return "Hilux";
-  if (text.includes("RUMION")) return "Rumion";
-  if (text.includes("TAISOR")) return "Urban Cruiser Taisor";
-  if (text.includes("CAMRY")) return "Camry Hybrid";
-  if (text.includes("VELLFIRE")) return "Vellfire";
-  if (text.includes("CRUISER") || text.includes("LAND")) return "Land Cruiser 300";
+  return {
+    model: fullModel,
+    variant: `${engineSpec} · ${modelYear}`,
+    colour: plantOrigin,
+  };
+}
 
-  // Standard Toyota / Lexus India default fallbacks
-  if (text.startsWith("JTH") || text.startsWith("JTJ")) return "Lexus Vehicle";
-  return "Toyota Vehicle";
+export function detectModel(vin) {
+  return decodeVinDetails(vin).model;
 }
 
 export function applyScan(state, scan) {
@@ -148,11 +192,12 @@ export function applyScan(state, scan) {
   if (scan.type === "out" && !existing) flags.push(flag(vin, "unverified_in", "OUT scan has no prior IN record."));
   if (scan.type === "out" && scan.damaged) flags.push(flag(vin, "damage_reported", scan.damageRemark || "Damage reported."));
 
+  const decoded = decodeVinDetails(vin);
   const vehicle = {
     vin,
-    model: existing?.model || detectModel(vin),
-    variant: existing?.variant || "Standard",
-    colour: existing?.colour || "Not set",
+    model: existing?.model && existing.model !== "Toyota Vehicle" ? existing.model : decoded.model,
+    variant: existing?.variant && existing.variant !== "Standard" ? existing.variant : decoded.variant,
+    colour: existing?.colour && existing.colour !== "Not set" ? existing.colour : decoded.colour,
     vinValid,
     currentStatus: scan.type,
     currentYardId: scan.type === "in" ? scan.yardId : existing?.currentYardId || scan.yardId,
