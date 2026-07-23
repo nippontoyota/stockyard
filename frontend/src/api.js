@@ -39,6 +39,7 @@ export async function bulkSync(scans) {
     scan_type: s.type,
     client_scan_id: s.clientScanId,
     vin: s.vinRaw,
+    yard_id: s.yardId,
     scanned_at: s.scannedAt,
     latitude: s.gps?.latitude,
     longitude: s.gps?.longitude,
