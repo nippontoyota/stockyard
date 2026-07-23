@@ -723,16 +723,61 @@ function AdminHome({ stats, state, setState }) {
                     </small>
                   </span>
                   {setState && (
-                    <button onClick={async () => {
-                      try {
-                        await apiResolveFlag(flag.id);
-                        setState(resolveFlag(state, flag.id));
-                      } catch (err) {
-                        alert(err.message);
-                      }
-                    }}>
-                      Resolve
-                    </button>
+                    <div className="flag-actions">
+                      {flag.type === "duplicate_yard_status" && (
+                        <button
+                          type="button"
+                          className="flag-btn primary-flag"
+                          title="Confirm vehicle is IN at the newly scanned yard and resolve flag"
+                          onClick={async () => {
+                            try {
+                              await apiResolveFlag(flag.id);
+                              setState(resolveFlag(state, flag.id));
+                              setToastMessage(`Flag for VIN ${flag.vin} resolved — Confirmed IN at new yard.`);
+                              setTimeout(() => setToastMessage(""), 3500);
+                            } catch (err) {
+                              alert(err.message);
+                            }
+                          }}
+                        >
+                          Confirm IN at New Yard
+                        </button>
+                      )}
+                      {flag.type === "unverified_in" && (
+                        <button
+                          type="button"
+                          className="flag-btn secondary-flag"
+                          title="Reconcile missing IN record and mark vehicle IN"
+                          onClick={async () => {
+                            try {
+                              await adminOverrideVehicle(flag.vin, "in", "Admin reconciled missing IN record");
+                              await apiResolveFlag(flag.id);
+                              setState(resolveFlag(state, flag.id));
+                              setToastMessage(`Reconciled IN record for VIN ${flag.vin}.`);
+                              setTimeout(() => setToastMessage(""), 3500);
+                            } catch (err) {
+                              alert(err.message);
+                            }
+                          }}
+                        >
+                          Reconcile IN
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="flag-btn"
+                        onClick={async () => {
+                          try {
+                            await apiResolveFlag(flag.id);
+                            setState(resolveFlag(state, flag.id));
+                          } catch (err) {
+                            alert(err.message);
+                          }
+                        }}
+                      >
+                        Dismiss / Resolve
+                      </button>
+                    </div>
                   )}
                 </div>
               ))
