@@ -177,7 +177,7 @@ export function CredentialsTab() {
             className={roleFilter === "all" ? "active" : ""}
             onClick={() => setRoleFilter("all")}
           >
-            All Accounts ({credentials.length})
+            All ({credentials.length})
           </button>
           <button
             type="button"
