@@ -1009,6 +1009,27 @@ function ScanView({ state, setState, session, online }) {
             <span className="corner bottom-left"></span>
             <span className="corner bottom-right"></span>
             {!cameraOpen && <span className="qr-pattern" aria-hidden="true"></span>}
+            {cameraOpen && supportsTorch && (
+              <span
+                role="button"
+                tabIndex={0}
+                className="torch-toggle"
+                aria-label={torchOn ? "Turn flash off" : "Turn flash on"}
+                aria-pressed={torchOn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleTorch();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.stopPropagation();
+                    toggleTorch();
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined">{torchOn ? "flashlight_off" : "flashlight_on"}</span>
+              </span>
+            )}
           </button>
           {scanSuccess && (
             <div className="scan-result-popover" aria-live="polite">
@@ -1051,11 +1072,6 @@ function ScanView({ state, setState, session, online }) {
               {message && <small className={`scan-popover-message ${message.kind}`}>{message.text}</small>}
               <button className="primary scan-submit-button">Submit {scanType.toUpperCase()}</button>
             </div>
-          )}
-          {cameraOpen && supportsTorch && (
-            <button type="button" className="torch-toggle" aria-label={torchOn ? "Turn flash off" : "Turn flash on"} aria-pressed={torchOn} onClick={toggleTorch}>
-              <span className="material-symbols-outlined">{torchOn ? "flashlight_off" : "flashlight_on"}</span>
-            </button>
           )}
           <p>{cameraOpen ? "Point the camera at the vehicle QR code." : "Tap the QR grid to open camera scanner."}</p>
           {cameraError && <p className="camera-error">{cameraError}</p>}
