@@ -389,3 +389,15 @@ export function removeDeliveredVehicles(state, vins) {
   ];
   return { ...state, vehicles, delivered };
 }
+
+export function flagLabel(type) {
+  return {
+    damage_reported: "Damage Reported",
+    gps_outside_yard: "GPS Radius Violation",
+    unverified_in: "Unverified OUT",
+    yard_capacity_exceeded: "Capacity Exceeded",
+    duplicate_yard_status: "Duplicate Status",
+    invalid_vin: "Invalid VIN Format",
+    manual_admin_override: "Admin Override",
+  }[type] || String(type || "Flag").replace(/_/g, " ");
+}
