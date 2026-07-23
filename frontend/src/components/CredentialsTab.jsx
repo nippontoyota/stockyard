@@ -152,15 +152,15 @@ export function CredentialsTab() {
 
       {/* Control / Filter Bar */}
       <div className="modal-controls credentials-controls">
-        <div className="search-row modal-search">
-          <span className="material-symbols-outlined">search</span>
-          <input
-            className="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search account by yard code (e.g. CO01A), name or email..."
-          />
-        </div>
+          <div className="search-row modal-search">
+            <span className="material-symbols-outlined">search</span>
+            <input
+              className="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search stockyard by code (e.g. CO01A) or name..."
+            />
+          </div>
         <div className="segmented">
           <button
             type="button"
@@ -325,20 +325,10 @@ export function CredentialsTab() {
 
             <form onSubmit={handleUpdatePassword} className="modal-body stack">
               <div className="field-group">
-                <label className="field-label">Account Email Username</label>
+                <label className="field-label">Stockyard Account / Role</label>
                 <input
                   className="input-disabled"
-                  value={editingAccount.username}
-                  readOnly
-                  disabled
-                />
-              </div>
-
-              <div className="field-group">
-                <label className="field-label">Associated Yard / Title</label>
-                <input
-                  className="input-disabled"
-                  value={editingAccount.yardName || "System Administrator"}
+                  value={editingAccount.yardName ? `${editingAccount.yardId || "Yard"} · ${editingAccount.yardName}` : "System Administrator"}
                   readOnly
                   disabled
                 />
