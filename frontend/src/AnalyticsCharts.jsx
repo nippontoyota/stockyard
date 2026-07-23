@@ -166,7 +166,7 @@ export function ModelDonutChart({ models = [] }) {
   );
 }
 
-export function YardCapacityBarChart({ yards = [] }) {
+export function YardCapacityBarChart({ yards = [], onSelectYard }) {
   const [filter, setFilter] = useState("all"); // 'all' | 'high'
   const displayYards = filter === "high" ? yards.filter((y) => y.utilization >= 75) : yards;
   const allLabel = yards.length === 1 ? "This Yard" : `All Yards (${yards.length})`;
@@ -174,7 +174,7 @@ export function YardCapacityBarChart({ yards = [] }) {
   return (
     <div className="chart-container stack">
       <div className="chart-toolbar">
-        <span className="chart-subtitle">Comparing vehicles parked vs maximum space</span>
+        <span className="chart-subtitle">Comparing vehicles parked vs maximum space (Tap row for car list)</span>
         <div className="pill-toggle">
           <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>{allLabel}</button>
           <button className={filter === "high" ? "active" : ""} onClick={() => setFilter("high")}>High Utilization</button>
@@ -188,7 +188,7 @@ export function YardCapacityBarChart({ yards = [] }) {
           const barColor = isCritical ? "#EB0A1E" : isHeavy ? "#D97706" : "#2563EB";
 
           return (
-            <div key={yard.id} className="bar-row">
+            <div key={yard.id} className="bar-row clickable" onClick={() => onSelectYard?.(yard)} title={`Click to view all vehicles at ${yard.name}`}>
               <div className="bar-info">
                 <span className="bar-label">{yard.name}</span>
                 <span className="bar-code">{yard.code}</span>

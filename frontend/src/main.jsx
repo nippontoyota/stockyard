@@ -362,11 +362,134 @@ function exportAnalyticsReport(stats) {
   XLSX.writeFile(workbook, `Stockyard_Analytics_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
+function YardVehiclesModal({ yard, state, onClose }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  if (!yard) return null;
+
+  const allVehicles = state ? Object.values(state.vehicles) : [];
+  const yardVehicles = allVehicles.filter(
+    (v) => v.currentYardId === yard.id || v.currentYardId === yard.code
+  );
+
+  const filteredVehicles = yardVehicles.filter((v) => {
+    const matchesStatus = statusFilter === "all" || v.currentStatus === statusFilter;
+    const searchString = `${v.vin} ${v.model || ""} ${v.variant || ""} ${v.colour || ""}`.toLowerCase();
+    const matchesSearch = searchString.includes(searchQuery.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
+
+  const countIn = yardVehicles.filter((v) => v.currentStatus === "in").length;
+  const countOut = yardVehicles.filter((v) => v.currentStatus === "out").length;
+  const emptySpace = Math.max(0, yard.capacity - countIn);
+
+  return (
+    <div className="modal-overlay" onClick={onClose} aria-modal="true" role="dialog">
+      <div className="modal-content yard-modal-card" onClick={(e) => e.stopPropagation()}>
+        <header className="modal-header">
+          <div>
+            <div className="modal-badge-row">
+              <span className="eyebrow">{yard.code}</span>
+              <span className="modal-chip capacity">Capacity {yard.capacity}</span>
+              <span className="modal-chip occupied">{countIn} IN</span>
+              <span className="modal-chip empty">{emptySpace} Free</span>
+            </div>
+            <h2>{yard.name}</h2>
+          </div>
+          <button className="close-modal-btn" onClick={onClose} aria-label="Close dialog">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </header>
+
+        <div className="modal-body stack">
+          <div className="modal-controls">
+            <div className="search-row modal-search">
+              <span className="material-symbols-outlined">search</span>
+              <input
+                className="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search VIN or model in this yard..."
+              />
+            </div>
+            <div className="segmented modal-tabs">
+              <button
+                type="button"
+                className={statusFilter === "all" ? "active" : ""}
+                onClick={() => setStatusFilter("all")}
+              >
+                All ({yardVehicles.length})
+              </button>
+              <button
+                type="button"
+                className={statusFilter === "in" ? "active" : ""}
+                onClick={() => setStatusFilter("in")}
+              >
+                Parked IN ({countIn})
+              </button>
+              <button
+                type="button"
+                className={statusFilter === "out" ? "active" : ""}
+                onClick={() => setStatusFilter("out")}
+              >
+                Moved OUT ({countOut})
+              </button>
+            </div>
+          </div>
+
+          <div className="modal-vehicle-list">
+            {filteredVehicles.length === 0 ? (
+              <div className="no-results modal-no-results">
+                <span className="material-symbols-outlined">directions_car</span>
+                <p>No vehicles found {statusFilter !== "all" ? `with status ${statusFilter.toUpperCase()}` : "in this stockyard"}.</p>
+              </div>
+            ) : (
+              filteredVehicles.map((vehicle) => {
+                const activeFlag = state?.flags?.find((f) => f.vin === vehicle.vin && !f.resolved);
+                return (
+                  <div key={vehicle.vin} className={`vehicle-row-card ${vehicle.currentStatus} ${activeFlag ? "flagged" : ""}`}>
+                    <div className="v-row-mark">
+                      <span className="material-symbols-outlined">
+                        {vehicle.currentStatus === "in" ? "directions_car" : "logout"}
+                      </span>
+                    </div>
+                    <div className="v-row-info">
+                      <div className="v-row-top">
+                        <strong>{vehicle.vin}</strong>
+                        {activeFlag && (
+                          <span className="badge bad">{flagLabel(activeFlag.type)}</span>
+                        )}
+                      </div>
+                      <small>{vehicle.model || "Unknown Model"} · {vehicle.variant || "Standard"}</small>
+                    </div>
+                    <div className="v-row-status">
+                      <span className={`status-tag ${vehicle.currentStatus}`}>
+                        {vehicle.currentStatus.toUpperCase()}
+                      </span>
+                      <small>{vehicle.lastChangedAt ? new Date(vehicle.lastChangedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</small>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <footer className="modal-footer">
+          <button className="primary modal-done-btn" onClick={onClose}>Done</button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
 function AdminHome({ stats, state, setState }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [showFilterBar, setShowFilterBar] = useState(false);
   const [riskFilter, setRiskFilter] = useState("all"); // 'all' | 'critical' | 'heavy'
   const [toastMessage, setToastMessage] = useState("");
+  const [selectedYardModal, setSelectedYardModal] = useState(null);
 
   const busiestYard = stats.yards.reduce((top, yard) => yard.count > top.count ? yard : top, stats.yards[0] || { count: 0, code: "-", name: "No yard" });
   const healthyYards = stats.yards.filter((yard) => yard.risk === "normal").length;
@@ -497,7 +620,7 @@ function AdminHome({ stats, state, setState }) {
                   <h2>Yard Capacity Utilization</h2>
                   <span className="pill info">Capacity vs Occupied</span>
                 </div>
-                <YardCapacityBarChart yards={filteredYards} />
+                <YardCapacityBarChart yards={filteredYards} onSelectYard={(y) => setSelectedYardModal(y)} />
               </section>
 
               <section className="panel chart-panel chart-panel-compact">
@@ -543,13 +666,18 @@ function AdminHome({ stats, state, setState }) {
           <>
             <div className="tab-summary">
               <span className="eyebrow">Yard details</span>
-              <strong>{filteredYards.length} stockyard{filteredYards.length === 1 ? "" : "s"}</strong>
+              <strong>{filteredYards.length} stockyard{filteredYards.length === 1 ? "" : "s"} (Tap any card to view cars)</strong>
             </div>
             <section className="yard-box-grid">
               {filteredYards.map((yard) => {
                 const empty = Math.max(0, yard.capacity - yard.count);
                 return (
-                  <article className={`yard-box ${yard.risk === "critical" ? "risk-critical" : yard.risk === "heavy" ? "risk-heavy" : ""}`} key={yard.id}>
+                  <article
+                    className={`yard-box clickable ${yard.risk === "critical" ? "risk-critical" : yard.risk === "heavy" ? "risk-heavy" : ""}`}
+                    key={yard.id}
+                    onClick={() => setSelectedYardModal(yard)}
+                    title={`Click to view all vehicles at ${yard.name}`}
+                  >
                     <div>
                       <span className="eyebrow">{yard.code}</span>
                       <h2>{yard.name}</h2>
@@ -563,6 +691,10 @@ function AdminHome({ stats, state, setState }) {
                     <div className="progress-wrapper">
                       <progress max="100" value={Math.min(100, yard.utilization)} />
                       <span className="progress-lbl">{yard.utilization}%</span>
+                    </div>
+                    <div className="yard-box-tap-hint">
+                      <span className="material-symbols-outlined">directions_car</span>
+                      <span>Tap to view vehicles &rarr;</span>
                     </div>
                   </article>
                 );
@@ -608,6 +740,12 @@ function AdminHome({ stats, state, setState }) {
           </section>
         )}
       </div>
+
+      <YardVehiclesModal
+        yard={selectedYardModal}
+        state={state}
+        onClose={() => setSelectedYardModal(null)}
+      />
     </section>
   );
 }
