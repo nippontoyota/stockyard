@@ -476,11 +476,43 @@ import { YardVehiclesModal } from "./components/YardVehiclesModal.jsx";
 import { AdminHome } from "./components/AdminDashboard.jsx";
 import { CredentialsTab } from "./components/CredentialsTab.jsx";
 
+function compressImage(file, maxDimension = 1000, quality = 0.8) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => resolve(e.target.result || "");
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
 function ScanView({ state, setState, session, online }) {
   const [vin, setVin] = useState("");
   const [outRemark, setOutRemark] = useState("");
   const [damaged, setDamaged] = useState(false);
   const [damageRemark, setDamageRemark] = useState("");
+  const [damageImage, setDamageImage] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [torchOn, setTorchOn] = useState(false);
@@ -489,12 +521,25 @@ function ScanView({ state, setState, session, online }) {
   const [message, setMessage] = useState(null);
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
+  const damagePhotoInputRef = useRef(null);
   const trackRef = useRef(null);
   const scanLockedRef = useRef(false);
   const yard = yards.find((item) => item.id === session.yardId) || yards[0];
   const pendingVin = normalizeVin(vin);
   const isCarInCurrentYard = state.vehicles[pendingVin]?.currentStatus === "in" && (state.vehicles[pendingVin]?.currentYardId === yard.id || state.vehicles[pendingVin]?.currentYardId === yard.code);
   const scanType = isCarInCurrentYard ? "out" : "in";
+
+  async function handleDamagePhotoSelect(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file, 1000, 0.8);
+      setDamageImage(compressed);
+      setMessage(null);
+    } catch {
+      setDamageImage("");
+    }
+  }
 
   const signalScanSuccess = useCallback(() => {
     if (navigator.vibrate?.([200])) return;
@@ -696,10 +741,13 @@ function ScanView({ state, setState, session, online }) {
     event.preventDefault();
     if (!vin.trim()) return setMessage({ kind: "error", text: "Enter or scan a VIN." });
     if (scanType === "out" && !outRemark) return setMessage({ kind: "error", text: "Select an OUT reason." });
-    if (scanType === "out" && damaged && !damageRemark.trim()) return setMessage({ kind: "error", text: "Add the damage remark." });
+    if (damaged) {
+      if (!damageRemark.trim()) return setMessage({ kind: "error", text: "Add the damage remark." });
+      if (!damageImage) return setMessage({ kind: "error", text: "Attach or capture a photo of the vehicle damage." });
+    }
 
     const gps = { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
-    const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, damaged, damageRemark, online });
+    const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, damaged, damageRemark, damageImage, online });
     const result = applyScan(state, scan);
     setState(result.state);
     setMessage({ kind: result.accepted ? "ok" : "error", text: result.message });
@@ -707,6 +755,7 @@ function ScanView({ state, setState, session, online }) {
     setOutRemark("");
     setDamaged(false);
     setDamageRemark("");
+    setDamageImage("");
     setScanSuccess(null);
     scanLockedRef.current = false;
   }
@@ -766,35 +815,51 @@ function ScanView({ state, setState, session, online }) {
                 <small>Ready for vehicle {scanType.toUpperCase()}.</small>
               </div>
               {scanType === "out" && (
-                <>
-                  <select value={outRemark} onChange={(event) => {
-                    setOutRemark(event.target.value);
-                    setMessage(null);
-                  }} aria-label="OUT reason">
-                    <option value="">Select OUT reason</option>
-                    <option value="customer_acquisition">Customer Acquisition</option>
-                    <option value="stockyard_transfer">Stockyard Transfer</option>
-                  </select>
-                  <label className="check scan-damage-check">
-                    <input type="checkbox" checked={damaged} onChange={(event) => {
-                      setDamaged(event.target.checked);
-                      if (!event.target.checked) setDamageRemark("");
+                <select value={outRemark} onChange={(event) => {
+                  setOutRemark(event.target.value);
+                  setMessage(null);
+                }} aria-label="OUT reason">
+                  <option value="">Select OUT reason</option>
+                  <option value="customer_acquisition">Customer Acquisition</option>
+                  <option value="stockyard_transfer">Stockyard Transfer</option>
+                </select>
+              )}
+              <label className="check scan-damage-check">
+                <input type="checkbox" checked={damaged} onChange={(event) => {
+                  setDamaged(event.target.checked);
+                  if (!event.target.checked) {
+                    setDamageRemark("");
+                    setDamageImage("");
+                  }
+                  setMessage(null);
+                }} />
+                Car damaged
+              </label>
+              {damaged && (
+                <div className="damage-inputs stack">
+                  <textarea
+                    value={damageRemark}
+                    onChange={(event) => {
+                      setDamageRemark(event.target.value);
                       setMessage(null);
-                    }} />
-                    Damage reported
-                  </label>
-                  {damaged && (
-                    <textarea
-                      value={damageRemark}
-                      onChange={(event) => {
-                        setDamageRemark(event.target.value);
-                        setMessage(null);
-                      }}
-                      rows="2"
-                      placeholder="Damage remark"
-                    />
-                  )}
-                </>
+                    }}
+                    rows="2"
+                    placeholder="Type of damage & details..."
+                  />
+                  <input ref={damagePhotoInputRef} type="file" accept="image/*" capture="environment" onChange={handleDamagePhotoSelect} style={{ display: "none" }} />
+                  <div className="damage-photo-upload-row">
+                    <button type="button" className="ghost damage-photo-btn" onClick={() => damagePhotoInputRef.current?.click()}>
+                      <span className="material-symbols-outlined">add_a_photo</span>
+                      <span>{damageImage ? "Change photo" : "Take damage photo"}</span>
+                    </button>
+                    {damageImage && (
+                      <div className="damage-thumb-wrap">
+                        <img src={damageImage} alt="Damage preview" className="damage-thumb" />
+                        <button type="button" className="damage-thumb-remove" onClick={() => setDamageImage("")} title="Remove photo">&times;</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
               {message && <small className={`scan-popover-message ${message.kind}`}>{message.text}</small>}
               <button className="primary scan-submit-button">Submit {scanType.toUpperCase()}</button>
@@ -819,6 +884,7 @@ function ScanView({ state, setState, session, online }) {
               setOutRemark("");
               setDamaged(false);
               setDamageRemark("");
+              setDamageImage("");
               setScanSuccess(null);
               setMessage(null);
               scanLockedRef.current = false;
@@ -827,16 +893,43 @@ function ScanView({ state, setState, session, online }) {
             }}>Scan next</button>
           )}
         </div>
-        {!scanSuccess && scanType === "out" && (
+        {!scanSuccess && (
           <div className="stack">
-            <label htmlFor="remark">OUT Reason</label>
-            <select id="remark" value={outRemark} onChange={(event) => setOutRemark(event.target.value)}>
-              <option value="">Select reason</option>
-              <option value="customer_acquisition">Customer Acquisition</option>
-              <option value="stockyard_transfer">Stockyard Transfer</option>
-            </select>
-            <label className="check"><input type="checkbox" checked={damaged} onChange={(event) => setDamaged(event.target.checked)} /> Damage reported</label>
-            {damaged && <textarea value={damageRemark} onChange={(event) => setDamageRemark(event.target.value)} rows="3" placeholder="Damage remark" />}
+            {scanType === "out" && (
+              <>
+                <label htmlFor="remark">OUT Reason</label>
+                <select id="remark" value={outRemark} onChange={(event) => setOutRemark(event.target.value)}>
+                  <option value="">Select reason</option>
+                  <option value="customer_acquisition">Customer Acquisition</option>
+                  <option value="stockyard_transfer">Stockyard Transfer</option>
+                </select>
+              </>
+            )}
+            <label className="check"><input type="checkbox" checked={damaged} onChange={(event) => {
+              setDamaged(event.target.checked);
+              if (!event.target.checked) {
+                setDamageRemark("");
+                setDamageImage("");
+              }
+            }} /> Car damaged</label>
+            {damaged && (
+              <div className="damage-inputs stack">
+                <textarea value={damageRemark} onChange={(event) => setDamageRemark(event.target.value)} rows="3" placeholder="Type of damage & details..." />
+                <input ref={damagePhotoInputRef} type="file" accept="image/*" capture="environment" onChange={handleDamagePhotoSelect} style={{ display: "none" }} />
+                <div className="damage-photo-upload-row">
+                  <button type="button" className="ghost damage-photo-btn" onClick={() => damagePhotoInputRef.current?.click()}>
+                    <span className="material-symbols-outlined">add_a_photo</span>
+                    <span>{damageImage ? "Change photo" : "Take damage photo"}</span>
+                  </button>
+                  {damageImage && (
+                    <div className="damage-thumb-wrap">
+                      <img src={damageImage} alt="Damage preview" className="damage-thumb" />
+                      <button type="button" className="damage-thumb-remove" onClick={() => setDamageImage("")} title="Remove photo">&times;</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {message && !scanSuccess && <p className={`notice ${message.kind}`}>{message.text}</p>}

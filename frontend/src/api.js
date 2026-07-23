@@ -44,10 +44,11 @@ export async function bulkSync(scans) {
     longitude: s.gps?.longitude,
     gps_accuracy_meters: s.gps?.accuracy,
     device_fingerprint: s.deviceId,
+    damaged: s.damaged || false,
+    damage_remark: s.damageRemark || undefined,
+    damage_image: s.damageImage || undefined,
     ...(s.type === 'out' ? {
       out_remark: s.outRemark,
-      damaged: s.damaged,
-      damage_remark: s.damageRemark || undefined,
     } : {})
   }));
 

@@ -71,6 +71,7 @@ export const scans = pgTable(
     out_remark: text('out_remark'), // 'customer_acquisition' | 'stockyard_transfer'
     damaged: boolean('damaged'),
     damage_remark: text('damage_remark'),
+    damage_image: text('damage_image'),
     status: text('status').notNull(), // 'accepted' | 'rejected' | 'flagged'
   },
   (t) => [

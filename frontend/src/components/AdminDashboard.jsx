@@ -10,7 +10,7 @@ import {
 } from "../AnalyticsCharts.jsx";
 import { YardVehiclesModal } from "./YardVehiclesModal.jsx";
 import { CredentialsTab } from "./CredentialsTab.jsx";
-import { flagLabel, resolveFlag } from "../stockyardLogic.js";
+import { flagLabel, resolveFlag, yards, detectModel } from "../stockyardLogic.js";
 import { resolveFlag as apiResolveFlag, adminOverrideVehicle } from "../api.js";
 
 function exportAnalyticsReport(stats) {
@@ -45,6 +45,7 @@ export function AdminHome({ stats, state, setState }) {
   const [riskFilter, setRiskFilter] = useState("all");
   const [toastMessage, setToastMessage] = useState("");
   const [selectedYardModal, setSelectedYardModal] = useState(null);
+  const [selectedPhotoModal, setSelectedPhotoModal] = useState(null);
 
   const busiestYard = stats.yards.reduce((top, yard) => yard.count > top.count ? yard : top, stats.yards[0] || { count: 0, code: "-", name: "No yard" });
   const healthyYards = stats.yards.filter((yard) => yard.risk === "normal").length;
@@ -62,6 +63,55 @@ export function AdminHome({ stats, state, setState }) {
   };
 
   const activeFlagsList = state ? state.flags.filter((f) => !f.resolved) : [];
+
+  // Compute Damaged Vehicles List (combining flags and scans)
+  const damagedVehiclesMap = new Map();
+  if (state?.flags) {
+    state.flags.filter((f) => f.type === "damage_reported").forEach((flag) => {
+      const scan = state?.scans?.find((s) => s.vin === flag.vin || s.id === flag.scanId);
+      const vehicle = state?.vehicles?.[flag.vin];
+      const yardObj = yards.find((y) => y.id === (flag.yardId || scan?.yardId || vehicle?.currentYardId));
+      damagedVehiclesMap.set(flag.id, {
+        id: flag.id,
+        flagId: flag.id,
+        vin: flag.vin,
+        model: vehicle?.model || (scan ? scan.model : null) || detectModel(flag.vin),
+        scanType: flag.scanType || scan?.type || "in",
+        yardName: yardObj?.name || flag.yardId || "Stockyard",
+        yardCode: yardObj?.code || "",
+        damageRemark: flag.damageRemark || scan?.damageRemark || flag.message || "Damage reported",
+        damageImage: flag.damageImage || scan?.damageImage || null,
+        createdAt: flag.createdAt || scan?.scannedAt || new Date().toISOString(),
+        resolved: flag.resolved,
+      });
+    });
+  }
+
+  if (state?.scans) {
+    state.scans.filter((s) => s.damaged).forEach((scan) => {
+      const existing = [...damagedVehiclesMap.values()].find((d) => d.vin === scan.vin && Math.abs(new Date(d.createdAt) - new Date(scan.scannedAt)) < 5000);
+      if (!existing) {
+        const vehicle = state?.vehicles?.[scan.vin];
+        const yardObj = yards.find((y) => y.id === scan.yardId);
+        damagedVehiclesMap.set(scan.id || scan.clientScanId || crypto.randomUUID(), {
+          id: scan.id || scan.clientScanId || crypto.randomUUID(),
+          flagId: null,
+          vin: scan.vin,
+          model: vehicle?.model || detectModel(scan.vin),
+          scanType: scan.type || "in",
+          yardName: yardObj?.name || scan.yardId || "Stockyard",
+          yardCode: yardObj?.code || "",
+          damageRemark: scan.damageRemark || "Damage reported",
+          damageImage: scan.damageImage || null,
+          createdAt: scan.scannedAt || new Date().toISOString(),
+          resolved: false,
+        });
+      }
+    });
+  }
+
+  const damagedVehiclesList = [...damagedVehiclesMap.values()];
+  const activeDamagedCount = damagedVehiclesList.filter((d) => !d.resolved).length;
 
   return (
     <section className="dashboard-workspace">
@@ -95,6 +145,15 @@ export function AdminHome({ stats, state, setState }) {
             <span className="material-symbols-outlined">flag</span>
             <span>Flags</span>
             {stats.openFlags > 0 && <span className="rail-badge">{stats.openFlags}</span>}
+          </button>
+          <button
+            type="button"
+            className={activeTab === "damaged" ? "active" : ""}
+            onClick={() => setActiveTab("damaged")}
+          >
+            <span className="material-symbols-outlined">car_crash</span>
+            <span>Damaged Cars</span>
+            {activeDamagedCount > 0 && <span className="rail-badge bad">{activeDamagedCount}</span>}
           </button>
         </div>
         <div className="rail-note">
@@ -132,6 +191,7 @@ export function AdminHome({ stats, state, setState }) {
               <button type="button" className={activeTab === "overview" ? "active" : ""} onClick={() => setActiveTab("overview")}>Overview</button>
               <button type="button" className={activeTab === "yards" ? "active" : ""} onClick={() => setActiveTab("yards")}>Yards</button>
               <button type="button" className={activeTab === "flags" ? "active" : ""} onClick={() => setActiveTab("flags")}>Flags ({stats.openFlags})</button>
+              <button type="button" className={activeTab === "damaged" ? "active" : ""} onClick={() => setActiveTab("damaged")}>Damaged Cars ({activeDamagedCount})</button>
             </div>
           </div>
         </div>
@@ -343,6 +403,107 @@ export function AdminHome({ stats, state, setState }) {
             )}
           </section>
         )}
+
+        {activeTab === "damaged" && (
+          <section className="panel stack flag-tab-panel">
+            <div className="tab-summary">
+              <span className="eyebrow">Vehicle Damage Log</span>
+              <strong>{activeDamagedCount} active damaged car flag{activeDamagedCount === 1 ? "" : "s"} ({damagedVehiclesList.length} total recorded)</strong>
+              <span className={activeDamagedCount > 0 ? "pill bad" : "pill ok"}>
+                {activeDamagedCount > 0 ? "Action Required" : "No Active Damage Flags"}
+              </span>
+            </div>
+
+            {damagedVehiclesList.length === 0 ? (
+              <p className="notice ok">No damaged cars reported across stockyard scans.</p>
+            ) : (
+              <div className="damaged-cars-grid">
+                {damagedVehiclesList.map((item) => (
+                  <article className={`damaged-car-card ${item.resolved ? "resolved" : "active"}`} key={item.id}>
+                    <div className="damaged-card-header">
+                      <div>
+                        <div className="damaged-card-title-row">
+                          <strong className="damaged-vin">{item.vin}</strong>
+                          <span className={`scan-badge ${item.scanType}`}>{item.scanType.toUpperCase()} SCAN</span>
+                        </div>
+                        <span className="damaged-model">{item.model}</span>
+                      </div>
+                      <span className={item.resolved ? "pill ok" : "pill bad"}>
+                        {item.resolved ? "Resolved" : "Flagged"}
+                      </span>
+                    </div>
+
+                    <div className="damaged-card-meta">
+                      <span className="material-symbols-outlined">warehouse</span>
+                      <span>{item.yardName} {item.yardCode && `(${item.yardCode})`}</span>
+                      <span className="dot-sep">&bull;</span>
+                      <span className="damaged-time">
+                        {new Date(item.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+
+                    <div className="damaged-remark-box">
+                      <span className="material-symbols-outlined remark-icon">report_problem</span>
+                      <div>
+                        <small className="remark-label">Damage Remarks</small>
+                        <p className="remark-text">{item.damageRemark}</p>
+                      </div>
+                    </div>
+
+                    <div className="damaged-photo-section">
+                      <small className="photo-label">Damage Evidence Photo</small>
+                      {item.damageImage ? (
+                        <div
+                          className="damaged-photo-preview clickable"
+                          onClick={() => setSelectedPhotoModal({
+                            vin: item.vin,
+                            model: item.model,
+                            yardName: item.yardName,
+                            src: item.damageImage,
+                            remark: item.damageRemark,
+                          })}
+                          title="Click to expand photo"
+                        >
+                          <img src={item.damageImage} alt="Damage evidence" />
+                          <div className="photo-overlay">
+                            <span className="material-symbols-outlined">zoom_in</span>
+                            <span>View Full Photo</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="no-photo-box">
+                          <span className="material-symbols-outlined">image_not_supported</span>
+                          <span>No photo attached</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {!item.resolved && item.flagId && setState && (
+                      <div className="damaged-card-actions">
+                        <button
+                          type="button"
+                          className="flag-btn primary-flag"
+                          onClick={async () => {
+                            try {
+                              await apiResolveFlag(item.flagId);
+                              setState(resolveFlag(state, item.flagId));
+                              setToastMessage(`Damage flag resolved for VIN ${item.vin}`);
+                              setTimeout(() => setToastMessage(""), 3500);
+                            } catch (err) {
+                              alert(err.message);
+                            }
+                          }}
+                        >
+                          Resolve Damage Flag
+                        </button>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
 
       <YardVehiclesModal
@@ -350,6 +511,27 @@ export function AdminHome({ stats, state, setState }) {
         state={state}
         onClose={() => setSelectedYardModal(null)}
       />
+
+      {selectedPhotoModal && (
+        <div className="damage-modal-backdrop" onClick={() => setSelectedPhotoModal(null)}>
+          <div className="damage-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="damage-modal-header">
+              <div>
+                <h3>{selectedPhotoModal.vin}</h3>
+                <span className="eyebrow">{selectedPhotoModal.model} &bull; {selectedPhotoModal.yardName}</span>
+              </div>
+              <button type="button" className="damage-modal-close" onClick={() => setSelectedPhotoModal(null)}>&times;</button>
+            </div>
+            <div className="damage-modal-body">
+              <img src={selectedPhotoModal.src} alt="Damage evidence" className="damage-modal-img" />
+              <div className="damage-modal-caption">
+                <strong>Type of Damage & Remarks:</strong>
+                <p>{selectedPhotoModal.remark}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
