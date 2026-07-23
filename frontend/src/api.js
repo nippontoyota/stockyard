@@ -1,6 +1,6 @@
 import { yards } from "./stockyardLogic.js";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_BASE = import.meta.env.VITE_API_URL || "https://stockyard-00s6.onrender.com";
 
 export async function getAuthHeaders() {
   const session = JSON.parse(localStorage.getItem("yardSession") || "null");
