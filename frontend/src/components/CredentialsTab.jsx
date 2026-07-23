@@ -206,7 +206,7 @@ export function CredentialsTab() {
             <div>
               <span className="eyebrow">Executive Access</span>
               <h3>System Administrator Account</h3>
-              <small className="cred-email">{adminAccount.username}</small>
+              <small className="cred-email">Admin Console</small>
             </div>
           </div>
 
@@ -275,11 +275,6 @@ export function CredentialsTab() {
 
                 <div className="cred-card-body">
                   <div className="cred-meta">
-                    <span className="cred-meta-label">Login Account:</span>
-                    <span className="cred-meta-val">{account.username}</span>
-                  </div>
-
-                  <div className="cred-meta">
                     <span className="cred-meta-label">Password:</span>
                     <div className="cred-password-wrapper">
                       <span className="cred-password-text">
@@ -305,7 +300,7 @@ export function CredentialsTab() {
                     className="cred-card-btn"
                     onClick={() => openEditModal(account)}
                   >
-                    <span className="material-symbols-outlined">edit_key</span>
+                    <span className="material-symbols-outlined">key</span>
                     <span>Edit Password</span>
                   </button>
                 </div>
