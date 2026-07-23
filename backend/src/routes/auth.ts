@@ -47,8 +47,12 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     const cleanUsername = String(username).trim();
     const cleanPassword = String(password).trim();
 
-    // Check DB
-    const found = await db.select().from(credentials).where(eq(credentials.username, cleanUsername));
+    // Check DB (seed if unpopulated)
+    let found = await db.select().from(credentials).where(eq(credentials.username, cleanUsername));
+    if (found.length === 0) {
+      await seedDefaultCredentials();
+      found = await db.select().from(credentials).where(eq(credentials.username, cleanUsername));
+    }
     
     if (found.length > 0) {
       const user = found[0];
@@ -62,25 +66,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
           },
         });
       }
-      return res.status(401).json({ error: 'Invalid password. Please check your credentials.' });
-    }
-
-    // Default fallback check for dynamic validation if DB table is unpopulated
-    if (cleanUsername === 'ADMIN123@nippon.com' && cleanPassword === 'ADMIN123@nippon.com') {
-      return res.json({
-        success: true,
-        user: { username: cleanUsername, role: 'admin', yardId: null },
-      });
-    }
-
-    if (cleanUsername.endsWith('@nippon.com')) {
-      const yardCode = cleanUsername.replace('@nippon.com', '');
-      if (cleanPassword === cleanUsername || cleanPassword === yardCode) {
-        return res.json({
-          success: true,
-          user: { username: cleanUsername, role: 'yard', yardId: yardCode },
-        });
-      }
+      return res.status(401).json({ error: 'Incorrect password. Please try again.' });
     }
 
     return res.status(401).json({ error: 'Invalid username or password.' });
