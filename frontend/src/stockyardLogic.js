@@ -37,7 +37,7 @@ export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, gps, outRemark = "", damaged = false, damageRemark = "" }) {
+export function createScan({ vin, type, yardId, gps, outRemark = "", damaged = false, damageRemark = "", damageImage = "" }) {
   return {
     id: crypto.randomUUID(),
     clientScanId: createClientScanId(),
@@ -48,6 +48,7 @@ export function createScan({ vin, type, yardId, gps, outRemark = "", damaged = f
     outRemark,
     damaged,
     damageRemark,
+    damageImage,
     deviceId: localStorage.getItem("yardDeviceId") || "unknown-device",
     scannedAt: new Date().toISOString(),
     syncStatus: "queued",
@@ -190,7 +191,7 @@ export function applyScan(state, scan) {
   if (duplicateIn) flags.push(flag(vin, "duplicate_yard_status", duplicateMessage(existing.currentYardId, scan.yardId)));
 
   if (scan.type === "out" && !existing) flags.push(flag(vin, "unverified_in", "OUT scan has no prior IN record."));
-  if (scan.type === "out" && scan.damaged) flags.push(flag(vin, "damage_reported", scan.damageRemark || "Damage reported."));
+  if (scan.damaged) flags.push(flag(vin, "damage_reported", scan.damageRemark || "Damage reported.", { damageRemark: scan.damageRemark, damageImage: scan.damageImage, scanType: scan.type, yardId: scan.yardId }));
 
   const decoded = decodeVinDetails(vin);
   const vehicle = {
@@ -213,8 +214,8 @@ export function applyScan(state, scan) {
   return { state: next, accepted: true, message: flags.length ? "Scan accepted with admin flag." : "Scan accepted." };
 }
 
-function flag(vin, type, message) {
-  return { id: crypto.randomUUID(), vin, type, message, resolved: false, createdAt: new Date().toISOString() };
+function flag(vin, type, message, meta = {}) {
+  return { id: crypto.randomUUID(), vin, type, message, resolved: false, createdAt: new Date().toISOString(), ...meta };
 }
 
 function duplicateMessage(currentYardId, scanYardId) {

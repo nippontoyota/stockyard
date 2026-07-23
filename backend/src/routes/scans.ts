@@ -12,7 +12,7 @@ router.use(authenticate);
 
 // ─── Zod schemas ─────────────────────────────────────────────────────
 
-const scanInBody = z.object({
+const scanInBase = z.object({
   vin: z.string().min(1),
   scanned_at: z.string().datetime(),
   latitude: z.number().nullish(),
@@ -20,13 +20,24 @@ const scanInBody = z.object({
   gps_accuracy_meters: z.number().nullish(),
   device_fingerprint: z.string().min(1),
   client_scan_id: z.string().min(1),
+  damaged: z.boolean().optional(),
+  damage_remark: z.string().optional(),
+  damage_image: z.string().optional(),
 });
 
-const scanOutBody = scanInBody.extend({
+const scanInBody = scanInBase.refine((d) => !d.damaged || (d.damage_remark && d.damage_remark.length > 0), {
+  message: 'damage_remark is required when damaged is true',
+  path: ['damage_remark'],
+});
+
+const scanOutBase = scanInBase.extend({
   out_remark: z.enum(['customer_acquisition', 'stockyard_transfer']),
   damaged: z.boolean(),
   damage_remark: z.string().optional(),
-}).refine((d) => !d.damaged || (d.damage_remark && d.damage_remark.length > 0), {
+  damage_image: z.string().optional(),
+});
+
+const scanOutBody = scanOutBase.refine((d) => !d.damaged || (d.damage_remark && d.damage_remark.length > 0), {
   message: 'damage_remark is required when damaged is true',
   path: ['damage_remark'],
 });
@@ -34,14 +45,8 @@ const scanOutBody = scanInBody.extend({
 const bulkSyncBody = z.object({
   scans: z.array(
     z.discriminatedUnion('scan_type', [
-      z.object({ scan_type: z.literal('in') }).merge(scanInBody),
-      z.object({ scan_type: z.literal('out') }).merge(
-        scanInBody.extend({
-          out_remark: z.enum(['customer_acquisition', 'stockyard_transfer']),
-          damaged: z.boolean(),
-          damage_remark: z.string().optional(),
-        }),
-      ),
+      z.object({ scan_type: z.literal('in') }).merge(scanInBase),
+      z.object({ scan_type: z.literal('out') }).merge(scanOutBase),
     ]),
   ),
 });
@@ -122,7 +127,7 @@ async function processScanIn(body: ScanIn, yardId: string) {
   }
 
   const [scan] = await db.insert(scans).values({
-    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), status: 'accepted',
+    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
   }).returning();
 
   const scanTime = new Date(body.scanned_at);
@@ -136,6 +141,7 @@ async function processScanIn(body: ScanIn, yardId: string) {
 
   const flagsList: string[] = [];
   if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`); flagsList.push('invalid_vin'); }
+  if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported'); flagsList.push('damage_reported'); }
   
   if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id !== yardId) {
     let oldYardCode = String(currentStatus.current_yard_id);
@@ -166,7 +172,7 @@ async function processScanOut(body: ScanOut, yardId: string) {
   const [currentStatus] = await db.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
   const [scan] = await db.insert(scans).values({
-    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), out_remark: body.out_remark, damaged: body.damaged, damage_remark: body.damage_remark, status: 'accepted',
+    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), out_remark: body.out_remark, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
   }).returning();
 
   const scanTime = new Date(body.scanned_at);

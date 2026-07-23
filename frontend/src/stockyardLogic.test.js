@@ -69,4 +69,20 @@ assert.equal(yardStats.currentStock, 1);
 assert.equal(yardStats.totalCapacity, 200);
 assert.equal(yardStats.openFlags, 0);
 
+// IN scan with damage reported
+const damagedInScan = applyScan(createInitialState(), {
+  ...baseScan,
+  clientScanId: "client-6",
+  vinRaw: "MBJUYML1STE999999",
+  type: "in",
+  damaged: true,
+  damageRemark: "Scratched side door panel",
+  damageImage: "data:image/png;base64,sampleImageData",
+});
+assert.equal(damagedInScan.accepted, true);
+const damageFlag = damagedInScan.state.flags.find((f) => f.type === "damage_reported");
+assert.ok(damageFlag);
+assert.equal(damageFlag.damageRemark, "Scratched side door panel");
+assert.equal(damageFlag.damageImage, "data:image/png;base64,sampleImageData");
+
 console.log("stockyard logic ok");
