@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { eq, and, count } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { scans, vehicles, vehicleStatus, devices, flags, yards } from '../db/schema.js';
-import { isValidVin, detectModel } from '../lib/vin.js';
+import { isValidVin, detectModel, resolveVehicleMetadata } from '../lib/vin.js';
 import { haversineMeters } from '../lib/geo.js';
 import { authenticate } from '../middleware/auth.js';
 
@@ -66,7 +66,7 @@ async function findOrCreateDevice(fingerprint: string): Promise<string> {
 async function findOrCreateVehicle(vinRaw: string): Promise<{ id: string; vinValid: boolean }> {
   const vin = vinRaw.toUpperCase().trim();
   const vinValid = isValidVin(vin);
-  const model = detectModel(vin);
+  const model = await resolveVehicleMetadata(vin);
 
   const result = await db
     .insert(vehicles)

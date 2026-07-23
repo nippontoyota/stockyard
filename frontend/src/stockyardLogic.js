@@ -68,7 +68,7 @@ export function detectModel(vin) {
   const text = String(vin || "").toUpperCase().trim();
   const vds = text.substring(3, 6);
 
-  // Direct VDS code mapping for Toyota India (TKM, CBU, Alliance models)
+  // Direct VDS code mapping for Toyota & Lexus India (TKM, CBU, Alliance models)
   const map = {
     MXA: "Innova Hycross",
     MXP: "Innova Hycross",
@@ -85,11 +85,26 @@ export function detectModel(vin) {
     GRJ: "Land Cruiser 300",
     FJA: "Land Cruiser 300",
     ZSA: "Urban Cruiser",
+    BJ1: "Lexus ES 300h",
+    HZ1: "Lexus RX 350h",
+    AA1: "Lexus NX 350h",
+    AH1: "Lexus LM 350h",
+    URJ: "Lexus LX 600",
+    VJA: "Lexus LX 600",
   };
+
+  // Lexus WMI checks
+  if (text.startsWith("JTH")) return map[vds] ? map[vds] : "Lexus ES 300h";
+  if (text.startsWith("JTJ")) return map[vds] ? map[vds] : "Lexus RX 350h";
 
   if (map[vds]) return map[vds];
 
   // Keyword and WMI/VDS pattern fallbacks
+  if (text.includes("LEXUS") || text.includes("RX350") || text.includes("RX500")) return "Lexus RX 350h";
+  if (text.includes("NX350") || text.includes("NX250")) return "Lexus NX 350h";
+  if (text.includes("ES300")) return "Lexus ES 300h";
+  if (text.includes("LM350")) return "Lexus LM 350h";
+  if (text.includes("LX600") || text.includes("LX570")) return "Lexus LX 600";
   if (text.includes("HYCROSS")) return "Innova Hycross";
   if (text.includes("CRYSTA") || text.includes("INNOVA")) return "Innova Crysta";
   if (text.includes("FORTUNER") || text.includes("LEGENDER")) return "Fortuner";
@@ -102,7 +117,8 @@ export function detectModel(vin) {
   if (text.includes("VELLFIRE")) return "Vellfire";
   if (text.includes("CRUISER") || text.includes("LAND")) return "Land Cruiser 300";
 
-  // Standard Toyota India default fallback
+  // Standard Toyota / Lexus India default fallbacks
+  if (text.startsWith("JTH") || text.startsWith("JTJ")) return "Lexus Vehicle";
   return "Toyota Vehicle";
 }
 
