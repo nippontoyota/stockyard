@@ -76,15 +76,21 @@ function getViewFromPath(pathname, role) {
   return "scan";
 }
 
-function App() {
-  const [state, setState] = useState(loadState);
-  const [session, setSession] = useState(() => JSON.parse(localStorage.getItem("yardSession") || "null"));
-  const [view, setView] = useState(() => {
-    const savedSession = JSON.parse(localStorage.getItem("yardSession") || "null");
-    if (!savedSession) return "scan";
-    return getViewFromPath(window.location.pathname, savedSession.role);
+export default function App() {
+  const [session, setSession] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("yardSession"));
+    } catch {
+      return null;
+    }
   });
-  const [online, setOnline] = useState(navigator.onLine);
+
+  const [state, setState] = useState(loadState);
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const [view, setView] = useState(() => {
+    if (!session) return "login";
+    return getViewFromPath(window.location.pathname, session.role);
+  });
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -114,7 +120,11 @@ function App() {
   const fetchServerData = useCallback(async () => {
     if (!session || !online) return;
     try {
-      const vehiclesData = await getVehicles();
+      const [vehiclesData, flagsData, scansData] = await Promise.all([
+        getVehicles().catch(() => []),
+        getFlags().catch(() => []),
+        getScans().catch(() => []),
+      ]);
       
       const mappedVehicles = {};
       vehiclesData.forEach(v => {
@@ -131,21 +141,49 @@ function App() {
         };
       });
       
-      const flagsData = await getFlags();
-      let mappedFlags = flagsData.map(f => ({
+      const mappedFlags = flagsData.map(f => ({
         id: f.id,
         vin: f.vin,
         type: f.flag_type,
         message: f.message,
         createdAt: f.created_at,
         resolved: f.resolved,
+        damageRemark: f.damage_remark,
+        damageImage: f.damage_image,
+        scanType: f.scan_type,
+        yardId: f.yard_id,
+      }));
+
+      const mappedScans = scansData.map(s => ({
+        id: s.id,
+        clientScanId: s.clientScanId || s.id,
+        vin: s.vin,
+        vinRaw: s.vinRaw || s.vin,
+        type: s.type,
+        yardId: s.yardId,
+        scannedAt: s.scannedAt,
+        damaged: Boolean(s.damaged),
+        damageRemark: s.damageRemark || "",
+        damageImage: s.damageImage || "",
+        outRemark: s.outRemark || "",
+        syncStatus: "synced",
       }));
       
-      setState(s => ({
-        ...s,
-        vehicles: mappedVehicles,
-        flags: mappedFlags
-      }));
+      setState(s => {
+        const localQueuedScans = (s.scans || []).filter(sc => s.queue?.includes(sc.clientScanId));
+        const combinedScans = [...mappedScans];
+        localQueuedScans.forEach(lqs => {
+          if (!combinedScans.some(cs => cs.clientScanId === lqs.clientScanId)) {
+            combinedScans.push(lqs);
+          }
+        });
+        return {
+          ...s,
+          vehicles: mappedVehicles,
+          flags: mappedFlags,
+          scans: combinedScans,
+        };
+      });
     } catch (err) {
       console.error("Failed to load backend data", err);
     }
@@ -162,7 +200,7 @@ function App() {
     window.addEventListener("focus", onFocus);
     window.addEventListener("visibilitychange", onVisibilityChange);
     
-    const intervalId = setInterval(fetchServerData, 60000);
+    const intervalId = setInterval(fetchServerData, 5000);
     
     return () => {
       window.removeEventListener("focus", onFocus);

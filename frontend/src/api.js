@@ -64,7 +64,12 @@ export async function getVehicles() {
 }
 
 export async function getFlags() {
-  const response = await apiFetch("/api/admin/flags?resolved=false&limit=1000");
+  const response = await apiFetch("/api/admin/flags?limit=1000");
+  return response.data || [];
+}
+
+export async function getScans() {
+  const response = await apiFetch("/api/scans?limit=1000");
   return response.data || [];
 }
 
