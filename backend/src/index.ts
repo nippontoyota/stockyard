@@ -9,6 +9,7 @@ import scanRoutes from './routes/scans.js';
 import vehicleRoutes from './routes/vehicles.js';
 import yardRoutes from './routes/yards.js';
 import adminRoutes from './routes/admin.js';
+import { authRouter } from './routes/auth.js';
 import { authenticate } from './middleware/auth.js';
 
 const app = express();
@@ -39,9 +40,11 @@ app.get('/api/auth/me', authenticate, (req, res) => {
 });
 
 // Routes
+app.use('/api/auth', authRouter);
 app.use('/api/scans', scanRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/yards', yardRoutes);
+app.use('/api/admin', authRouter);
 app.use('/api/admin', adminRoutes);
 
 // Global error handler
