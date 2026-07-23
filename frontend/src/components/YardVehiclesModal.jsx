@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { flagLabel } from "../stockyardLogic.js";
+import { decodeVinDetails, flagLabel } from "../stockyardLogic.js";
 
 export function YardVehiclesModal({ yard, state, onClose }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -99,6 +99,10 @@ export function YardVehiclesModal({ yard, state, onClose }) {
             ) : (
               filteredVehicles.map((vehicle) => {
                 const activeFlag = state?.flags?.find((f) => f.vin === vehicle.vin && !f.resolved);
+                const decoded = decodeVinDetails(vehicle.vin);
+                const displayModel = vehicle.model && vehicle.model !== "Unknown" && vehicle.model !== "Toyota Vehicle" ? vehicle.model : decoded.model;
+                const displayVariant = vehicle.variant && vehicle.variant !== "Standard" ? vehicle.variant : decoded.variant;
+
                 return (
                   <div key={vehicle.vin} className={`vehicle-row-card ${vehicle.currentStatus} ${activeFlag ? "flagged" : ""}`}>
                     <div className="v-row-mark">
@@ -113,7 +117,7 @@ export function YardVehiclesModal({ yard, state, onClose }) {
                           <span className="badge bad">{flagLabel(activeFlag.type)}</span>
                         )}
                       </div>
-                      <small>{vehicle.model || "Unknown Model"} · {vehicle.variant || "Standard"}</small>
+                      <small>{displayModel} · {displayVariant}</small>
                     </div>
                     <div className="v-row-status">
                       <span className={`status-tag ${vehicle.currentStatus}`}>

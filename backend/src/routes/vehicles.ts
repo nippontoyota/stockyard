@@ -4,6 +4,8 @@ import { db } from '../db/client.js';
 import { vehicles, vehicleStatus, scans, yards } from '../db/schema.js';
 import { authenticate } from '../middleware/auth.js';
 
+import { detectModel } from '../lib/vin.js';
+
 const router = Router();
 router.use(authenticate);
 
@@ -33,7 +35,7 @@ router.get('/', async (req, res, next) => {
       conditions.push(ilike(vehicles.model, `%${req.query.model}%`));
     }
 
-    const rows = await db
+    const rawRows = await db
       .select({
         id: vehicles.id,
         vin: vehicles.vin,
@@ -49,6 +51,11 @@ router.get('/', async (req, res, next) => {
       .orderBy(desc(vehicleStatus.last_changed_at))
       .limit(limit)
       .offset(offset);
+
+    const rows = rawRows.map((v) => ({
+      ...v,
+      model: v.model && v.model !== 'Unknown' && v.model !== 'Toyota Vehicle' ? v.model : detectModel(v.vin),
+    }));
 
     res.json({ page, limit, data: rows });
   } catch (err) {
