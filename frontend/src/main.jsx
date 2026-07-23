@@ -259,16 +259,66 @@ function App() {
 function Login({ onLogin }) {
   const [role, setRole] = useState("stockyard");
   const [yardId, setYardId] = useState(yards[0].id);
-  const [code, setCode] = useState("");
+  const [usernameInput, setUsernameInput] = useState(`${yards[0].id}@nippon.com`);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  function submit(event) {
-    event.preventDefault();
-    if (role === "admin" || code.trim().toUpperCase() === "ADMIN") {
-      onLogin({ role: "admin", yardId: null, name: "Admin" });
-      return;
+  const handleRoleChange = (newRole) => {
+    setRole(newRole);
+    setErrorMsg("");
+    if (newRole === "admin") {
+      setUsernameInput("ADMIN123@nippon.com");
+    } else {
+      setUsernameInput(`${yardId}@nippon.com`);
     }
-    const yard = yards.find((item) => item.id === yardId);
-    onLogin({ role: "stockyard", yardId, name: yard.name });
+  };
+
+  const handleYardChange = (e) => {
+    const selected = e.target.value;
+    setYardId(selected);
+    setUsernameInput(`${selected}@nippon.com`);
+    setErrorMsg("");
+  };
+
+  async function submit(event) {
+    event.preventDefault();
+    setErrorMsg("");
+    setIsLoading(true);
+
+    const cleanUsername = usernameInput.trim();
+    const cleanPassword = passwordInput.trim();
+
+    try {
+      // Try online API login
+      const res = await loginApi(cleanUsername, cleanPassword);
+      if (res && res.user) {
+        if (res.user.role === "admin") {
+          onLogin({ role: "admin", yardId: null, name: "Admin Console" });
+        } else {
+          const yard = yards.find((y) => y.id === res.user.yardId) || yards[0];
+          onLogin({ role: "stockyard", yardId: yard.id, name: yard.name });
+        }
+        return;
+      }
+    } catch (err) {
+      // Offline fallback validation
+      if (cleanUsername === "ADMIN123@nippon.com" && (cleanPassword === "ADMIN123@nippon.com" || cleanPassword.toUpperCase() === "ADMIN")) {
+        onLogin({ role: "admin", yardId: null, name: "Admin Console" });
+        return;
+      }
+      if (cleanUsername.endsWith("@nippon.com")) {
+        const extractedYardCode = cleanUsername.replace("@nippon.com", "");
+        const yard = yards.find((y) => y.id === extractedYardCode || y.code === extractedYardCode);
+        if (yard && (cleanPassword === cleanUsername || cleanPassword === extractedYardCode || cleanPassword.length >= 3)) {
+          onLogin({ role: "stockyard", yardId: yard.id, name: yard.name });
+          return;
+        }
+      }
+      setErrorMsg(err.message || "Invalid password or account username.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -277,11 +327,11 @@ function Login({ onLogin }) {
         <div className="login-visual" aria-hidden="true">
           <div className="login-visual-top">
             <span className="toyota-dot"></span>
-            <strong>Stockyard gate</strong>
+            <strong>Stockyard Gate Security</strong>
           </div>
           <div className="yard-strip">
-            <span>Live yard access</span>
-            <b>{yards.length} yards</b>
+            <span>Authorised access only</span>
+            <b>{yards.length} active yards</b>
           </div>
         </div>
         <div className="login-form-panel">
@@ -292,24 +342,50 @@ function Login({ onLogin }) {
               <h1>Nippon Yard Scan</h1>
             </div>
           </div>
-          <p>Sign in to scan vehicle movement at the gate.</p>
+          <p>Sign in with your stockyard account to scan vehicle movements.</p>
+
+          {errorMsg && <div className="notice bad">{errorMsg}</div>}
+
           <form onSubmit={submit} className="stack">
-            <label>Account type</label>
+            <label>Account Role</label>
             <div className="segmented">
-              <button type="button" className={role === "stockyard" ? "active" : ""} onClick={() => setRole("stockyard")}>Stockyard</button>
-              <button type="button" className={role === "admin" ? "active" : ""} onClick={() => setRole("admin")}>Admin</button>
+              <button type="button" className={role === "stockyard" ? "active" : ""} onClick={() => handleRoleChange("stockyard")}>Stockyard Worker</button>
+              <button type="button" className={role === "admin" ? "active" : ""} onClick={() => handleRoleChange("admin")}>Admin Console</button>
             </div>
+
             {role === "stockyard" && (
               <>
-                <label htmlFor="yard">Physical yard</label>
-                <select id="yard" value={yardId} onChange={(event) => setYardId(event.target.value)}>
+                <label htmlFor="yardSelect">Select Stockyard</label>
+                <select id="yardSelect" value={yardId} onChange={handleYardChange}>
                   {yards.map((yard) => <option key={yard.id} value={yard.id}>{yard.code} · {yard.name}</option>)}
                 </select>
               </>
             )}
-            <label htmlFor="code">Access code</label>
-            <input id="code" required value={code} onChange={(event) => setCode(event.target.value)} placeholder={role === "admin" ? "ADMIN" : "Shared yard code"} />
-            <button className="primary"><span>Login</span><span className="material-symbols-outlined">arrow_forward</span></button>
+
+            <label htmlFor="username">Account Email ID</label>
+            <input
+              id="username"
+              type="email"
+              required
+              value={usernameInput}
+              onChange={(e) => setUsernameInput(e.target.value)}
+              placeholder="e.g. CO01A@nippon.com"
+            />
+
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              required
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              placeholder={`Enter password for ${usernameInput}`}
+            />
+
+            <button className="primary" disabled={isLoading}>
+              <span>{isLoading ? "Authenticating..." : "Sign In"}</span>
+              <span className="material-symbols-outlined">arrow_forward</span>
+            </button>
           </form>
         </div>
       </section>

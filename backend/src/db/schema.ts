@@ -23,6 +23,16 @@ export const yards = pgTable('yards', {
   active: boolean('active').default(true).notNull(),
 });
 
+// ─── credentials ─────────────────────────────────────────────────────
+export const credentials = pgTable('credentials', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  username: text('username').notNull().unique(),
+  password: text('password').notNull(),
+  role: text('role').notNull(), // 'admin' | 'yard'
+  yard_id: text('yard_id'),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ─── devices ─────────────────────────────────────────────────────────
 export const devices = pgTable('devices', {
   id: uuid('id').defaultRandom().primaryKey(),
