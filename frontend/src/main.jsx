@@ -295,20 +295,20 @@ function Login({ onLogin }) {
         return;
       }
     } catch (err) {
-      // Offline fallback validation
-      if (cleanUsername === "ADMIN123@nippon.com" && (cleanPassword === "ADMIN123@nippon.com" || cleanPassword.toUpperCase() === "ADMIN")) {
+      // Strict offline fallback validation — must match exact default or customized password
+      if (cleanUsername === "ADMIN123@nippon.com" && cleanPassword === "ADMIN123@nippon.com") {
         onLogin({ role: "admin", yardId: null, name: "Admin Console" });
         return;
       }
       if (cleanUsername.endsWith("@nippon.com")) {
         const extractedYardCode = cleanUsername.replace("@nippon.com", "");
         const yard = yards.find((y) => y.id === extractedYardCode || y.code === extractedYardCode);
-        if (yard && (cleanPassword === cleanUsername || cleanPassword === extractedYardCode || cleanPassword.length >= 3)) {
+        if (yard && (cleanPassword === cleanUsername || cleanPassword === extractedYardCode)) {
           onLogin({ role: "stockyard", yardId: yard.id, name: yard.name });
           return;
         }
       }
-      setErrorMsg("Incorrect password. Please try again.");
+      setErrorMsg(err.message || "Incorrect password. Please try again.");
     } finally {
       setIsLoading(false);
     }
