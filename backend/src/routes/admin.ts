@@ -146,9 +146,14 @@ router.get('/flags', async (req, res, next) => {
         created_at: flags.created_at,
         vin: vehicles.vin,
         model: vehicles.model,
+        damage_remark: scans.damage_remark,
+        damage_image: scans.damage_image,
+        scan_type: scans.scan_type,
+        yard_id: scans.yard_id,
       })
       .from(flags)
       .innerJoin(vehicles, eq(flags.vehicle_id, vehicles.id))
+      .leftJoin(scans, eq(flags.scan_id, scans.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(flags.id))
       .limit(limit)
