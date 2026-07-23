@@ -171,6 +171,19 @@ export default function App() {
       
       setState(s => {
         const localQueuedScans = (s.scans || []).filter(sc => s.queue?.includes(sc.clientScanId));
+
+        if (vehiclesData.length === 0 && flagsData.length === 0 && scansData.length === 0 && localQueuedScans.length === 0) {
+          const freshState = {
+            deviceId: s.deviceId || localStorage.getItem("yardDeviceId") || crypto.randomUUID(),
+            vehicles: {},
+            scans: [],
+            flags: [],
+            queue: [],
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(freshState));
+          return freshState;
+        }
+
         const combinedScans = [...mappedScans];
         localQueuedScans.forEach(lqs => {
           if (!combinedScans.some(cs => cs.clientScanId === lqs.clientScanId)) {
