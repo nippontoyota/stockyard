@@ -623,13 +623,15 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   background: #f1f5f9;
 }
 
-/* Modal Overlay */
+/* Modal Overlay & Scroll Locking */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0, 16, 35, 0.65);
+  background: rgba(0, 16, 35, 0.68);
   backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center; padding: 16px;
   animation: fadeIn 0.2s ease;
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 @keyframes fadeIn {
@@ -642,18 +644,22 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 }
 
 .modal-content.yard-modal-card {
-  width: min(560px, 100%);
+  width: min(580px, 100%);
+  height: min(680px, calc(100dvh - 32px));
   max-height: calc(100dvh - 32px);
   background: #ffffff;
-  border-radius: 14px;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.26);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.3);
   display: flex; flex-direction: column; overflow: hidden;
   animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   border: 1px solid #d7dee3;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 
 .modal-header {
-  padding: 18px 20px;
+  flex-shrink: 0;
+  padding: 16px 20px;
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
   display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
@@ -668,18 +674,30 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .close-modal-btn {
   width: 36px; height: 36px; border-radius: 999px; border: 1px solid #cbd5e1;
   background: #ffffff; color: #475569; display: grid; place-items: center; cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s ease; flex-shrink: 0;
 }
 .close-modal-btn:hover { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
 
-.modal-body { padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
-.modal-controls { display: flex; flex-direction: column; gap: 10px; }
+.modal-body {
+  flex: 1; min-height: 0; padding: 16px 20px; overflow: hidden; display: flex; flex-direction: column; gap: 12px;
+}
+.modal-controls { flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
 .modal-search { min-height: 42px; }
 .modal-tabs button { padding: 8px 12px; font-size: 12px; }
 
-.modal-vehicle-list {
-  display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; padding-right: 2px;
+.modal-list-header {
+  flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; font-weight: 700; color: #64748b; margin-top: 2px; padding: 0 2px;
 }
+
+.modal-vehicle-list {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px;
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-right: 4px;
+}
+.modal-vehicle-list::-webkit-scrollbar { width: 6px; }
+.modal-vehicle-list::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 999px; }
+.modal-vehicle-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+.modal-vehicle-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
 .vehicle-row-card {
   display: flex; align-items: center; gap: 12px; padding: 12px 14px;
@@ -707,8 +725,10 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .v-row-status small { display: block; font-size: 10px; color: #94a3b8; margin-top: 2px; }
 
 .modal-footer {
-  padding: 14px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px;
+  flex-shrink: 0; padding: 14px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0;
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
 }
+.modal-footer-note { font-size: 12px; color: #64748b; font-weight: 600; }
 .modal-done-btn { min-height: 40px; padding: 0 20px; }
 
 /* Admin Flag Resolution Action Buttons */
