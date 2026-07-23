@@ -23,7 +23,10 @@ export function YardVehiclesModal({ yard, state, onClose }) {
 
   const filteredVehicles = yardVehicles.filter((v) => {
     const matchesStatus = statusFilter === "all" || v.currentStatus === statusFilter;
-    const searchString = `${v.vin} ${v.model || ""} ${v.variant || ""} ${v.colour || ""}`.toLowerCase();
+    const decoded = decodeVinDetails(v.vin);
+    const displayModel = v.model && v.model !== "Unknown" && v.model !== "Toyota Vehicle" ? v.model : decoded.model;
+    const displayVariant = v.variant && v.variant !== "Standard" ? v.variant : decoded.variant;
+    const searchString = `${v.vin} ${displayModel} ${displayVariant} ${v.colour || ""}`.toLowerCase();
     const matchesSearch = searchString.includes(searchQuery.toLowerCase());
     return matchesStatus && matchesSearch;
   });
