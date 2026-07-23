@@ -9,22 +9,36 @@ html, body { max-width: 100vw; overflow-x: hidden; margin: 0; min-height: 100vh;
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 
-.app-shell { min-height: 100vh; padding: 68px 12px 84px; background: #f3f4f6; max-width: 100vw; box-sizing: border-box; }
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: calc(68px + env(safe-area-inset-top, 0px)) 12px calc(92px + env(safe-area-inset-bottom, 0px));
+  background: #f3f4f6;
+  max-width: 100vw;
+  box-sizing: border-box;
+}
 .content { width: min(1040px, 100%); margin: 0 auto; max-width: 100%; }
 .topbar {
-  position: fixed; inset: 0 0 auto; z-index: 10; height: 56px; padding: 0 16px;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+  height: calc(58px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: 16px;
+  padding-right: 16px;
   display: flex; align-items: center; justify-content: space-between;
-  background: #fff; border-bottom: 1px solid #c4c6cf; width: 100vw; max-width: 100%;
+  background: #fff; border-bottom: 1px solid #c4c6cf; width: 100%; max-width: 100%;
 }
 .topbar strong, h1 { text-transform: uppercase; letter-spacing: 0; color: #000; }
 .topbar small { display: block; color: #58595B; }
 .top-actions { display: flex; gap: 8px; align-items: center; }
 .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; color: #000; }
 .bottom-nav {
-  position: fixed; left: 50%; right: auto; bottom: 16px; transform: translateX(-50%);
-  width: min(440px, calc(100% - 32px)); height: 64px; z-index: 100; background: #fff;
-  border-top: 1px solid #c4c6cf; display: flex; justify-content: space-around; align-items: center;
-  border: 1px solid #c4c6cf; border-radius: 8px; padding: 0 4px; box-sizing: border-box;
+  position: fixed; left: 50%; right: auto;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px)); height: 62px; z-index: 100; background: #fff;
+  border: 1px solid #c4c6cf; border-radius: 12px; padding: 0 4px; box-sizing: border-box;
+  display: flex; justify-content: space-around; align-items: center;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
 }
 .bottom-nav button {
   flex: 1 1 0; min-width: 0; border: 0; background: transparent; color: #44474e;
