@@ -767,7 +767,8 @@ function ScanView({ state, setState, session, online }) {
   const scanLockedRef = useRef(false);
   const yard = yards.find((item) => item.id === session.yardId) || yards[0];
   const pendingVin = normalizeVin(vin);
-  const scanType = state.vehicles[pendingVin]?.currentStatus === "in" ? "out" : "in";
+  const isCarInCurrentYard = state.vehicles[pendingVin]?.currentStatus === "in" && (state.vehicles[pendingVin]?.currentYardId === yard.id || state.vehicles[pendingVin]?.currentYardId === yard.code);
+  const scanType = isCarInCurrentYard ? "out" : "in";
 
   const signalScanSuccess = useCallback(() => {
     if (navigator.vibrate?.([200])) return;
