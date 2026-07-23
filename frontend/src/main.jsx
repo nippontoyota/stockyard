@@ -259,25 +259,18 @@ function App() {
 function Login({ onLogin }) {
   const [role, setRole] = useState("stockyard");
   const [yardId, setYardId] = useState(yards[0].id);
-  const [usernameInput, setUsernameInput] = useState(`${yards[0].id}@nippon.com`);
   const [passwordInput, setPasswordInput] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleRoleChange = (newRole) => {
     setRole(newRole);
     setErrorMsg("");
-    if (newRole === "admin") {
-      setUsernameInput("ADMIN123@nippon.com");
-    } else {
-      setUsernameInput(`${yardId}@nippon.com`);
-    }
   };
 
   const handleYardChange = (e) => {
-    const selected = e.target.value;
-    setYardId(selected);
-    setUsernameInput(`${selected}@nippon.com`);
+    setYardId(e.target.value);
     setErrorMsg("");
   };
 
@@ -286,7 +279,7 @@ function Login({ onLogin }) {
     setErrorMsg("");
     setIsLoading(true);
 
-    const cleanUsername = usernameInput.trim();
+    const cleanUsername = role === "admin" ? "ADMIN123@nippon.com" : `${yardId}@nippon.com`;
     const cleanPassword = passwordInput.trim();
 
     try {
@@ -315,11 +308,13 @@ function Login({ onLogin }) {
           return;
         }
       }
-      setErrorMsg(err.message || "Invalid password or account username.");
+      setErrorMsg("Incorrect password. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }
+
+  const selectedYardObj = yards.find((y) => y.id === yardId);
 
   return (
     <main className="login">
@@ -342,7 +337,7 @@ function Login({ onLogin }) {
               <h1>Nippon Yard Scan</h1>
             </div>
           </div>
-          <p>Sign in with your stockyard account to scan vehicle movements.</p>
+          <p>Select your yard location and enter password to sign in.</p>
 
           {errorMsg && <div className="notice bad">{errorMsg}</div>}
 
@@ -355,32 +350,35 @@ function Login({ onLogin }) {
 
             {role === "stockyard" && (
               <>
-                <label htmlFor="yardSelect">Select Stockyard</label>
+                <label htmlFor="yardSelect">Select Stockyard Location</label>
                 <select id="yardSelect" value={yardId} onChange={handleYardChange}>
                   {yards.map((yard) => <option key={yard.id} value={yard.id}>{yard.code} · {yard.name}</option>)}
                 </select>
               </>
             )}
 
-            <label htmlFor="username">Account Email ID</label>
-            <input
-              id="username"
-              type="email"
-              required
-              value={usernameInput}
-              onChange={(e) => setUsernameInput(e.target.value)}
-              placeholder="e.g. CO01A@nippon.com"
-            />
-
             <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder={`Enter password for ${usernameInput}`}
-            />
+            <div className="password-field-wrapper">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                required
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder={role === "admin" ? "Enter Admin Password" : `Enter Password for ${selectedYardObj?.code || yardId}`}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                title={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                <span className="material-symbols-outlined">
+                  {showPassword ? "visibility_off" : "visibility"}
+                </span>
+              </button>
+            </div>
 
             <button className="primary" disabled={isLoading}>
               <span>{isLoading ? "Authenticating..." : "Sign In"}</span>
