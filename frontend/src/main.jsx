@@ -775,7 +775,7 @@ function ScanView({ state, setState, session, online }) {
     }
   }
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
     if (!vin.trim()) return setMessage({ kind: "error", text: "Enter or scan a VIN." });
     if (scanType === "out" && !outRemark) return setMessage({ kind: "error", text: "Select an OUT reason." });
@@ -796,6 +796,20 @@ function ScanView({ state, setState, session, online }) {
     setDamageImage("");
     setScanSuccess(null);
     scanLockedRef.current = false;
+
+    if (online && result.accepted) {
+      try {
+        await bulkSync([scan]);
+        setState((current) => ({
+          ...current,
+          queue: current.queue.filter(id => id !== scan.clientScanId),
+          scans: current.scans.map(s => s.clientScanId === scan.clientScanId ? { ...s, syncStatus: "synced" } : s),
+        }));
+        fetchServerData();
+      } catch (err) {
+        console.error("Immediate backend sync failed, scan remains queued locally:", err);
+      }
+    }
   }
 
   return (
