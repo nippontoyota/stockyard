@@ -151,7 +151,7 @@ async function processScanIn(body: ScanIn, yardId: string) {
     flagsList.push('duplicate_yard_status');
   }
   
-  await checkGps(yardId, body.latitude, body.longitude, vehicleId, scan.id);
+  await checkGps(yardId, body.latitude ?? undefined, body.longitude ?? undefined, vehicleId, scan.id);
   await checkCapacity(yardId, vehicleId, scan.id);
 
   return { scan_id: scan.id, status: 'accepted', flags: flagsList };
@@ -182,7 +182,7 @@ async function processScanOut(body: ScanOut, yardId: string) {
   if (!currentStatus || currentStatus.current_status !== 'in') { await createFlag(vehicleId, scan.id, 'unverified_in', 'OUT scan with no prior IN record'); flagsList.push('unverified_in'); }
   if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`); flagsList.push('invalid_vin'); }
   if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported'); flagsList.push('damage_reported'); }
-  await checkGps(yardId, body.latitude, body.longitude, vehicleId, scan.id);
+  await checkGps(yardId, body.latitude ?? undefined, body.longitude ?? undefined, vehicleId, scan.id);
 
   return { scan_id: scan.id, status: 'accepted', flags: flagsList };
 }
