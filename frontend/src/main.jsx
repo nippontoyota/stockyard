@@ -438,6 +438,7 @@ function exportAnalyticsReport(stats) {
 
 import { YardVehiclesModal } from "./components/YardVehiclesModal.jsx";
 import { AdminHome } from "./components/AdminDashboard.jsx";
+import { CredentialsTab } from "./components/CredentialsTab.jsx";
 
 function ScanView({ state, setState, session, online }) {
   const [vin, setVin] = useState("");
@@ -1078,6 +1079,7 @@ function Progress({ yard }) {
 }
 
 function AdminView({ state, setState }) {
+  const [activeTab, setActiveTab] = useState("credentials");
   const [vin, setVin] = useState("");
   const [yardId, setYardId] = useState(yards[0].id);
   const [status, setStatus] = useState("out");
@@ -1092,6 +1094,7 @@ function AdminView({ state, setState }) {
       setState(updateVehicleAdmin(state, { vin, yardId, status, reason }));
       setVin("");
       setReason("");
+      alert("Manual vehicle correction applied successfully.");
     } catch (err) {
       alert("Failed to override: " + err.message);
     } finally {
@@ -1100,19 +1103,80 @@ function AdminView({ state, setState }) {
   }
 
   return (
-    <section className="panel stack">
-      <h2>Admin Correction</h2>
-      <form className="stack" onSubmit={submit}>
-        <input required value={vin} onChange={(event) => setVin(event.target.value.toUpperCase())} placeholder="VIN" />
-        <select value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="out">Force close OUT</option>
-          <option value="in">Reassign IN yard</option>
-        </select>
-        {status === "in" && <select value={yardId} onChange={(event) => setYardId(event.target.value)}>{yards.map((yard) => <option value={yard.id} key={yard.id}>{yard.name}</option>)}</select>}
-        <textarea required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Correction note" />
-        <button className="primary" disabled={loading}>{loading ? "Applying..." : "Apply Correction"}</button>
-      </form>
-    </section>
+    <div className="stack admin-view-container">
+      <div className="dashboard-header" style={{ marginBottom: "1rem" }}>
+        <div>
+          <span className="eyebrow">System Administration</span>
+          <h1>Admin Control & Password Console</h1>
+        </div>
+        <div className="segmented">
+          <button
+            type="button"
+            className={activeTab === "credentials" ? "active" : ""}
+            onClick={() => setActiveTab("credentials")}
+          >
+            Manage Passwords
+          </button>
+          <button
+            type="button"
+            className={activeTab === "corrections" ? "active" : ""}
+            onClick={() => setActiveTab("corrections")}
+          >
+            Manual Corrections
+          </button>
+        </div>
+      </div>
+
+      {activeTab === "credentials" && <CredentialsTab />}
+
+      {activeTab === "corrections" && (
+        <section className="panel stack">
+          <h2>Admin Manual Vehicle Correction</h2>
+          <p className="field-hint" style={{ marginBottom: "1rem" }}>
+            Force status overrides or reassign vehicle stockyard locations manually.
+          </p>
+          <form className="stack" onSubmit={submit}>
+            <label htmlFor="override-vin">Target Vehicle VIN</label>
+            <input
+              id="override-vin"
+              required
+              value={vin}
+              onChange={(event) => setVin(event.target.value.toUpperCase())}
+              placeholder="17-Digit Vehicle Identification Number"
+            />
+
+            <label htmlFor="override-status">Action / Target Status</label>
+            <select id="override-status" value={status} onChange={(event) => setStatus(event.target.value)}>
+              <option value="out">Force close OUT</option>
+              <option value="in">Reassign IN yard location</option>
+            </select>
+
+            {status === "in" && (
+              <>
+                <label htmlFor="override-yard">Select Destination Stockyard</label>
+                <select id="override-yard" value={yardId} onChange={(event) => setYardId(event.target.value)}>
+                  {yards.map((yard) => <option value={yard.id} key={yard.id}>{yard.code} · {yard.name}</option>)}
+                </select>
+              </>
+            )}
+
+            <label htmlFor="override-reason">Correction Justification Note</label>
+            <textarea
+              id="override-reason"
+              required
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Enter official audit note for this manual state correction..."
+            />
+
+            <button className="primary" disabled={loading}>
+              <span>{loading ? "Applying..." : "Apply Manual Correction"}</span>
+              <span className="material-symbols-outlined">build</span>
+            </button>
+          </form>
+        </section>
+      )}
+    </div>
   );
 }
 
