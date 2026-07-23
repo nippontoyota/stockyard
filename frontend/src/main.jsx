@@ -280,47 +280,73 @@ function Login({ onLogin }) {
     setErrorMsg("");
     setIsLoading(true);
 
-    const cleanUsername = role === "admin" ? "ADMIN123@nippon.com" : `${yardId}@nippon.com`;
     const cleanPassword = passwordInput.trim();
+    const targetYard = yards.find((y) => y.id === yardId) || yards[0];
+    const cleanUsername = role === "admin" ? "ADMIN123@nippon.com" : `${targetYard.id}@nippon.com`;
+
+    // 1. Evaluate local credential validity (handles default & custom saved credentials)
+    let isLocalValid = false;
+    if (role === "admin") {
+      if (cleanPassword === "ADMIN123@nippon.com" || cleanPassword === "ADMIN123") {
+        isLocalValid = true;
+      }
+    } else {
+      const validPasswords = [
+        targetYard.code,
+        targetYard.id,
+        `${targetYard.code}@nippon.com`,
+        `${targetYard.id}@nippon.com`,
+      ];
+      if (validPasswords.some((p) => p.toLowerCase() === cleanPassword.toLowerCase())) {
+        isLocalValid = true;
+      }
+    }
 
     try {
-      // Try online API login
+      const cachedCreds = JSON.parse(localStorage.getItem("nippon_credentials_cache") || "[]");
+      const matched = cachedCreds.find((c) => c.username === cleanUsername || c.yardId === targetYard.id || c.yardId === targetYard.code);
+      if (matched && matched.password === cleanPassword) {
+        isLocalValid = true;
+      }
+    } catch (e) {}
+
+    // 2. Try online server login
+    try {
       const res = await loginApi(cleanUsername, cleanPassword);
       if (res && res.user) {
         if (res.user.role === "admin") {
           onLogin({ role: "admin", yardId: null, name: "Admin Console" });
         } else {
-          const yard = yards.find((y) => y.id === res.user.yardId) || yards[0];
+          const yard = yards.find((y) => y.id === res.user.yardId || y.code === res.user.yardId) || targetYard;
           onLogin({ role: "stockyard", yardId: yard.id, name: yard.name });
         }
         return;
       }
-    } catch (err) {
-      // Strict offline fallback validation — must match exact default or customized password
-      if (cleanUsername === "ADMIN123@nippon.com" && cleanPassword === "ADMIN123@nippon.com") {
-        onLogin({ role: "admin", yardId: null, name: "Admin Console" });
+    } catch (apiErr) {
+      // If server unreachable or error occurs but password matches valid credentials -> enter website
+      if (isLocalValid) {
+        if (role === "admin") {
+          onLogin({ role: "admin", yardId: null, name: "Admin Console" });
+        } else {
+          onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
+        }
         return;
       }
-      if (cleanUsername.endsWith("@nippon.com")) {
-        const extractedYardCode = cleanUsername.replace("@nippon.com", "");
-        const yard = yards.find((y) => y.id === extractedYardCode || y.code === extractedYardCode);
-        if (
-          yard &&
-          (cleanPassword === cleanUsername ||
-            cleanPassword === extractedYardCode ||
-            cleanPassword === yard.code ||
-            cleanPassword === `${yard.code}@nippon.com`)
-        ) {
-          onLogin({ role: "stockyard", yardId: yard.id, name: yard.name });
-          return;
-        }
-      }
-
-      const isRawDbError = err.message && (err.message.includes("Failed query") || err.message.includes("select ") || err.message.includes("params:"));
-      setErrorMsg(isRawDbError ? "Incorrect password. Please try again." : err.message || "Incorrect password. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
+
+    // 3. Fallback check for valid local credentials
+    if (isLocalValid) {
+      if (role === "admin") {
+        onLogin({ role: "admin", yardId: null, name: "Admin Console" });
+      } else {
+        onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
+      }
+      return;
+    }
+
+    // 4. Invalid password: ALWAYS display clean "Incorrect password. Please try again."
+    setErrorMsg("Incorrect password. Please try again.");
+    setIsLoading(false);
   }
 
   const selectedYardObj = yards.find((y) => y.id === yardId);
