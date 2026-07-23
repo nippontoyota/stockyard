@@ -15,6 +15,7 @@ router.use(authenticate);
 const scanInBase = z.object({
   vin: z.string().min(1),
   scanned_at: z.string().datetime(),
+  yard_id: z.string().optional(),
   latitude: z.number().nullish(),
   longitude: z.number().nullish(),
   gps_accuracy_meters: z.number().nullish(),
@@ -197,10 +198,11 @@ async function processScanOut(body: ScanOut, yardId: string) {
 
 router.post('/in', async (req, res, next) => {
   try {
-    const yardId = req.user!.yard_id;
-    if (!yardId) { res.status(400).json({ error: 'User is not assigned to a yard' }); return; }
+    const parsed = scanInBody.parse(req.body);
+    const yardId = parsed.yard_id || req.user!.yard_id;
+    if (!yardId) { res.status(400).json({ error: 'Yard ID is required for scan' }); return; }
     
-    const result = await processScanIn(scanInBody.parse(req.body), yardId);
+    const result = await processScanIn(parsed, yardId);
     if (result.status === 'rejected') res.status(409).json(result);
     else res.status(result.status === 'already_processed' ? 200 : 201).json(result);
   } catch (err) { next(err); }
@@ -210,10 +212,11 @@ router.post('/in', async (req, res, next) => {
 
 router.post('/out', async (req, res, next) => {
   try {
-    const yardId = req.user!.yard_id;
-    if (!yardId) { res.status(400).json({ error: 'User is not assigned to a yard' }); return; }
+    const parsed = scanOutBody.parse(req.body);
+    const yardId = parsed.yard_id || req.user!.yard_id;
+    if (!yardId) { res.status(400).json({ error: 'Yard ID is required for scan' }); return; }
 
-    const result = await processScanOut(scanOutBody.parse(req.body), yardId);
+    const result = await processScanOut(parsed, yardId);
     res.status(result.status === 'already_processed' ? 200 : 201).json(result);
   } catch (err) { next(err); }
 });
@@ -223,16 +226,18 @@ router.post('/out', async (req, res, next) => {
 router.post('/bulk-sync', async (req, res, next) => {
   try {
     const body = bulkSyncBody.parse(req.body);
-    const yardId = req.user!.yard_id;
-    if (!yardId) { res.status(400).json({ error: 'User is not assigned to a yard' }); return; }
-
     const results: Array<{ client_scan_id: string; status: string; error?: string; flags?: string[] }> = [];
 
     for (const scanData of body.scans) {
+      const targetYardId = scanData.yard_id || req.user!.yard_id;
+      if (!targetYardId) {
+        results.push({ client_scan_id: scanData.client_scan_id, status: 'rejected', error: 'Yard ID is required for scan' });
+        continue;
+      }
       if (scanData.scan_type === 'in') {
-        results.push({ client_scan_id: scanData.client_scan_id, ...await processScanIn(scanData, yardId) });
+        results.push({ client_scan_id: scanData.client_scan_id, ...await processScanIn(scanData, targetYardId) });
       } else {
-        results.push({ client_scan_id: scanData.client_scan_id, ...await processScanOut(scanData, yardId) });
+        results.push({ client_scan_id: scanData.client_scan_id, ...await processScanOut(scanData, targetYardId) });
       }
     }
     res.json({ results });
