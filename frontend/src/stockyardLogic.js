@@ -65,12 +65,45 @@ export function isValidVin(vin) {
 }
 
 export function detectModel(vin) {
-  if (vin.startsWith("JTMBA")) return "TOYOTA HILUX";
-  if (vin.startsWith("JTDAR")) return "TOYOTA RAV4";
-  if (vin.startsWith("JTD")) return "TOYOTA";
-  if (vin.startsWith("1FT")) return "FORD F-150";
-  if (vin.startsWith("MMB")) return "MITSUBISHI TRITON";
-  return "UNKNOWN MODEL";
+  const text = String(vin || "").toUpperCase().trim();
+  const vds = text.substring(3, 6);
+
+  // Direct VDS code mapping for Toyota India (TKM, CBU, Alliance models)
+  const map = {
+    MXA: "Innova Hycross",
+    MXP: "Innova Hycross",
+    KUN: "Innova Crysta",
+    GUN: "Fortuner",
+    GD6: "Hilux",
+    NHP: "Urban Cruiser Hyryder",
+    NSP: "Glanza",
+    MSP: "Rumion",
+    TAA: "Urban Cruiser Taisor",
+    ASK: "Camry Hybrid",
+    AGH: "Vellfire",
+    AAH: "Vellfire",
+    GRJ: "Land Cruiser 300",
+    FJA: "Land Cruiser 300",
+    ZSA: "Urban Cruiser",
+  };
+
+  if (map[vds]) return map[vds];
+
+  // Keyword and WMI/VDS pattern fallbacks
+  if (text.includes("HYCROSS")) return "Innova Hycross";
+  if (text.includes("CRYSTA") || text.includes("INNOVA")) return "Innova Crysta";
+  if (text.includes("FORTUNER") || text.includes("LEGENDER")) return "Fortuner";
+  if (text.includes("HYRYDER")) return "Urban Cruiser Hyryder";
+  if (text.includes("GLANZA")) return "Glanza";
+  if (text.includes("HILUX") || text.startsWith("JTMBA")) return "Hilux";
+  if (text.includes("RUMION")) return "Rumion";
+  if (text.includes("TAISOR")) return "Urban Cruiser Taisor";
+  if (text.includes("CAMRY")) return "Camry Hybrid";
+  if (text.includes("VELLFIRE")) return "Vellfire";
+  if (text.includes("CRUISER") || text.includes("LAND")) return "Land Cruiser 300";
+
+  // Standard Toyota India default fallback
+  return "Toyota Vehicle";
 }
 
 export function applyScan(state, scan) {
