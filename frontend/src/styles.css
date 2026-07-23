@@ -589,6 +589,19 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .flag-time { color: #666; font-weight: normal; margin-right: 4px; }
 
 /* ─── Interactive Stockyard Modal & Affordance ───────────────────────── */
+.dashboard-spotlight.clickable {
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+.dashboard-spotlight.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 32, 70, 0.16);
+  border-color: #002046;
+}
+.dashboard-spotlight.clickable:active {
+  transform: scale(0.98);
+}
+
 .yard-box.clickable {
   cursor: pointer;
   position: relative;
