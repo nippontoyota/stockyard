@@ -24,7 +24,7 @@ import {
   DwellByModelChart,
 } from "./AnalyticsCharts.jsx";
 import {
-  bulkSync, getVehicles, getAdminDashboard, getFlags, resolveFlag as apiResolveFlag, adminOverrideVehicle
+  bulkSync, getVehicles, getAdminDashboard, getFlags, resolveFlag as apiResolveFlag, adminOverrideVehicle, loginApi
 } from "./api.js";
 import "./styles.css";
 
