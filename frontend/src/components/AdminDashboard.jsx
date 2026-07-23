@@ -96,14 +96,6 @@ export function AdminHome({ stats, state, setState }) {
             <span>Flags</span>
             {stats.openFlags > 0 && <span className="rail-badge">{stats.openFlags}</span>}
           </button>
-          <button
-            type="button"
-            className={activeTab === "credentials" ? "active" : ""}
-            onClick={() => setActiveTab("credentials")}
-          >
-            <span className="material-symbols-outlined">key</span>
-            <span>Credentials</span>
-          </button>
         </div>
         <div className="rail-note">
           <b>{healthyYards}/{stats.yards.length}</b>
@@ -140,7 +132,6 @@ export function AdminHome({ stats, state, setState }) {
               <button type="button" className={activeTab === "overview" ? "active" : ""} onClick={() => setActiveTab("overview")}>Overview</button>
               <button type="button" className={activeTab === "yards" ? "active" : ""} onClick={() => setActiveTab("yards")}>Yards</button>
               <button type="button" className={activeTab === "flags" ? "active" : ""} onClick={() => setActiveTab("flags")}>Flags ({stats.openFlags})</button>
-              <button type="button" className={activeTab === "credentials" ? "active" : ""} onClick={() => setActiveTab("credentials")}>Credentials</button>
             </div>
           </div>
         </div>
@@ -352,8 +343,6 @@ export function AdminHome({ stats, state, setState }) {
             )}
           </section>
         )}
-
-        {activeTab === "credentials" && <CredentialsTab />}
       </div>
 
       <YardVehiclesModal
