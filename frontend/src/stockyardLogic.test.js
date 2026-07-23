@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { applyScan, createInitialState, dashboard, normalizeVin, parseDeliveredVins, removeDeliveredVehicles } from "./stockyardLogic.js";
+import { applyScan, createInitialState, dashboard, decodeVinDetails, normalizeVin, parseDeliveredVins, removeDeliveredVehicles } from "./stockyardLogic.js";
+
+// Verify Toyota Hyryder VIN decoding (from user screenshot VIN MBJUYML1STE225473)
+const hyryderDecoded = decodeVinDetails("MBJUYML1STE225473");
+assert.equal(hyryderDecoded.model, "Toyota Urban Cruiser Hyryder");
+assert.equal(hyryderDecoded.variant, "1.5L / 2.0L NeoDrive Hybrid · 2026 MY");
+assert.equal(hyryderDecoded.colour, "TKM Bidadi Plant");
 
 globalThis.localStorage = {
   data: {},
