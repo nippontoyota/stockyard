@@ -617,9 +617,13 @@ function AdminHome({ stats, state, setState }) {
 
         {activeTab === "overview" && (
           <>
-            <div className="dashboard-spotlight">
+            <div
+              className="dashboard-spotlight clickable"
+              onClick={() => setSelectedYardModal(busiestYard)}
+              title={`Click to view all vehicles at ${busiestYard.name}`}
+            >
               <div>
-                <span>Highest occupied yard</span>
+                <span>Highest occupied yard &rarr;</span>
                 <strong>{busiestYard.name}</strong>
               </div>
               <b>{busiestYard.count}</b>
