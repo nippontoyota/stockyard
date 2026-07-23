@@ -7,6 +7,7 @@ import {
   createInitialState,
   createScan,
   dashboard,
+  decodeVinDetails,
   parseDeliveredVins,
   normalizeVin,
   removeDeliveredVehicles,
