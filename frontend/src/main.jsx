@@ -117,11 +117,12 @@ function App() {
       
       const mappedVehicles = {};
       vehiclesData.forEach(v => {
+        const decoded = decodeVinDetails(v.vin);
         mappedVehicles[v.vin] = {
           vin: v.vin,
-          model: v.model || "Unknown",
-          variant: "Standard",
-          colour: "Not set",
+          model: v.model && v.model !== "Unknown" && v.model !== "Toyota Vehicle" ? v.model : decoded.model,
+          variant: v.variant && v.variant !== "Standard" ? v.variant : decoded.variant,
+          colour: v.colour && v.colour !== "Not set" ? v.colour : decoded.colour,
           vinValid: v.vin_valid,
           currentStatus: v.current_status,
           currentYardId: v.current_yard_id,
