@@ -110,7 +110,7 @@ export function decodeVinDetails(vinRaw) {
     else if (char4 === "L" || vin.includes("CAMRY")) modelName = "Camry Hybrid";
     else if (char4 === "M" || char4 === "V" || vin.includes("VELLFIRE")) modelName = "Vellfire";
     else if (char4 === "R" || char4 === "W" || vin.includes("CRUISER") || vin.includes("LAND")) modelName = "Land Cruiser 300";
-    else modelName = "Vehicle";
+    else modelName = wmi === "MBJ" ? `TKM Series (${vds || "India"})` : `Series (${vds || "Spec"})`;
   }
 
   const fullModel = `${make} ${modelName}`;
