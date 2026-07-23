@@ -711,3 +711,16 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 }
 .modal-done-btn { min-height: 40px; padding: 0 20px; }
 
+/* Admin Flag Resolution Action Buttons */
+.flag-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.flag-btn {
+  border: 0; border-radius: 6px; background: #e2e8f0; color: #1e293b; padding: 6px 12px;
+  font-weight: 700; font-size: 12px; cursor: pointer; transition: all 0.15s ease;
+}
+.flag-btn:hover { background: #cbd5e1; }
+.flag-btn.primary-flag { background: #166534; color: #ffffff; }
+.flag-btn.primary-flag:hover { background: #14532d; }
+.flag-btn.secondary-flag { background: #002046; color: #ffffff; }
+.flag-btn.secondary-flag:hover { background: #00122a; }
+
+
