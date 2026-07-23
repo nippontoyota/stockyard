@@ -172,30 +172,39 @@ export default function App() {
       setState(s => {
         const localQueuedScans = (s.scans || []).filter(sc => s.queue?.includes(sc.clientScanId));
 
-        if (vehiclesData.length === 0 && flagsData.length === 0 && scansData.length === 0 && localQueuedScans.length === 0) {
-          const freshState = {
-            deviceId: s.deviceId || localStorage.getItem("yardDeviceId") || crypto.randomUUID(),
-            vehicles: {},
-            scans: [],
-            flags: [],
-            queue: [],
-          };
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(freshState));
-          return freshState;
-        }
-
         const combinedScans = [...mappedScans];
         localQueuedScans.forEach(lqs => {
           if (!combinedScans.some(cs => cs.clientScanId === lqs.clientScanId)) {
             combinedScans.push(lqs);
           }
         });
-        return {
+
+        // Vehicles strictly reflect server state + unsynced queue items only
+        const finalVehicles = { ...mappedVehicles };
+        localQueuedScans.forEach(lqs => {
+          if (!finalVehicles[lqs.vin]) {
+            const decoded = decodeVinDetails(lqs.vin);
+            finalVehicles[lqs.vin] = {
+              vin: lqs.vin,
+              model: decoded.model,
+              variant: decoded.variant,
+              colour: decoded.colour,
+              vinValid: true,
+              currentStatus: lqs.type,
+              currentYardId: lqs.yardId,
+              lastChangedAt: lqs.scannedAt,
+            };
+          }
+        });
+
+        const nextState = {
           ...s,
-          vehicles: mappedVehicles,
+          vehicles: finalVehicles,
           flags: mappedFlags,
           scans: combinedScans,
         };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+        return nextState;
       });
     } catch (err) {
       console.error("Failed to load backend data", err);
@@ -223,7 +232,11 @@ export default function App() {
   }, [fetchServerData]);
 
   useEffect(() => {
-    navigator.serviceWorker?.register("/sw.js").catch(() => {});
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").then((reg) => {
+        reg.update();
+      }).catch(() => {});
+    }
     const up = () => setOnline(true);
     const down = () => setOnline(false);
     addEventListener("online", up);
@@ -287,10 +300,22 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Header session={session} online={online} pending={state.queue.length} onLogout={() => {
-        setSession(null);
-        window.history.replaceState(null, "", "/");
-      }} />
+      <Header
+        session={session}
+        online={online}
+        pending={state.queue.length}
+        onSyncReset={() => {
+          localStorage.removeItem(STORAGE_KEY);
+          if ("caches" in window) {
+            caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
+          }
+          window.location.reload();
+        }}
+        onLogout={() => {
+          setSession(null);
+          window.history.replaceState(null, "", "/");
+        }}
+      />
       <main className="content">
         {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} />}
         {view === "stock" && <StockView state={state} session={session} />}
@@ -478,7 +503,7 @@ function Login({ onLogin }) {
   );
 }
 
-function Header({ session, online, pending, onLogout }) {
+function Header({ session, online, pending, onLogout, onSyncReset }) {
   return (
     <header className="topbar">
       <div>
@@ -487,6 +512,15 @@ function Header({ session, online, pending, onLogout }) {
       </div>
       <div className="top-actions">
         <span className={online ? "pill ok" : "pill warn"}>{online ? "Online" : "Offline"} · {pending} queued</span>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onSyncReset}
+          title="Force Sync & Purge Cache"
+          aria-label="Force Sync & Purge Cache"
+        >
+          <span className="material-symbols-outlined">sync</span>
+        </button>
         <button className="icon-btn" onClick={onLogout} aria-label="Log out"><span className="material-symbols-outlined">logout</span></button>
       </div>
     </header>
