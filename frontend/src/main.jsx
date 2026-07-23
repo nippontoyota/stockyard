@@ -366,6 +366,15 @@ function YardVehiclesModal({ yard, state, onClose }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  useEffect(() => {
+    if (!yard) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [yard]);
+
   if (!yard) return null;
 
   const allVehicles = state ? Object.values(state.vehicles) : [];
@@ -402,7 +411,7 @@ function YardVehiclesModal({ yard, state, onClose }) {
           </button>
         </header>
 
-        <div className="modal-body stack">
+        <div className="modal-body">
           <div className="modal-controls">
             <div className="search-row modal-search">
               <span className="material-symbols-outlined">search</span>
@@ -436,6 +445,10 @@ function YardVehiclesModal({ yard, state, onClose }) {
                 Moved OUT ({countOut})
               </button>
             </div>
+          </div>
+
+          <div className="modal-list-header">
+            <span>Showing {filteredVehicles.length} of {yardVehicles.length} vehicle{yardVehicles.length === 1 ? "" : "s"}</span>
           </div>
 
           <div className="modal-vehicle-list">
@@ -477,6 +490,7 @@ function YardVehiclesModal({ yard, state, onClose }) {
         </div>
 
         <footer className="modal-footer">
+          <span className="modal-footer-note">Scroll to view all cars</span>
           <button className="primary modal-done-btn" onClick={onClose}>Done</button>
         </footer>
       </div>
