@@ -71,7 +71,8 @@ authRouter.post('/login', async (req: Request, res: Response) => {
 
     return res.status(401).json({ error: 'Invalid username or password.' });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    console.error('Auth login DB error:', err);
+    return res.status(500).json({ error: 'Service temporarily unavailable. Please try again.' });
   }
 });
 
