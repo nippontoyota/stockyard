@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { eq, and, count } from 'drizzle-orm';
+import { eq, and, count, desc } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { scans, vehicles, vehicleStatus, devices, flags, yards } from '../db/schema.js';
 import { isValidVin, detectModel, resolveVehicleMetadata } from '../lib/vin.js';
@@ -237,6 +237,38 @@ router.post('/bulk-sync', async (req, res, next) => {
     }
     res.json({ results });
   } catch (err) { next(err); }
+});
+
+// ─── GET / ───────────────────────────────────────────────────────────
+// List recent scans for cross-device synchronization
+
+router.get('/', async (req, res, next) => {
+  try {
+    const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 1000));
+    const rows = await db
+      .select({
+        id: scans.id,
+        clientScanId: scans.client_scan_id,
+        vin: vehicles.vin,
+        vinRaw: scans.vin_raw,
+        type: scans.scan_type,
+        yardId: scans.yard_id,
+        scannedAt: scans.scanned_at,
+        damaged: scans.damaged,
+        damageRemark: scans.damage_remark,
+        damageImage: scans.damage_image,
+        outRemark: scans.out_remark,
+        status: scans.status,
+      })
+      .from(scans)
+      .innerJoin(vehicles, eq(scans.vehicle_id, vehicles.id))
+      .orderBy(desc(scans.scanned_at))
+      .limit(limit);
+
+    res.json({ data: rows });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ─── GET /:id ────────────────────────────────────────────────────────
