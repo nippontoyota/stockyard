@@ -15,10 +15,14 @@ export function CredentialsTab() {
 
   const loadCredentials = async () => {
     setLoading(true);
+    const cachedRaw = localStorage.getItem("nippon_credentials_cache");
+    const cachedCreds = cachedRaw ? JSON.parse(cachedRaw) : [];
+
     try {
       const res = await getCredentialsApi();
       if (res && res.credentials) {
         setCredentials(res.credentials);
+        localStorage.setItem("nippon_credentials_cache", JSON.stringify(res.credentials));
       } else {
         // Fallback default list from static yards array
         const defaultList = [
@@ -39,7 +43,11 @@ export function CredentialsTab() {
             isDefault: true,
           })),
         ];
-        setCredentials(defaultList);
+        const mergedList = defaultList.map((d) => {
+          const found = cachedCreds.find((c) => c.username === d.username);
+          return found ? { ...d, password: found.password, isDefault: found.password === d.username } : d;
+        });
+        setCredentials(mergedList);
       }
     } catch (err) {
       // Offline / fallback fallback populate
@@ -61,7 +69,11 @@ export function CredentialsTab() {
           isDefault: true,
         })),
       ];
-      setCredentials(fallbackList);
+      const mergedList = fallbackList.map((d) => {
+        const found = cachedCreds.find((c) => c.username === d.username);
+        return found ? { ...d, password: found.password, isDefault: found.password === d.username } : d;
+      });
+      setCredentials(mergedList);
     } finally {
       setLoading(false);
     }
@@ -87,33 +99,31 @@ export function CredentialsTab() {
     e.preventDefault();
     if (!newPasswordInput.trim() || !editingAccount) return;
     setIsSubmitting(true);
+    const updatedPassword = newPasswordInput.trim();
+
+    const applyLocalUpdate = () => {
+      setCredentials((prev) => {
+        const updated = prev.map((item) =>
+          item.username === editingAccount.username
+            ? { ...item, password: updatedPassword, isDefault: updatedPassword === item.username }
+            : item
+        );
+        localStorage.setItem("nippon_credentials_cache", JSON.stringify(updated));
+        return updated;
+      });
+    };
+
     try {
-      await updateCredentialApi(editingAccount.username, newPasswordInput.trim());
-      setCredentials((prev) =>
-        prev.map((item) =>
-          item.username === editingAccount.username
-            ? { ...item, password: newPasswordInput.trim(), isDefault: newPasswordInput.trim() === item.username }
-            : item
-        )
-      );
-      setToastMessage(`Password for ${editingAccount.username} updated successfully!`);
-      setEditingAccount(null);
-      setNewPasswordInput("");
-      setTimeout(() => setToastMessage(""), 3500);
+      await updateCredentialApi(editingAccount.username, updatedPassword);
+      applyLocalUpdate();
+      setToastMessage(`Password updated successfully!`);
     } catch (err) {
-      // Local fallback update for offline dev testing
-      setCredentials((prev) =>
-        prev.map((item) =>
-          item.username === editingAccount.username
-            ? { ...item, password: newPasswordInput.trim(), isDefault: newPasswordInput.trim() === item.username }
-            : item
-        )
-      );
-      setToastMessage(`Password for ${editingAccount.username} updated locally.`);
+      applyLocalUpdate();
+      setToastMessage(`Password updated locally.`);
+    } finally {
       setEditingAccount(null);
       setNewPasswordInput("");
       setTimeout(() => setToastMessage(""), 3500);
-    } finally {
       setIsSubmitting(false);
     }
   };
