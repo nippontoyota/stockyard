@@ -304,13 +304,6 @@ export default function App() {
         session={session}
         online={online}
         pending={state.queue.length}
-        onSyncReset={() => {
-          localStorage.removeItem(STORAGE_KEY);
-          if ("caches" in window) {
-            caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
-          }
-          window.location.reload();
-        }}
         onLogout={() => {
           setSession(null);
           window.history.replaceState(null, "", "/");
@@ -503,7 +496,7 @@ function Login({ onLogin }) {
   );
 }
 
-function Header({ session, online, pending, onLogout, onSyncReset }) {
+function Header({ session, online, pending, onLogout }) {
   return (
     <header className="topbar">
       <div>
@@ -512,15 +505,6 @@ function Header({ session, online, pending, onLogout, onSyncReset }) {
       </div>
       <div className="top-actions">
         <span className={online ? "pill ok" : "pill warn"}>{online ? "Online" : "Offline"} · {pending} queued</span>
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={onSyncReset}
-          title="Force Sync & Purge Cache"
-          aria-label="Force Sync & Purge Cache"
-        >
-          <span className="material-symbols-outlined">sync</span>
-        </button>
         <button className="icon-btn" onClick={onLogout} aria-label="Log out"><span className="material-symbols-outlined">logout</span></button>
       </div>
     </header>
