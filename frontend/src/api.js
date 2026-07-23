@@ -79,3 +79,31 @@ export async function adminOverrideVehicle(vin, status, reason, yardId) {
     body: JSON.stringify({ status, reason, yardId })
   });
 }
+
+export async function loginApi(username, password) {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    let msg = "Invalid login credentials";
+    try {
+      const b = await res.json();
+      msg = b.error || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+export async function getCredentialsApi() {
+  return apiFetch("/api/admin/credentials");
+}
+
+export async function updateCredentialApi(username, password) {
+  return apiFetch("/api/admin/credentials/update", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+}

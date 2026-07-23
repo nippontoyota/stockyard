@@ -756,4 +756,266 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .flag-btn.secondary-flag { background: #002046; color: #ffffff; }
 .flag-btn.secondary-flag:hover { background: #00122a; }
 
+/* ─── Credentials Tab Styling (Impeccable Craft) ───────────────────── */
+.credentials-workspace {
+  gap: 1.25rem;
+}
+
+.credentials-controls {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  backdrop-filter: blur(8px);
+}
+
+.admin-cred-spotlight {
+  background: linear-gradient(135deg, #001e3c 0%, #001026 100%);
+  border: 1px solid rgba(235, 10, 30, 0.3);
+  border-radius: 16px;
+  padding: 1.5rem;
+  color: #ffffff;
+  box-shadow: 0 10px 25px -5px rgba(0, 32, 70, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.cred-spotlight-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cred-icon-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(235, 10, 30, 0.15);
+  color: #eb0a1e;
+  border: 1px solid rgba(235, 10, 30, 0.3);
+}
+
+.cred-icon-badge.admin {
+  background: rgba(235, 10, 30, 0.2);
+  color: #ffffff;
+}
+
+.cred-email {
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.cred-field-box {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.cred-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.6);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.cred-password-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cred-password-input {
+  flex: 1;
+  min-width: 200px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #ffffff;
+  padding: 0.6rem 0.875rem;
+  font-family: monospace;
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+}
+
+.cred-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 1rem;
+}
+
+.cred-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+}
+
+.cred-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+  border-color: #cbd5e1;
+}
+
+.cred-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.cred-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cred-card-icon {
+  color: #002046;
+  background: #f1f5f9;
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.cred-yard-code {
+  display: block;
+  font-weight: 700;
+  color: #eb0a1e;
+  font-size: 0.8rem;
+}
+
+.cred-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cred-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.cred-meta-label {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.cred-meta-val {
+  font-family: monospace;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.cred-password-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #f8fafc;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.cred-password-text {
+  font-family: monospace;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #0f172a;
+}
+
+.icon-btn-tiny {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+
+.icon-btn-tiny:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+.icon-btn-inline {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.icon-btn-inline:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.cred-card-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cred-card-btn {
+  background: #002046;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  width: 100%;
+  justify-content: center;
+}
+
+.cred-card-btn:hover {
+  background: #00122a;
+}
+
+.cred-modal-card {
+  max-width: 480px;
+}
+
+.input-disabled {
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+  border-color: #cbd5e1 !important;
+  cursor: not-allowed;
+  font-weight: 600;
+}
+
+.field-hint {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 4px;
+}
+
 
