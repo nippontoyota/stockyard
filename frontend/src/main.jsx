@@ -195,6 +195,11 @@ export default function App() {
   }, [fetchServerData]);
 
   useEffect(() => {
+    if (!session) return;
+    fetchServerData();
+  }, [view, session, fetchServerData]);
+
+  useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").then((reg) => {
         reg.update();
