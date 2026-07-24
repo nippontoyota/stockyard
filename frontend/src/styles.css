@@ -1584,4 +1584,66 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   font-weight: 500;
 }
 
+/* ─── All Vehicles Table ──────────────────────────────────────────────── */
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  margin-top: 16px;
+}
 
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.data-table th, .data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.data-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #0f172a;
+}
+
+.empty-state-cell {
+  text-align: center;
+  padding: 48px !important;
+  color: #64748b;
+  font-size: 14px;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.badge-transit { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.badge-in { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.badge-out { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+.badge-transfer { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge-unknown { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }

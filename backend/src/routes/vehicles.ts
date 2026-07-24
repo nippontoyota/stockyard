@@ -44,9 +44,11 @@ router.get('/', async (req, res, next) => {
         current_status: vehicleStatus.current_status,
         current_yard_id: vehicleStatus.current_yard_id,
         last_changed_at: vehicleStatus.last_changed_at,
+        out_remark: scans.out_remark,
       })
       .from(vehicles)
       .leftJoin(vehicleStatus, eq(vehicles.id, vehicleStatus.vehicle_id))
+      .leftJoin(scans, eq(vehicleStatus.last_out_scan_id, scans.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(sql`${vehicleStatus.last_changed_at} DESC NULLS LAST`)
       .limit(limit)

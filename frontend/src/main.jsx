@@ -130,6 +130,7 @@ export default function App() {
           currentStatus: v.current_status,
           currentYardId: v.current_yard_id,
           lastChangedAt: v.last_changed_at,
+          outRemark: v.out_remark,
         };
       });
       
