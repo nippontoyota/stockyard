@@ -171,12 +171,14 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px;
   background: #fff; color: #000; border: 3px solid #EB0A1E; border-radius: 8px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, .26);
+  max-height: calc(100% - 24px); overflow-y: auto;
 }
 .scan-result-popover .material-symbols-outlined { color: #EB0A1E; font-size: 28px; }
 .scan-result-popover b { font-size: 16px; line-height: 1.25; overflow-wrap: anywhere; }
 .scan-result-popover small { display: block; margin-top: 4px; color: #58595B; font-size: 12px; font-weight: 700; }
 .scan-result-popover select,
 .scan-result-popover textarea,
+.scan-result-popover .damage-inputs,
 .scan-result-popover .scan-damage-check,
 .scan-result-popover .scan-submit-button,
 .scan-result-popover .scan-popover-message {
@@ -184,6 +186,27 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 }
 .scan-result-popover select { min-height: 44px; }
 .scan-result-popover textarea { min-height: 64px; resize: vertical; }
+.damage-inputs { display: flex; flex-direction: column; gap: 8px; }
+.damage-photo-upload-row { display: flex; align-items: center; gap: 12px; }
+.damage-photo-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex: 1; min-height: 44px; border: 1px dashed #002046; border-radius: 6px;
+  background: #f1f5f9; color: #002046; font-weight: 700; font-size: 13px;
+  cursor: pointer; transition: background 0.2s;
+}
+.damage-photo-btn:hover { background: #e2e8f0; }
+.damage-thumb-wrap {
+  position: relative; width: 56px; height: 56px; border-radius: 6px; overflow: visible;
+  flex-shrink: 0;
+}
+.damage-thumb {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 6px; border: 1px solid #d7dee3;
+}
+.damage-thumb-remove {
+  position: absolute; top: -6px; right: -6px; width: 22px; height: 22px;
+  border-radius: 50%; background: #EB0A1E; color: #fff; border: 2px solid #fff;
+  display: grid; place-items: center; cursor: pointer; font-size: 14px; font-weight: bold; padding: 0; line-height: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
 .scan-result-popover .scan-damage-check {
   width: 100%; margin: 0; padding: 8px 0; color: #000; justify-content: flex-start;
 }
@@ -511,9 +534,9 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .dashboard-actions .action-icon-btn:hover { background: #f1f5f9; color: #002046; border-color: #cbd5e1; }
 .dashboard-actions .action-icon-btn.active { background: #002046; color: #fff; border-color: #002046; }
 .dashboard-actions .segmented {
-  width: 260px; background: #e8f1ff; border: 1px solid #cfe0ff; border-radius: 8px; display: grid; grid-template-columns: repeat(3, 1fr);
+  width: max-content; background: #e8f1ff; border: 1px solid #cfe0ff; border-radius: 8px; display: grid; grid-template-columns: repeat(4, 1fr); padding: 4px; gap: 4px;
 }
-.dashboard-actions .segmented button { min-height: 38px; font-size: 12px; font-weight: 700; border: 0; background: transparent; color: #475569; border-radius: 6px; }
+.dashboard-actions .segmented button { min-height: 38px; font-size: 12px; font-weight: 700; border: 0; background: transparent; color: #475569; border-radius: 6px; padding: 0 12px; white-space: nowrap; }
 .dashboard-actions .segmented .active { background: #002046; color: #fff; }
 .dashboard-spotlight {
   min-height: 70px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px;
@@ -570,7 +593,7 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   .analytical-dashboard { padding: 12px; gap: 12px; }
   .dashboard-header { align-items: stretch; flex-direction: column; }
   .dashboard-actions { justify-content: space-between; }
-  .dashboard-actions .segmented { width: min(100%, 220px); }
+  .dashboard-actions .segmented { width: 100%; grid-template-columns: repeat(2, 1fr); }
   .dashboard-spotlight { grid-template-columns: minmax(0, 1fr) auto; }
   .dashboard-spotlight small { display: none; }
   .kpi-grid { grid-template-columns: 1fr; }
