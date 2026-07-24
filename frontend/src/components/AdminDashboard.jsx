@@ -10,6 +10,7 @@ import {
 } from "../AnalyticsCharts.jsx";
 import { YardVehiclesModal } from "./YardVehiclesModal.jsx";
 import { CredentialsTab } from "./CredentialsTab.jsx";
+import { TransitUploadTab } from "./TransitUploadTab.jsx";
 import { flagLabel, resolveFlag, yards, detectModel } from "../stockyardLogic.js";
 import { resolveFlag as apiResolveFlag, adminOverrideVehicle } from "../api.js";
 
@@ -605,6 +606,12 @@ export function AdminHome({ stats, state, setState }) {
                 </table>
               </div>
             )}
+            
+            <div style={{ marginTop: "2rem" }}>
+              <TransitUploadTab onUploadComplete={() => {
+                // Dashboard will automatically react if state refreshes, or user can refresh.
+              }} />
+            </div>
           </section>
         )}
       </div>
