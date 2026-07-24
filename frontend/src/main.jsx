@@ -480,7 +480,6 @@ function exportAnalyticsReport(stats) {
 import { YardVehiclesModal } from "./components/YardVehiclesModal.jsx";
 import { AdminHome } from "./components/AdminDashboard.jsx";
 import { CredentialsTab } from "./components/CredentialsTab.jsx";
-import { TransitUploadTab } from "./components/TransitUploadTab.jsx";
 
 function compressImage(file, maxDimension = 1000, quality = 0.8) {
   return new Promise((resolve) => {
@@ -1338,21 +1337,10 @@ function AdminView({ state, setState }) {
           >
             Manual Corrections
           </button>
-          <button
-            type="button"
-            className={activeTab === "transit" ? "active" : ""}
-            onClick={() => setActiveTab("transit")}
-          >
-            Transit Upload
-          </button>
         </div>
       </div>
 
       {activeTab === "credentials" && <CredentialsTab />}
-      
-      {activeTab === "transit" && (
-        <TransitUploadTab />
-      )}
 
       {activeTab === "corrections" && (
         <section className="panel stack">
