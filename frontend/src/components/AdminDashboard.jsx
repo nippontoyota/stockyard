@@ -215,6 +215,7 @@ export function AdminHome({ stats, state, setState }) {
               <button type="button" className={activeTab === "yards" ? "active" : ""} onClick={() => setActiveTab("yards")}>Yards</button>
               <button type="button" className={activeTab === "flags" ? "active" : ""} onClick={() => setActiveTab("flags")}>Flags ({stats.openFlags})</button>
               <button type="button" className={activeTab === "damaged" ? "active" : ""} onClick={() => setActiveTab("damaged")}>Damaged Cars ({activeDamagedCount})</button>
+              <button type="button" className={activeTab === "transit" ? "active" : ""} onClick={() => setActiveTab("transit")}>In Transit</button>
             </div>
           </div>
         </div>
