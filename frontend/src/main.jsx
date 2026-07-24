@@ -1351,11 +1351,7 @@ function AdminView({ state, setState }) {
       {activeTab === "credentials" && <CredentialsTab />}
       
       {activeTab === "transit" && (
-        <TransitUploadTab 
-          onUploadComplete={() => {
-            alert("Transit List processed. Please refresh the dashboard to see changes.");
-          }} 
-        />
+        <TransitUploadTab />
       )}
 
       {activeTab === "corrections" && (
