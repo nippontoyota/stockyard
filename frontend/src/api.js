@@ -123,3 +123,10 @@ export async function updateCredentialApi(username, password) {
     body: JSON.stringify({ username, password }),
   });
 }
+
+export async function uploadTransitListApi(vehicles) {
+  return apiFetch("/api/vehicles/transit-list", {
+    method: "POST",
+    body: JSON.stringify({ vehicles }),
+  });
+}
