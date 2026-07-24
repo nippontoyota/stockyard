@@ -25,6 +25,8 @@ const baseScan = {
   syncStatus: "synced",
 };
 
+assert.equal(Object.hasOwn(createInitialState(), "queue"), false);
+
 // First scan: should be accepted normally
 const firstScanResult = applyScan(createInitialState(), baseScan);
 assert.equal(firstScanResult.accepted, true);

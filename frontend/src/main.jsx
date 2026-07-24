@@ -12,7 +12,6 @@ import {
   normalizeVin,
   removeDeliveredVehicles,
   resolveFlag,
-  STORAGE_KEY,
   updateVehicleAdmin,
   yards,
 } from "./stockyardLogic.js";
@@ -25,17 +24,9 @@ import {
   DwellByModelChart,
 } from "./AnalyticsCharts.jsx";
 import {
-  bulkSync, getVehicles, getAdminDashboard, getFlags, resolveFlag as apiResolveFlag, adminOverrideVehicle, loginApi
+  bulkSync, getVehicles, getAdminDashboard, getFlags, getScans, resolveFlag as apiResolveFlag, adminOverrideVehicle, loginApi
 } from "./api.js";
 import "./styles.css";
-
-const loadState = () => {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || createInitialState();
-  } catch {
-    return createInitialState();
-  }
-};
 
 function flagLabel(type) {
   return {
@@ -85,7 +76,7 @@ export default function App() {
     }
   });
 
-  const [state, setState] = useState(loadState);
+  const [state, setState] = useState(createInitialState);
   const [online, setOnline] = useState(() => navigator.onLine);
   const [view, setView] = useState(() => {
     if (!session) return "login";
@@ -93,8 +84,9 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    // Drop scans saved by versions that queued data only in this browser.
+    localStorage.removeItem("yardScanState");
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("yardSession", JSON.stringify(session));
@@ -170,41 +162,12 @@ export default function App() {
       }));
       
       setState(s => {
-        const localQueuedScans = (s.scans || []).filter(sc => s.queue?.includes(sc.clientScanId));
-
-        const combinedScans = [...mappedScans];
-        localQueuedScans.forEach(lqs => {
-          if (!combinedScans.some(cs => cs.clientScanId === lqs.clientScanId)) {
-            combinedScans.push(lqs);
-          }
-        });
-
-        // Vehicles strictly reflect server state + unsynced queue items only
-        const finalVehicles = { ...mappedVehicles };
-        localQueuedScans.forEach(lqs => {
-          if (!finalVehicles[lqs.vin]) {
-            const decoded = decodeVinDetails(lqs.vin);
-            finalVehicles[lqs.vin] = {
-              vin: lqs.vin,
-              model: decoded.model,
-              variant: decoded.variant,
-              colour: decoded.colour,
-              vinValid: true,
-              currentStatus: lqs.type,
-              currentYardId: lqs.yardId,
-              lastChangedAt: lqs.scannedAt,
-            };
-          }
-        });
-
-        const nextState = {
+        return {
           ...s,
-          vehicles: finalVehicles,
+          vehicles: mappedVehicles,
           flags: mappedFlags,
-          scans: combinedScans,
+          scans: mappedScans,
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
-        return nextState;
       });
     } catch (err) {
       console.error("Failed to load backend data", err);
@@ -247,39 +210,6 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!online || state.queue.length === 0) return;
-    
-    let cancelled = false;
-    async function performSync() {
-      // Find all queued scans that haven't been synced yet
-      const scansToSync = state.scans.filter(s => state.queue.includes(s.clientScanId));
-      if (scansToSync.length === 0) return;
-      
-      try {
-        await bulkSync(scansToSync);
-        if (cancelled) return;
-        
-        setState((current) => {
-          const syncedIds = scansToSync.map(s => s.clientScanId);
-          return {
-            ...current,
-            queue: current.queue.filter(id => !syncedIds.includes(id)),
-            scans: current.scans.map((scan) => syncedIds.includes(scan.clientScanId) ? { ...scan, syncStatus: "synced" } : scan),
-          };
-        });
-        
-        // Immediately fetch the fresh state from the server now that our sync is accepted!
-        fetchServerData();
-      } catch (err) {
-        console.error("Background sync failed:", err);
-      }
-    }
-    
-    performSync();
-    return () => { cancelled = true; };
-  }, [online, state.queue.length, state.scans, fetchServerData]);
-
   const navigateTo = (nextView) => {
     setView(nextView);
     if (session) {
@@ -303,14 +233,13 @@ export default function App() {
       <Header
         session={session}
         online={online}
-        pending={state.queue.length}
         onLogout={() => {
           setSession(null);
           window.history.replaceState(null, "", "/");
         }}
       />
       <main className="content">
-        {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} />}
+        {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} onRefresh={fetchServerData} />}
         {view === "stock" && <StockView state={state} session={session} />}
         {view === "dashboard" && (isAdmin ? <AdminHome stats={stats} state={state} setState={setState} /> : <DashboardView state={state} stats={stats} session={session} setState={setState} />)}
         {view === "delivered" && isAdmin && <DeliveredUpload state={state} setState={setState} />}
@@ -496,7 +425,7 @@ function Login({ onLogin }) {
   );
 }
 
-function Header({ session, online, pending, onLogout }) {
+function Header({ session, online, onLogout }) {
   return (
     <header className="topbar">
       <div>
@@ -504,7 +433,7 @@ function Header({ session, online, pending, onLogout }) {
         <small>{session.role === "admin" ? "Admin Console" : session.name}</small>
       </div>
       <div className="top-actions">
-        <span className={online ? "pill ok" : "pill warn"}>{online ? "Online" : "Offline"} · {pending} queued</span>
+        <span className={online ? "pill ok" : "pill warn"}>{online ? "Online" : "Offline"}</span>
         <button className="icon-btn" onClick={onLogout} aria-label="Log out"><span className="material-symbols-outlined">logout</span></button>
       </div>
     </header>
@@ -576,7 +505,7 @@ function compressImage(file, maxDimension = 1000, quality = 0.8) {
   });
 }
 
-function ScanView({ state, setState, session, online }) {
+function ScanView({ state, setState, session, online, onRefresh }) {
   const [vin, setVin] = useState("");
   const [outRemark, setOutRemark] = useState("");
   const [damaged, setDamaged] = useState(false);
@@ -814,32 +743,28 @@ function ScanView({ state, setState, session, online }) {
       if (!damageRemark.trim()) return setMessage({ kind: "error", text: "Add the damage remark." });
       if (!damageImage) return setMessage({ kind: "error", text: "Attach or capture a photo of the vehicle damage." });
     }
+    if (!online) return setMessage({ kind: "error", text: "No connection. This scan was not saved." });
 
     const gps = { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
     const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, damaged, damageRemark, damageImage, online });
     const result = applyScan(state, scan);
-    setState(result.state);
-    setMessage({ kind: result.accepted ? "ok" : "error", text: result.message });
-    setVin("");
-    setOutRemark("");
-    setDamaged(false);
-    setDamageRemark("");
-    setDamageImage("");
-    setScanSuccess(null);
-    scanLockedRef.current = false;
+    if (!result.accepted) return setMessage({ kind: "error", text: result.message });
 
-    if (online && result.accepted) {
-      try {
-        await bulkSync([scan]);
-        setState((current) => ({
-          ...current,
-          queue: current.queue.filter(id => id !== scan.clientScanId),
-          scans: current.scans.map(s => s.clientScanId === scan.clientScanId ? { ...s, syncStatus: "synced" } : s),
-        }));
-        fetchServerData();
-      } catch (err) {
-        console.error("Immediate backend sync failed, scan remains queued locally:", err);
-      }
+    try {
+      await bulkSync([scan]);
+      setState(result.state);
+      setMessage({ kind: "ok", text: result.message });
+      setVin("");
+      setOutRemark("");
+      setDamaged(false);
+      setDamageRemark("");
+      setDamageImage("");
+      setScanSuccess(null);
+      scanLockedRef.current = false;
+      onRefresh();
+    } catch (err) {
+      console.error("Backend sync failed:", err);
+      setMessage({ kind: "error", text: "Server did not save this scan. Please try again." });
     }
   }
 
@@ -1025,7 +950,7 @@ function ScanView({ state, setState, session, online }) {
           <span className="material-symbols-outlined">smartphone</span>
           <span>Device {state.deviceId.slice(-8)}</span>
         </div>
-        <p className="muted">GPS is captured on submit. Offline scans stay queued until the browser comes online.</p>
+        <p className="muted">GPS is captured on submit. A connection is required to save a scan.</p>
       </aside>
     </section>
   );
