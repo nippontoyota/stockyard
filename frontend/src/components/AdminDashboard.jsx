@@ -11,6 +11,7 @@ import {
 import { YardVehiclesModal } from "./YardVehiclesModal.jsx";
 import { CredentialsTab } from "./CredentialsTab.jsx";
 import { TransitUploadTab } from "./TransitUploadTab.jsx";
+import { AllVehiclesTab } from "./AllVehiclesTab.jsx";
 import { flagLabel, resolveFlag, yards, detectModel } from "../stockyardLogic.js";
 import { resolveFlag as apiResolveFlag, adminOverrideVehicle } from "../api.js";
 
@@ -212,6 +213,7 @@ export function AdminHome({ stats, state, setState }) {
             </button>
             <div className="segmented">
               <button type="button" className={activeTab === "overview" ? "active" : ""} onClick={() => setActiveTab("overview")}>Overview</button>
+              <button type="button" className={activeTab === "all-vehicles" ? "active" : ""} onClick={() => setActiveTab("all-vehicles")}>All Vehicles</button>
               <button type="button" className={activeTab === "yards" ? "active" : ""} onClick={() => setActiveTab("yards")}>Yards</button>
               <button type="button" className={activeTab === "flags" ? "active" : ""} onClick={() => setActiveTab("flags")}>Flags ({stats.openFlags})</button>
               <button type="button" className={activeTab === "damaged" ? "active" : ""} onClick={() => setActiveTab("damaged")}>Damaged Cars ({activeDamagedCount})</button>
@@ -299,10 +301,14 @@ export function AdminHome({ stats, state, setState }) {
                   <h2>Dwell by Model</h2>
                   <span className="pill neutral">Days in Stock</span>
                 </div>
-                <DwellByModelChart dwellByModel={stats.dwellByModel} />
+                <DwellByModelChart data={stats.dwellTime.byModel} />
               </section>
             </div>
           </>
+        )}
+
+        {activeTab === "all-vehicles" && (
+          <AllVehiclesTab state={state} />
         )}
 
         {activeTab === "yards" && (
