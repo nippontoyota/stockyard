@@ -534,7 +534,7 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .dashboard-actions .action-icon-btn:hover { background: #f1f5f9; color: #002046; border-color: #cbd5e1; }
 .dashboard-actions .action-icon-btn.active { background: #002046; color: #fff; border-color: #002046; }
 .dashboard-actions .segmented {
-  width: max-content; background: #e8f1ff; border: 1px solid #cfe0ff; border-radius: 8px; display: grid; grid-template-columns: repeat(4, 1fr); padding: 4px; gap: 4px;
+  display: none; /* Hidden on desktop, see media query for mobile */
 }
 .dashboard-actions .segmented button { min-height: 38px; font-size: 12px; font-weight: 700; border: 0; background: transparent; color: #475569; border-radius: 6px; padding: 0 12px; white-space: nowrap; }
 .dashboard-actions .segmented .active { background: #002046; color: #fff; }
@@ -583,6 +583,11 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 @media (max-width: 1080px) {
   .dashboard-workspace { grid-template-columns: 1fr; padding: 12px; }
   .dashboard-rail { display: none; }
+  .dashboard-actions .segmented {
+    width: 100%; max-width: 100%; background: #e8f1ff; border: 1px solid #cfe0ff; border-radius: 8px; display: flex; overflow-x: auto; padding: 4px; gap: 4px;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .dashboard-actions .segmented::-webkit-scrollbar { display: none; }
   .analytical-dashboard { border-radius: 8px; padding: 16px; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .analytics-grid-2col, .analytics-grid-3col { grid-template-columns: 1fr; }
@@ -593,7 +598,6 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   .analytical-dashboard { padding: 12px; gap: 12px; }
   .dashboard-header { align-items: stretch; flex-direction: column; }
   .dashboard-actions { justify-content: space-between; }
-  .dashboard-actions .segmented { width: 100%; grid-template-columns: repeat(2, 1fr); }
   .dashboard-spotlight { grid-template-columns: minmax(0, 1fr) auto; }
   .dashboard-spotlight small { display: none; }
   .kpi-grid { grid-template-columns: 1fr; }
