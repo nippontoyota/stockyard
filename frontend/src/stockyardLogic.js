@@ -1,5 +1,3 @@
-export const STORAGE_KEY = "yardScanState";
-
 export const yards = [
   ["CO01A-1", "CO01A", "Nettur Showroom, Cochin", 125, 9.9369, 76.3149, 250],
   ["CO01B-1", "CO01B", "Kalamasery, Cochin", 200, 10.0529, 76.3157, 250],
@@ -30,7 +28,7 @@ export function createInitialState(now = new Date().toISOString()) {
   const vehicles = {};
   const scans = [];
   const flags = [];
-  return { deviceId, vehicles, scans, flags, queue: [] };
+  return { deviceId, vehicles, scans, flags };
 }
 
 export function createClientScanId() {
@@ -51,7 +49,6 @@ export function createScan({ vin, type, yardId, gps, outRemark = "", damaged = f
     damageImage,
     deviceId: localStorage.getItem("yardDeviceId") || "unknown-device",
     scannedAt: new Date().toISOString(),
-    syncStatus: "queued",
   };
 }
 
@@ -209,7 +206,6 @@ export function applyScan(state, scan) {
     vehicles: { ...state.vehicles, [vin]: vehicle },
     scans: [...state.scans, { ...scan, vin, status: flags.length ? "flagged" : "accepted" }],
     flags: [...state.flags, ...capacityFlags(state, scan, vin), ...flags],
-    queue: scan.syncStatus === "queued" ? [...state.queue, scan.clientScanId] : state.queue,
   };
   return { state: next, accepted: true, message: flags.length ? "Scan accepted with admin flag." : "Scan accepted." };
 }
