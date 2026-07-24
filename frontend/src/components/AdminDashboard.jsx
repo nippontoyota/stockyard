@@ -46,6 +46,16 @@ export function AdminHome({ stats, state, setState }) {
   const [toastMessage, setToastMessage] = useState("");
   const [selectedYardModal, setSelectedYardModal] = useState(null);
   const [selectedPhotoModal, setSelectedPhotoModal] = useState(null);
+  const [expandedDamagedRows, setExpandedDamagedRows] = useState(new Set());
+
+  const toggleDamagedRow = (id) => {
+    setExpandedDamagedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const busiestYard = stats.yards.reduce((top, yard) => yard.count > top.count ? yard : top, stats.yards[0] || { count: 0, code: "-", name: "No yard" });
   const healthyYards = stats.yards.filter((yard) => yard.risk === "normal").length;
@@ -417,89 +427,124 @@ export function AdminHome({ stats, state, setState }) {
             {damagedVehiclesList.length === 0 ? (
               <p className="notice ok">No damaged cars reported across stockyard scans.</p>
             ) : (
-              <div className="damaged-cars-grid">
-                {damagedVehiclesList.map((item) => (
-                  <article className={`damaged-car-card ${item.resolved ? "resolved" : "active"}`} key={item.id}>
-                    <div className="damaged-card-header">
-                      <div>
-                        <div className="damaged-card-title-row">
-                          <strong className="damaged-vin">{item.vin}</strong>
-                          <span className={`scan-badge ${item.scanType}`}>{item.scanType.toUpperCase()} SCAN</span>
-                        </div>
-                        <span className="damaged-model">{item.model}</span>
-                      </div>
-                      <span className={item.resolved ? "pill ok" : "pill bad"}>
-                        {item.resolved ? "Resolved" : "Flagged"}
-                      </span>
-                    </div>
+              <div className="table-wrapper">
+                <table className="damaged-table">
+                  <thead>
+                    <tr>
+                      <th>VIN</th>
+                      <th>Model</th>
+                      <th>Yard</th>
+                      <th>Scan</th>
+                      <th>Time</th>
+                      <th>Status</th>
+                      <th aria-label="Expand"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {damagedVehiclesList.map((item) => {
+                      const isExpanded = expandedDamagedRows.has(item.id);
+                      return (
+                        <React.Fragment key={item.id}>
+                          <tr 
+                            className={`damaged-row ${isExpanded ? "expanded-active" : ""} ${item.resolved ? "resolved" : "active"}`}
+                            onClick={() => toggleDamagedRow(item.id)}
+                          >
+                            <td><strong className="damaged-vin">{item.vin}</strong></td>
+                            <td><span className="damaged-model">{item.model}</span></td>
+                            <td>{item.yardName} {item.yardCode && `(${item.yardCode})`}</td>
+                            <td><span className={`scan-badge ${item.scanType}`}>{item.scanType.toUpperCase()} SCAN</span></td>
+                            <td>
+                              <span className="damaged-time">
+                                {new Date(item.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={item.resolved ? "pill ok" : "pill bad"}>
+                                {item.resolved ? "Resolved" : "Flagged"}
+                              </span>
+                            </td>
+                            <td className="expand-cell">
+                              <span className="material-symbols-outlined expand-icon" style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0)" }}>
+                                expand_more
+                              </span>
+                            </td>
+                          </tr>
+                          
+                          {isExpanded && (
+                            <tr className="expanded-row">
+                              <td colSpan="7">
+                                <div className="expanded-content">
+                                  <div className="damaged-remark-box">
+                                    <span className="material-symbols-outlined remark-icon">report_problem</span>
+                                    <div>
+                                      <small className="remark-label">Damage Remarks</small>
+                                      <p className="remark-text">{item.damageRemark}</p>
+                                    </div>
+                                  </div>
 
-                    <div className="damaged-card-meta">
-                      <span className="material-symbols-outlined">warehouse</span>
-                      <span>{item.yardName} {item.yardCode && `(${item.yardCode})`}</span>
-                      <span className="dot-sep">&bull;</span>
-                      <span className="damaged-time">
-                        {new Date(item.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
+                                  <div className="damaged-photo-section">
+                                    <small className="photo-label">Damage Evidence Photo</small>
+                                    {item.damageImage ? (
+                                      <div className="photo-actions">
+                                        <div
+                                          className="damaged-photo-preview clickable"
+                                          onClick={() => setSelectedPhotoModal({
+                                            vin: item.vin,
+                                            model: item.model,
+                                            yardName: item.yardName,
+                                            src: item.damageImage,
+                                            remark: item.damageRemark,
+                                          })}
+                                          title="Click to expand photo"
+                                        >
+                                          <img src={item.damageImage} alt="Damage evidence" />
+                                          <div className="photo-overlay">
+                                            <span className="material-symbols-outlined">zoom_in</span>
+                                            <span>View Full Photo</span>
+                                          </div>
+                                        </div>
+                                        <a href={item.damageImage} download={`damage-${item.vin}.jpg`} className="download-btn" onClick={(e) => e.stopPropagation()}>
+                                          <span className="material-symbols-outlined">download</span> Download Evidence
+                                        </a>
+                                      </div>
+                                    ) : (
+                                      <div className="no-photo-box">
+                                        <span className="material-symbols-outlined">image_not_supported</span>
+                                        <span>No photo attached</span>
+                                      </div>
+                                    )}
+                                  </div>
 
-                    <div className="damaged-remark-box">
-                      <span className="material-symbols-outlined remark-icon">report_problem</span>
-                      <div>
-                        <small className="remark-label">Damage Remarks</small>
-                        <p className="remark-text">{item.damageRemark}</p>
-                      </div>
-                    </div>
-
-                    <div className="damaged-photo-section">
-                      <small className="photo-label">Damage Evidence Photo</small>
-                      {item.damageImage ? (
-                        <div
-                          className="damaged-photo-preview clickable"
-                          onClick={() => setSelectedPhotoModal({
-                            vin: item.vin,
-                            model: item.model,
-                            yardName: item.yardName,
-                            src: item.damageImage,
-                            remark: item.damageRemark,
-                          })}
-                          title="Click to expand photo"
-                        >
-                          <img src={item.damageImage} alt="Damage evidence" />
-                          <div className="photo-overlay">
-                            <span className="material-symbols-outlined">zoom_in</span>
-                            <span>View Full Photo</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="no-photo-box">
-                          <span className="material-symbols-outlined">image_not_supported</span>
-                          <span>No photo attached</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {!item.resolved && item.flagId && setState && (
-                      <div className="damaged-card-actions">
-                        <button
-                          type="button"
-                          className="flag-btn primary-flag"
-                          onClick={async () => {
-                            try {
-                              await apiResolveFlag(item.flagId);
-                              setState(resolveFlag(state, item.flagId));
-                              setToastMessage(`Damage flag resolved for VIN ${item.vin}`);
-                              setTimeout(() => setToastMessage(""), 3500);
-                            } catch (err) {
-                              alert(err.message);
-                            }
-                          }}
-                        >
-                          Resolve Damage Flag
-                        </button>
-                      </div>
-                    )}
-                  </article>
-                ))}
+                                  {!item.resolved && item.flagId && setState && (
+                                    <div className="damaged-card-actions">
+                                      <button
+                                        type="button"
+                                        className="flag-btn primary-flag"
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          try {
+                                            await apiResolveFlag(item.flagId);
+                                            setState(resolveFlag(state, item.flagId));
+                                            setToastMessage(`Damage flag resolved for VIN ${item.vin}`);
+                                            setTimeout(() => setToastMessage(""), 3500);
+                                          } catch (err) {
+                                            alert(err.message);
+                                          }
+                                        }}
+                                      >
+                                        Resolve Damage Flag
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </section>
