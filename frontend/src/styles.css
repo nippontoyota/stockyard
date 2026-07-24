@@ -181,7 +181,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .scan-result-popover .damage-inputs,
 .scan-result-popover .scan-damage-check,
 .scan-result-popover .scan-submit-button,
-.scan-result-popover .scan-popover-message {
+.scan-result-popover .scan-popover-message,
+.scan-result-popover .notice {
   grid-column: 1 / -1;
 }
 .scan-result-popover select { min-height: 44px; }
