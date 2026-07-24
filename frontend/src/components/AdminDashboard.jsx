@@ -123,6 +123,9 @@ export function AdminHome({ stats, state, setState }) {
   const damagedVehiclesList = [...damagedVehiclesMap.values()];
   const activeDamagedCount = damagedVehiclesList.filter((d) => !d.resolved).length;
 
+  const transitVehicles = state?.vehicles ? Object.values(state.vehicles).filter(v => v.currentStatus === 'transit') : [];
+  const transitCount = transitVehicles.length;
+
   return (
     <section className="dashboard-workspace">
       <aside className="dashboard-rail" aria-label="Stockyard summary">
@@ -164,6 +167,15 @@ export function AdminHome({ stats, state, setState }) {
             <span className="material-symbols-outlined">car_crash</span>
             <span>Damaged Cars</span>
             {activeDamagedCount > 0 && <span className="rail-badge bad">{activeDamagedCount}</span>}
+          </button>
+          <button
+            type="button"
+            className={activeTab === "transit" ? "active" : ""}
+            onClick={() => setActiveTab("transit")}
+          >
+            <span className="material-symbols-outlined">local_shipping</span>
+            <span>In Transit</span>
+            {transitCount > 0 && <span className="rail-badge info" style={{ background: 'var(--brand)', color: 'white' }}>{transitCount}</span>}
           </button>
         </div>
         <div className="rail-note">
@@ -541,6 +553,52 @@ export function AdminHome({ stats, state, setState }) {
                             </tr>
                           )}
                         </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeTab === "transit" && (
+          <section className="panel stack flag-tab-panel">
+            <div className="tab-summary">
+              <span className="eyebrow">Incoming Vehicles</span>
+              <strong>{transitCount} vehicle{transitCount === 1 ? "" : "s"} currently in transit from TKM</strong>
+              <span className={transitCount > 0 ? "pill info" : "pill ok"} style={transitCount > 0 ? { background: 'var(--brand)', color: 'white' } : {}}>
+                {transitCount > 0 ? "Pending Arrival" : "No Transit Vehicles"}
+              </span>
+            </div>
+
+            {transitCount === 0 ? (
+              <p className="notice ok">There are no vehicles currently marked as in transit.</p>
+            ) : (
+              <div className="table-wrapper">
+                <table className="damaged-table">
+                  <thead>
+                    <tr>
+                      <th>VIN</th>
+                      <th>Model</th>
+                      <th>Destination Yard</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transitVehicles.map((vehicle) => {
+                      const destinationYard = yards.find(y => y.id === vehicle.currentYardId);
+                      return (
+                        <tr key={vehicle.vin}>
+                          <td style={{ fontFamily: "monospace" }}>{vehicle.vin}</td>
+                          <td>{vehicle.model}</td>
+                          <td>
+                            <span className="scan-badge in">{destinationYard?.code || "UKN"}</span> {destinationYard?.name || "Unknown Yard"}
+                          </td>
+                          <td>
+                            <span className="pill info" style={{ background: 'var(--brand)', color: 'white' }}>In Transit</span>
+                          </td>
+                        </tr>
                       );
                     })}
                   </tbody>

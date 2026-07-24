@@ -155,4 +155,83 @@ router.get('/:vin/history', async (req, res, next) => {
   }
 });
 
+// ─── POST /transit-list ──────────────────────────────────────────────
+
+router.post('/transit-list', async (req, res, next) => {
+  try {
+    if (req.user!.role !== 'admin') {
+      res.status(403).json({ error: 'Only admins can upload transit lists.' });
+      return;
+    }
+
+    const { vehicles: transitVehicles } = req.body;
+    if (!Array.isArray(transitVehicles) || transitVehicles.length === 0) {
+      res.status(400).json({ error: 'Invalid or empty transit list.' });
+      return;
+    }
+
+    let processedCount = 0;
+    let skippedCount = 0;
+
+    await db.transaction(async (tx) => {
+      for (const tv of transitVehicles) {
+        if (!tv.vin || !tv.yard_id) continue;
+
+        // Ensure vehicle exists
+        const [existing] = await tx
+          .select({ id: vehicles.id })
+          .from(vehicles)
+          .where(eq(vehicles.vin, tv.vin));
+
+        let vehicleId = existing?.id;
+        if (!existing) {
+          const [inserted] = await tx
+            .insert(vehicles)
+            .values({
+              vin: tv.vin,
+              model: tv.model || 'Toyota Vehicle',
+              vin_valid: true,
+            })
+            .returning({ id: vehicles.id });
+          vehicleId = inserted.id;
+        }
+
+        // Fetch current status
+        const [status] = await tx
+          .select({ current_status: vehicleStatus.current_status })
+          .from(vehicleStatus)
+          .where(eq(vehicleStatus.vehicle_id, vehicleId));
+
+        // Rule: Do not overwrite if vehicle is already "in" stockyard
+        if (status && status.current_status === 'in') {
+          skippedCount++;
+          continue;
+        }
+
+        // Insert or update to 'transit'
+        await tx
+          .insert(vehicleStatus)
+          .values({
+            vehicle_id: vehicleId,
+            current_status: 'transit',
+            current_yard_id: tv.yard_id,
+          })
+          .onConflictDoUpdate({
+            target: vehicleStatus.vehicle_id,
+            set: {
+              current_status: 'transit',
+              current_yard_id: tv.yard_id,
+              last_changed_at: new Date(),
+            },
+          });
+        processedCount++;
+      }
+    });
+
+    res.json({ message: `Transit list processed. Added: ${processedCount}, Skipped (already IN): ${skippedCount}` });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
