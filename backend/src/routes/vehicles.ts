@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { eq, and, desc, ilike } from 'drizzle-orm';
+import { eq, and, desc, ilike, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { vehicles, vehicleStatus, scans, yards } from '../db/schema.js';
 import { authenticate } from '../middleware/auth.js';
@@ -48,7 +48,7 @@ router.get('/', async (req, res, next) => {
       .from(vehicles)
       .leftJoin(vehicleStatus, eq(vehicles.id, vehicleStatus.vehicle_id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(vehicleStatus.last_changed_at))
+      .orderBy(sql`${vehicleStatus.last_changed_at} DESC NULLS LAST`)
       .limit(limit)
       .offset(offset);
 
