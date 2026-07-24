@@ -158,6 +158,8 @@ export default function App() {
         damageRemark: s.damageRemark || "",
         damageImage: s.damageImage || "",
         outRemark: s.outRemark || "",
+        transferDestinationYardId: s.transferDestinationYardId || "",
+        transferRequestedBy: s.transferRequestedBy || "",
         syncStatus: "synced",
       }));
       
@@ -513,6 +515,8 @@ function compressImage(file, maxDimension = 1000, quality = 0.8) {
 function ScanView({ state, setState, session, online, onRefresh }) {
   const [vin, setVin] = useState("");
   const [outRemark, setOutRemark] = useState("");
+  const [transferDestinationYardId, setTransferDestinationYardId] = useState("");
+  const [transferRequestedBy, setTransferRequestedBy] = useState("");
   const [damaged, setDamaged] = useState(false);
   const [damageRemark, setDamageRemark] = useState("");
   const [damageImage, setDamageImage] = useState("");
@@ -744,6 +748,8 @@ function ScanView({ state, setState, session, online, onRefresh }) {
     event.preventDefault();
     if (!vin.trim()) return setMessage({ kind: "error", text: "Enter or scan a VIN." });
     if (scanType === "out" && !outRemark) return setMessage({ kind: "error", text: "Select an OUT reason." });
+    if (outRemark === "stockyard_transfer" && !transferDestinationYardId) return setMessage({ kind: "error", text: "Select destination yard for transfer." });
+    if (outRemark === "stockyard_transfer" && !transferRequestedBy.trim()) return setMessage({ kind: "error", text: "Enter the name of person who requested the transfer." });
     if (damaged) {
       if (!damageRemark.trim()) return setMessage({ kind: "error", text: "Add the damage remark." });
       if (!damageImage) return setMessage({ kind: "error", text: "Attach or capture a photo of the vehicle damage." });
@@ -751,7 +757,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
     if (!online) return setMessage({ kind: "error", text: "No connection. This scan was not saved." });
 
     const gps = { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
-    const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, damaged, damageRemark, damageImage, online });
+    const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, transferDestinationYardId, transferRequestedBy, damaged, damageRemark, damageImage, online });
     const result = applyScan(state, scan);
     if (!result.accepted) return setMessage({ kind: "error", text: result.message });
 
@@ -761,6 +767,8 @@ function ScanView({ state, setState, session, online, onRefresh }) {
       setMessage({ kind: "ok", text: result.message });
       setVin("");
       setOutRemark("");
+      setTransferDestinationYardId("");
+      setTransferRequestedBy("");
       setDamaged(false);
       setDamageRemark("");
       setDamageImage("");
@@ -830,12 +838,37 @@ function ScanView({ state, setState, session, online, onRefresh }) {
               {scanType === "out" && (
                 <select value={outRemark} onChange={(event) => {
                   setOutRemark(event.target.value);
+                  if (event.target.value !== "stockyard_transfer") {
+                    setTransferDestinationYardId("");
+                    setTransferRequestedBy("");
+                  }
                   setMessage(null);
                 }} aria-label="OUT reason">
                   <option value="">Select OUT reason</option>
                   <option value="customer_acquisition">Customer Acquisition</option>
                   <option value="stockyard_transfer">Stockyard Transfer</option>
                 </select>
+              )}
+              {outRemark === "stockyard_transfer" && (
+                <>
+                  <select value={transferDestinationYardId} onChange={(event) => {
+                    setTransferDestinationYardId(event.target.value);
+                    setMessage(null);
+                  }} aria-label="Destination yard">
+                    <option value="">Select destination yard</option>
+                    {yards.filter((y) => y.id !== yard.id).map((y) => (
+                      <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    value={transferRequestedBy}
+                    onChange={(event) => {
+                      setTransferRequestedBy(event.target.value);
+                      setMessage(null);
+                    }}
+                    placeholder="Requested by (person name)"
+                  />
+                </>
               )}
               <label className="check scan-damage-check">
                 <input type="checkbox" checked={damaged} onChange={(event) => {
@@ -895,6 +928,8 @@ function ScanView({ state, setState, session, online, onRefresh }) {
             <button type="button" className="scan-next-button" onClick={() => {
               setVin("");
               setOutRemark("");
+              setTransferDestinationYardId("");
+              setTransferRequestedBy("");
               setDamaged(false);
               setDamageRemark("");
               setDamageImage("");
@@ -911,11 +946,35 @@ function ScanView({ state, setState, session, online, onRefresh }) {
             {scanType === "out" && (
               <>
                 <label htmlFor="remark">OUT Reason</label>
-                <select id="remark" value={outRemark} onChange={(event) => setOutRemark(event.target.value)}>
+                <select id="remark" value={outRemark} onChange={(event) => {
+                  setOutRemark(event.target.value);
+                  if (event.target.value !== "stockyard_transfer") {
+                    setTransferDestinationYardId("");
+                    setTransferRequestedBy("");
+                  }
+                }}>
                   <option value="">Select reason</option>
                   <option value="customer_acquisition">Customer Acquisition</option>
                   <option value="stockyard_transfer">Stockyard Transfer</option>
                 </select>
+                {outRemark === "stockyard_transfer" && (
+                  <>
+                    <label htmlFor="transfer-dest">Transfer Destination Yard</label>
+                    <select id="transfer-dest" value={transferDestinationYardId} onChange={(event) => setTransferDestinationYardId(event.target.value)}>
+                      <option value="">Select destination yard</option>
+                      {yards.filter((y) => y.id !== yard.id).map((y) => (
+                        <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
+                      ))}
+                    </select>
+                    <label htmlFor="transfer-requester">Requested By</label>
+                    <input
+                      id="transfer-requester"
+                      value={transferRequestedBy}
+                      onChange={(event) => setTransferRequestedBy(event.target.value)}
+                      placeholder="Person name who requested transfer"
+                    />
+                  </>
+                )}
               </>
             )}
             <label className="check"><input type="checkbox" checked={damaged} onChange={(event) => {

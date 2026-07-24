@@ -33,15 +33,22 @@ const scanInBody = scanInBase.refine((d) => !d.damaged || (d.damage_remark && d.
 
 const scanOutBase = scanInBase.extend({
   out_remark: z.enum(['customer_acquisition', 'stockyard_transfer']),
+  transfer_destination_yard_id: z.string().optional(),
+  transfer_requested_by: z.string().optional(),
   damaged: z.boolean(),
   damage_remark: z.string().optional(),
   damage_image: z.string().optional(),
 });
 
-const scanOutBody = scanOutBase.refine((d) => !d.damaged || (d.damage_remark && d.damage_remark.length > 0), {
-  message: 'damage_remark is required when damaged is true',
-  path: ['damage_remark'],
-});
+const scanOutBody = scanOutBase
+  .refine((d) => !d.damaged || (d.damage_remark && d.damage_remark.length > 0), {
+    message: 'damage_remark is required when damaged is true',
+    path: ['damage_remark'],
+  })
+  .refine((d) => d.out_remark !== 'stockyard_transfer' || (d.transfer_destination_yard_id && d.transfer_requested_by), {
+    message: 'transfer_destination_yard_id and transfer_requested_by are required for stockyard_transfer',
+    path: ['transfer_destination_yard_id'],
+  });
 
 const bulkSyncBody = z.object({
   scans: z.array(
@@ -173,7 +180,7 @@ async function processScanOut(body: ScanOut, yardId: string) {
   const [currentStatus] = await db.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
   const [scan] = await db.insert(scans).values({
-    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), out_remark: body.out_remark, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
+    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
   }).returning();
 
   const scanTime = new Date(body.scanned_at);
@@ -263,6 +270,8 @@ router.get('/', async (req, res, next) => {
         damageRemark: scans.damage_remark,
         damageImage: scans.damage_image,
         outRemark: scans.out_remark,
+        transferDestinationYardId: scans.transfer_destination_yard_id,
+        transferRequestedBy: scans.transfer_requested_by,
         status: scans.status,
       })
       .from(scans)

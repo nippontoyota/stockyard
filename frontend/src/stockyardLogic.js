@@ -35,7 +35,7 @@ export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, gps, outRemark = "", damaged = false, damageRemark = "", damageImage = "" }) {
+export function createScan({ vin, type, yardId, gps, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", damaged = false, damageRemark = "", damageImage = "" }) {
   return {
     id: crypto.randomUUID(),
     clientScanId: createClientScanId(),
@@ -44,6 +44,8 @@ export function createScan({ vin, type, yardId, gps, outRemark = "", damaged = f
     yardId,
     gps,
     outRemark,
+    transferDestinationYardId,
+    transferRequestedBy,
     damaged,
     damageRemark,
     damageImage,

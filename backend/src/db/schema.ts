@@ -69,6 +69,8 @@ export const scans = pgTable(
     longitude: numeric('longitude', { precision: 10, scale: 7 }),
     gps_accuracy_meters: numeric('gps_accuracy_meters', { precision: 8, scale: 2 }),
     out_remark: text('out_remark'), // 'customer_acquisition' | 'stockyard_transfer'
+    transfer_destination_yard_id: text('transfer_destination_yard_id').references(() => yards.id),
+    transfer_requested_by: text('transfer_requested_by'),
     damaged: boolean('damaged'),
     damage_remark: text('damage_remark'),
     damage_image: text('damage_image'),
