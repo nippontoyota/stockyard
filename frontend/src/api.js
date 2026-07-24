@@ -17,6 +17,7 @@ async function apiFetch(endpoint, options = {}) {
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: { ...headers, ...options.headers },
+    cache: "no-store",
   });
   if (!response.ok) {
     let errMessage = "Server request failed. Please try again.";
