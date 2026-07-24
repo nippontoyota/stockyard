@@ -51,6 +51,8 @@ export async function bulkSync(scans) {
     damage_image: s.damageImage || undefined,
     ...(s.type === 'out' ? {
       out_remark: s.outRemark,
+      transfer_destination_yard_id: s.transferDestinationYardId || undefined,
+      transfer_requested_by: s.transferRequestedBy || undefined,
     } : {})
   }));
 

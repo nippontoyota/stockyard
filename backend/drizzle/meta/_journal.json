@@ -8,6 +8,13 @@
       "when": 1784626561952,
       "tag": "0000_naive_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784872055627,
+      "tag": "0001_happy_micromax",
+      "breakpoints": true
     }
   ]
 }
