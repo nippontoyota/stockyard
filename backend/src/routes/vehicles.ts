@@ -164,7 +164,7 @@ router.post('/transit-list', async (req, res, next) => {
       return;
     }
 
-    const { vehicles: transitVehicles } = req.body;
+        const transitVehicles = req.body.vehicles;
     if (!Array.isArray(transitVehicles) || transitVehicles.length === 0) {
       res.status(400).json({ error: 'Invalid or empty transit list.' });
       return;
@@ -177,24 +177,21 @@ router.post('/transit-list', async (req, res, next) => {
       for (const tv of transitVehicles) {
         if (!tv.vin || !tv.yard_id) continue;
 
-        // Ensure vehicle exists
-        const [existing] = await tx
-          .select({ id: vehicles.id })
-          .from(vehicles)
-          .where(eq(vehicles.vin, tv.vin));
-
-        let vehicleId = existing?.id;
-        if (!existing) {
-          const [inserted] = await tx
-            .insert(vehicles)
-            .values({
-              vin: tv.vin,
-              model: tv.model || 'Toyota Vehicle',
-              vin_valid: true,
-            })
-            .returning({ id: vehicles.id });
-          vehicleId = inserted.id;
-        }
+        // Ensure vehicle exists (upsert)
+        const [upserted] = await tx
+          .insert(vehicles)
+          .values({
+            vin: tv.vin,
+            model: tv.model || 'Toyota Vehicle',
+            vin_valid: true,
+          })
+          .onConflictDoUpdate({
+            target: vehicles.vin,
+            set: { model: tv.model || 'Toyota Vehicle' },
+          })
+          .returning({ id: vehicles.id });
+        
+        let vehicleId = upserted.id;
 
         // Fetch current status
         const [status] = await tx
