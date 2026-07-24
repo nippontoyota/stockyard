@@ -64,7 +64,7 @@ export function TransitUploadTab({ onUploadComplete }) {
           extracted.push({
             vin: normalizedVin,
             model: rawModel || detectModel(normalizedVin),
-            yardId: matchedYard.id,
+            yard_id: matchedYard.id,
             yardCode: matchedYard.code,
             yardName: matchedYard.name
           });
@@ -85,8 +85,7 @@ export function TransitUploadTab({ onUploadComplete }) {
     setLoading(true);
     setError(null);
     try {
-      const payload = parsedData.map(v => ({ vin: v.vin, model: v.model, yard_id: v.yardId }));
-      const response = await uploadTransitListApi(payload);
+      const response = await uploadTransitListApi(parsedData);
       setSuccessMsg(response.message || "Transit list uploaded successfully.");
       setParsedData([]);
       setFile(null);
