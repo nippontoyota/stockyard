@@ -301,7 +301,7 @@ export function AdminHome({ stats, state, setState }) {
                   <h2>Dwell by Model</h2>
                   <span className="pill neutral">Days in Stock</span>
                 </div>
-                <DwellByModelChart data={stats.dwellTime.byModel} />
+                <DwellByModelChart data={stats.dwellByModel} />
               </section>
             </div>
           </>
