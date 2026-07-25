@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getAdminBranches, createAdminBranch, updateAdminBranch, assignBranchYards } from "../api.js";
 import { yards } from "../stockyardLogic.js";
+import "../branchManagement.css";
 
 export function BranchesTab() {
   const [branches, setBranches] = useState([]);
@@ -75,101 +76,135 @@ export function BranchesTab() {
   }
 
   if (loading && branches.length === 0) {
-    return <div className="p-xl text-center">Loading branches...</div>;
-  }
-
-  if (assigningId) {
-    const branch = branches.find(b => b.id === assigningId);
-    return (
-      <div className="stack p-md">
-        <header className="row justify-between">
-          <h2>Assign Yards to {branch?.name}</h2>
-          <button className="icon-btn" onClick={() => setAssigningId(null)}>
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        </header>
-        <form onSubmit={handleSaveYards} className="stack">
-          <div className="grid col-2">
-            {yards.map(y => (
-              <label key={y.id} className="row align-center gap-sm">
-                <input 
-                  type="checkbox" 
-                  checked={selectedYards.includes(y.id)} 
-                  onChange={(e) => {
-                    if (e.target.checked) setSelectedYards([...selectedYards, y.id]);
-                    else setSelectedYards(selectedYards.filter(id => id !== y.id));
-                  }}
-                />
-                {y.code} · {y.name}
-              </label>
-            ))}
-          </div>
-          <button type="submit" className="primary">Save Yard Assignments</button>
-        </form>
-      </div>
-    );
+    return <div className="p-xl text-center bm-container">Loading branches...</div>;
   }
 
   return (
-    <div className="stack p-md max-w-lg mx-auto">
-      <header>
+    <div className="bm-container">
+      {/* Header Section */}
+      <div className="bm-header">
         <h2>Branch Management</h2>
-        <p className="muted">Group physical yards into logical branches for requisitions.</p>
-      </header>
+        <p>Group physical yards into logical branches for requisitions.</p>
+      </div>
       
-      {error && <div className="notice bad">{error}</div>}
+      {error && <div className="notice bad" style={{marginBottom: 16}}>{error}</div>}
 
-      <form onSubmit={handleCreate} className="row align-end gap-sm">
-        <div className="field flex-1">
-          <label>New Branch Name</label>
-          <input value={newBranchName} onChange={e => setNewBranchName(e.target.value)} placeholder="e.g. Cochin (Nippon Towers)" required />
+      {/* Add Branch Form */}
+      <form onSubmit={handleCreate} className="bm-add-form">
+        <label htmlFor="new-branch">NEW BRANCH NAME</label>
+        <div className="input-group">
+          <input 
+            id="new-branch"
+            value={newBranchName} 
+            onChange={e => setNewBranchName(e.target.value)} 
+            placeholder="e.g. Cochin (Nippon Towers)" 
+            required 
+          />
+          <button type="submit">
+            Add
+          </button>
         </div>
-        <button type="submit" className="primary" style={{ marginBottom: '4px' }}>Add</button>
       </form>
 
-      <ul className="list-group">
+      {/* Branch List Grid */}
+      <div className="bm-grid">
         {branches.map(b => (
-          <li key={b.id} className="list-item stack">
-            <div className="row justify-between align-center">
+          <div key={b.id} className="bm-card">
+            <div className="bm-card-header">
               {editingId === b.id ? (
-                <div className="row gap-sm flex-1">
-                  <input value={editName} onChange={e => setEditName(e.target.value)} autoFocus className="flex-1" />
-                  <button onClick={() => handleSaveEdit(b.id)} className="primary small">Save</button>
-                  <button onClick={() => setEditingId(null)} className="small">Cancel</button>
+                <div style={{flex: 1, display: 'flex', gap: 8, alignItems: 'center'}}>
+                  <input 
+                    value={editName} 
+                    onChange={e => setEditName(e.target.value)} 
+                    autoFocus 
+                  />
+                  <button type="button" onClick={() => handleSaveEdit(b.id)} className="bm-btn-small">Save</button>
+                  <button type="button" onClick={() => setEditingId(null)} className="bm-btn-small secondary">Cancel</button>
                 </div>
               ) : (
-                <div className="row gap-sm align-center">
-                  <strong className={b.active ? "" : "muted"}>{b.name}</strong>
-                  {!b.active && <span className="pill warn">Inactive</span>}
-                </div>
-              )}
-              
-              {editingId !== b.id && (
-                <div className="row gap-sm">
-                  <button onClick={() => {
-                    setAssigningId(b.id);
-                    setSelectedYards(b.yards?.map(y => y.id) || []);
-                  }} className="small">Assign Yards</button>
-                  <button className="icon-btn small" onClick={() => { setEditingId(b.id); setEditName(b.name); }}>
-                    <span className="material-symbols-outlined">edit</span>
-                  </button>
-                  <button className="icon-btn small" onClick={() => handleToggleActive(b.id, b.active)}>
-                    <span className="material-symbols-outlined">{b.active ? "archive" : "unarchive"}</span>
-                  </button>
-                </div>
+                <>
+                  <div>
+                    <h3>
+                      {b.name}
+                    </h3>
+                    {!b.active && <span className="inactive-pill" style={{marginTop: 4}}>Inactive</span>}
+                  </div>
+                  <div className="bm-card-actions">
+                    <button type="button" className="bm-icon-btn" onClick={() => { setEditingId(b.id); setEditName(b.name); }} title="Edit">
+                      <span className="material-symbols-outlined">edit</span>
+                    </button>
+                    <button type="button" className="bm-icon-btn danger" onClick={() => handleToggleActive(b.id, b.active)} title={b.active ? "Archive" : "Unarchive"}>
+                      <span className="material-symbols-outlined">{b.active ? "archive" : "unarchive"}</span>
+                    </button>
+                  </div>
+                </>
               )}
             </div>
             
-            {b.yards && b.yards.length > 0 && (
-              <div className="row wrap gap-xs mt-sm">
-                {b.yards.map(y => (
-                  <span key={y.id} className="pill muted">{y.name}</span>
+            <div className="bm-card-body">
+              {b.yards && b.yards.length > 0 ? (
+                <>
+                  <p style={{textTransform: 'uppercase', fontSize: 12, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--bm-on-surface-variant)', marginBottom: 8}}>Assigned Yards</p>
+                  <div className="bm-yards-list">
+                    {b.yards.map(y => (
+                      <span key={y.id} className="bm-yard-chip">{y.name}</span>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p>No yards assigned.</p>
+              )}
+            </div>
+            
+            <div className="bm-card-footer">
+              <button type="button" className="bm-btn-assign" onClick={() => {
+                setAssigningId(b.id);
+                setSelectedYards(b.yards?.map(y => y.id) || []);
+              }}>
+                Assign Yards
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal for Assigning Yards */}
+      {assigningId && (
+        <div className="bm-modal-overlay" onClick={() => setAssigningId(null)}>
+          <div className="bm-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="bm-modal-header">
+              <div>
+                <h3>Assign Yards</h3>
+                <p>Select the yards for {branches.find(b => b.id === assigningId)?.name}</p>
+              </div>
+              <button type="button" className="bm-icon-btn" onClick={() => setAssigningId(null)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveYards} style={{display: 'flex', flexDirection: 'column', overflow: 'hidden'}}>
+              <div className="bm-modal-body">
+                {yards.map(y => (
+                  <label key={y.id} className="bm-yard-checkbox">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedYards.includes(y.id)} 
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedYards([...selectedYards, y.id]);
+                        else setSelectedYards(selectedYards.filter(id => id !== y.id));
+                      }}
+                    />
+                    <span>{y.name} ({y.code})</span>
+                  </label>
                 ))}
               </div>
-            )}
-          </li>
-        ))}
-      </ul>
+              <div className="bm-modal-footer">
+                <button type="submit">Save Assignments</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
