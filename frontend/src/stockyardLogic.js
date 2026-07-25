@@ -22,6 +22,25 @@ export const yards = [
   ["KT01A-1", "KT01A", "Kottayam, behind the showroom", 300, 9.5916, 76.5222, 300],
 ].map(([id, code, name, capacity, latitude, longitude, gpsRadiusMeters]) => ({ id, code, name, capacity, latitude, longitude, gpsRadiusMeters }));
 
+export const fallbackBranches = [
+  { id: "f2b0b744-9897-4d34-abac-fae239d547e6", name: "Enchakkal" },
+  { id: "27803e2a-4f62-4097-8270-d1150ed738b4", name: "Kalamassery (Nippon Towers)" },
+  { id: "5eedbae1-79f5-45a4-8b05-02fd1152bc99", name: "Kayamkulam" },
+  { id: "de871bf9-bc24-4f4c-af0d-b494180fea8a", name: "Kazhakootam" },
+  { id: "1557f329-a055-4762-a9c1-de986778c97b", name: "Kochuveli" },
+  { id: "5fc2e50d-9920-42be-8582-cd4d7cc710a2", name: "Kottiyam (Kollam)" },
+  { id: "a3d7675d-4811-4ea5-a270-bcc7aeb923a0", name: "Muvattupuzha" },
+  { id: "37ef85fd-0d8d-4b05-8a9a-e2e5fae90a18", name: "Nadathara" },
+  { id: "4afa5c46-33c7-47ad-8535-55cffa08666f", name: "Nattakom" },
+  { id: "05b6a32b-6aed-452a-966b-93bd15636dd1", name: "Nettoor" },
+  { id: "22c5bd37-02c4-4068-a4e1-89f0dfa327c9", name: "Pala" },
+  { id: "5d543b6d-adab-4026-a483-07f94e2a8e45", name: "Pathanamthitta" },
+  { id: "d3bdfff1-da7c-4b4b-9914-f335197aedcf", name: "Puzhakkal (Ayyanthole)" },
+  { id: "7aea1c90-21a1-464f-aa1d-d564c94f5525", name: "Thellakom" },
+  { id: "d59ed15e-0b0d-4183-9c9f-504fae005dd5", name: "Thiruvalla" },
+  { id: "96e60915-16f0-4fdb-b14a-adb04e4deb66", name: "Vellangallur (Irinjalakuda)" }
+];
+
 export function createInitialState(now = new Date().toISOString()) {
   const deviceId = localStorage.getItem("yardDeviceId") || crypto.randomUUID();
   localStorage.setItem("yardDeviceId", deviceId);
