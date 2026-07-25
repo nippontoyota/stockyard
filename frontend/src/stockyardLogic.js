@@ -47,7 +47,9 @@ export function createInitialState(now = new Date().toISOString()) {
   const vehicles = {};
   const scans = [];
   const flags = [];
-  return { deviceId, vehicles, scans, flags };
+  const notifications = [];
+  const requisitions = { incoming: [], outgoing: [] };
+  return { deviceId, vehicles, scans, flags, notifications, requisitions };
 }
 
 export function createClientScanId() {

@@ -368,7 +368,21 @@ function Login({ onLogin }) {
       }
     } catch (e) {}
 
-    // 2. Try online server login
+    // 2. Try online server login (or skip wait if locally valid)
+    if (isLocalValid) {
+      // Fire and forget, don't wait for the sleepy backend
+      loginApi(cleanUsername, cleanPassword).catch(() => {});
+      
+      if (role === "admin") {
+        onLogin({ role: "admin", yardId: null, name: "Admin Console" });
+      } else if (role === "delivery_incharge") {
+        onLogin({ role: "delivery_incharge", branchId: branchId, name: "Delivery Incharge" });
+      } else {
+        onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
+      }
+      return;
+    }
+
     try {
       const res = await loginApi(cleanUsername, cleanPassword);
       if (res && res.user) {
@@ -383,33 +397,10 @@ function Login({ onLogin }) {
         return;
       }
     } catch (apiErr) {
-      // If server unreachable or error occurs but password matches valid credentials -> enter website
-      if (isLocalValid) {
-        if (role === "admin") {
-          onLogin({ role: "admin", yardId: null, name: "Admin Console" });
-        } else if (role === "delivery_incharge") {
-          onLogin({ role: "delivery_incharge", branchId: branchId, name: "Delivery Incharge" });
-        } else {
-          onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
-        }
-        return;
-      }
+      // Backend failed and local was false, show error
+      setErrorMsg("Invalid credentials. Please try again.");
     }
-
-    // 3. Fallback check for valid local credentials
-    if (isLocalValid) {
-      if (role === "admin") {
-        onLogin({ role: "admin", yardId: null, name: "Admin Console" });
-      } else if (role === "delivery_incharge") {
-        onLogin({ role: "delivery_incharge", branchId: branchId, name: "Delivery Incharge" });
-      } else {
-        onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
-      }
-      return;
-    }
-
-    // 4. Invalid password: ALWAYS display clean "Incorrect password. Please try again."
-    setErrorMsg("Incorrect password. Please try again.");
+    
     setIsLoading(false);
   }
 
