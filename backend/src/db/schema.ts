@@ -28,8 +28,9 @@ export const credentials = pgTable('credentials', {
   id: uuid('id').defaultRandom().primaryKey(),
   username: text('username').notNull().unique(),
   password: text('password').notNull(),
-  role: text('role').notNull(), // 'admin' | 'yard'
+  role: text('role').notNull(), // 'admin' | 'yard' | 'delivery_incharge'
   yard_id: text('yard_id'),
+  branch_id: uuid('branch_id'), // new for delivery_incharge
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -120,11 +121,57 @@ export const flags = pgTable(
   ],
 );
 
+// ─── branches ────────────────────────────────────────────────────────
+export const branches = pgTable('branches', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  active: boolean('active').default(true).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const branchYards = pgTable('branch_yards', {
+  branch_id: uuid('branch_id').notNull().references(() => branches.id),
+  yard_id: text('yard_id').notNull().references(() => yards.id),
+}, (t) => [
+  index('branch_yards_pk').on(t.branch_id, t.yard_id), // Instead of composite PK for simplicity in Drizzle
+]);
+
+// ─── requisitions ────────────────────────────────────────────────────
+export const requisitions = pgTable('requisitions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  requesting_branch_id: uuid('requesting_branch_id').notNull().references(() => branches.id),
+  source_branch_id: uuid('source_branch_id').notNull().references(() => branches.id),
+  vehicle_id: uuid('vehicle_id').notNull().references(() => vehicles.id),
+  status: text('status').default('pending').notNull(), // 'pending' | 'approved' | 'rejected' | 'fulfilled'
+  requested_by: text('requested_by').notNull(),
+  requested_at: timestamp('requested_at', { withTimezone: true }).defaultNow().notNull(),
+  approved_by: text('approved_by'),
+  approved_at: timestamp('approved_at', { withTimezone: true }),
+  rejected_by: text('rejected_by'),
+  rejected_at: timestamp('rejected_at', { withTimezone: true }),
+  rejection_reason: text('rejection_reason'),
+  fulfilled_at: timestamp('fulfilled_at', { withTimezone: true }),
+});
+
+// ─── notifications ───────────────────────────────────────────────────
+export const notifications = pgTable('notifications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  user_role: text('user_role').notNull(), // 'delivery_incharge' | 'stockyard'
+  branch_id: uuid('branch_id').notNull().references(() => branches.id),
+  message: text('message').notNull(),
+  type: text('type').notNull(), // 'requisition_created' | 'requisition_approved' | 'requisition_rejected'
+  related_req_id: uuid('related_req_id').references(() => requisitions.id),
+  read: boolean('read').default(false).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ─── Relations ───────────────────────────────────────────────────────
 export const vehiclesRelations = relations(vehicles, ({ one, many }) => ({
   status: one(vehicleStatus, { fields: [vehicles.id], references: [vehicleStatus.vehicle_id] }),
   scans: many(scans),
   flags: many(flags),
+  requisitions: many(requisitions),
 }));
 
 export const scansRelations = relations(scans, ({ one }) => ({
@@ -143,4 +190,28 @@ export const vehicleStatusRelations = relations(vehicleStatus, ({ one }) => ({
 export const flagsRelations = relations(flags, ({ one }) => ({
   vehicle: one(vehicles, { fields: [flags.vehicle_id], references: [vehicles.id] }),
   scan: one(scans, { fields: [flags.scan_id], references: [scans.id] }),
+}));
+
+export const branchesRelations = relations(branches, ({ many }) => ({
+  yards: many(branchYards),
+  outgoingRequisitions: many(requisitions, { relationName: 'outgoingRequisitions' }),
+  incomingRequisitions: many(requisitions, { relationName: 'incomingRequisitions' }),
+  notifications: many(notifications),
+}));
+
+export const branchYardsRelations = relations(branchYards, ({ one }) => ({
+  branch: one(branches, { fields: [branchYards.branch_id], references: [branches.id] }),
+  yard: one(yards, { fields: [branchYards.yard_id], references: [yards.id] }),
+}));
+
+export const requisitionsRelations = relations(requisitions, ({ one, many }) => ({
+  requestingBranch: one(branches, { fields: [requisitions.requesting_branch_id], references: [branches.id], relationName: 'outgoingRequisitions' }),
+  sourceBranch: one(branches, { fields: [requisitions.source_branch_id], references: [branches.id], relationName: 'incomingRequisitions' }),
+  vehicle: one(vehicles, { fields: [requisitions.vehicle_id], references: [vehicles.id] }),
+  notifications: many(notifications),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  branch: one(branches, { fields: [notifications.branch_id], references: [branches.id] }),
+  requisition: one(requisitions, { fields: [notifications.related_req_id], references: [requisitions.id] }),
 }));

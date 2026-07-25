@@ -8,8 +8,9 @@ const JWKS = createRemoteJWKSet(
 
 export interface AuthUser {
   id: string;
-  role: 'stockyard' | 'admin';
+  role: 'stockyard' | 'admin' | 'delivery_incharge';
   yard_id: string | null;
+  branch_id: string | null;
 }
 
 // Extend Express Request
@@ -36,11 +37,15 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
   // Mock token support for local dev without Supabase
   if (token === 'mock-admin') {
-    req.user = { id: 'mock-admin-id', role: 'admin', yard_id: null };
+    req.user = { id: 'mock-admin-id', role: 'admin', yard_id: null, branch_id: null };
     return next();
   }
   if (token.startsWith('mock-yard-')) {
-    req.user = { id: 'mock-yard-id', role: 'stockyard', yard_id: token.slice(10) };
+    req.user = { id: 'mock-yard-id', role: 'stockyard', yard_id: token.slice(10), branch_id: null };
+    return next();
+  }
+  if (token.startsWith('mock-delivery-')) {
+    req.user = { id: 'mock-delivery-id', role: 'delivery_incharge', yard_id: null, branch_id: token.slice(14) };
     return next();
   }
 
@@ -51,13 +56,14 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     });
 
     const appMeta = (payload as Record<string, unknown>).app_metadata as
-      | { role?: string; yard_id?: string }
+      | { role?: string; yard_id?: string; branch_id?: string }
       | undefined;
 
     req.user = {
       id: payload.sub!,
       role: (appMeta?.role as AuthUser['role']) ?? 'stockyard',
       yard_id: appMeta?.yard_id ?? null,
+      branch_id: appMeta?.branch_id ?? null,
     };
 
     next();
@@ -77,5 +83,21 @@ export function requireRole(role: AuthUser['role']) {
       return;
     }
     next();
+  };
+}
+
+/**
+ * Require access to a specific branch. Use after authenticate().
+ * For stockyard, they implicitly access their branch via yard_id in the endpoints.
+ */
+export function requireBranchAccess(branchIdParam: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const branchId = req.params[branchIdParam] || req.body[branchIdParam];
+    if (req.user?.role === 'admin') return next();
+    if (req.user?.role === 'delivery_incharge' && req.user.branch_id === branchId) return next();
+    // stockyard authorization check requires DB lookup, typically handled in route
+    if (req.user?.role === 'stockyard') return next(); // Relaxed here, enforce in route
+    
+    res.status(403).json({ error: 'Forbidden branch access' });
   };
 }

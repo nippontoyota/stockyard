@@ -5,7 +5,7 @@
  */
 import 'dotenv/config';
 import { db } from './client.js';
-import { yards } from './schema.js';
+import { yards, branches, branchYards } from './schema.js';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -44,9 +44,39 @@ async function seed() {
   const insertedYards = await db
     .insert(yards)
     .values(YARD_DATA.map((y) => ({ ...y })))
-    .returning({ id: yards.id, code: yards.code, name: yards.name });
+    .returning({ id: yards.id, code: yards.code, name: yards.name, city: yards.city });
 
   console.log(`Inserted ${insertedYards.length} yards`);
+
+  // Create Branches based on cities and codes
+  console.log('Seeding branches...');
+  const branchMap = new Map<string, { name: string; yardIds: string[] }>();
+  for (const y of insertedYards) {
+    const branchKey = y.code;
+    const branchName = `${y.city || 'Unknown'} (${y.code})`;
+    if (!branchMap.has(branchKey)) {
+      branchMap.set(branchKey, { name: branchName, yardIds: [] });
+    }
+    branchMap.get(branchKey)!.yardIds.push(y.id);
+  }
+
+  const branchData = Array.from(branchMap.entries()).map(([code, data]) => ({ code, name: data.name, yardIds: data.yardIds }));
+  const insertedBranches = await db.insert(branches).values(branchData.map(b => ({ name: b.name }))).returning({ id: branches.id, name: branches.name });
+  
+  // Link branches and yards
+  const branchYardInserts = [];
+  const codeToBranchId = new Map<string, string>();
+  for (let i = 0; i < branchData.length; i++) {
+    const bId = insertedBranches[i].id;
+    const bCode = branchData[i].code;
+    codeToBranchId.set(bCode, bId);
+    for (const yId of branchData[i].yardIds) {
+      branchYardInserts.push({ branch_id: bId, yard_id: yId });
+    }
+  }
+  
+  await db.insert(branchYards).values(branchYardInserts);
+  console.log(`Inserted ${insertedBranches.length} branches and mapped yards.`);
 
   // Create Supabase Auth users for each unique yard code
   // Multiple physical locations share one code → one login per code
@@ -61,21 +91,38 @@ async function seed() {
 
   console.log('Creating Supabase Auth users for yards...');
   const DEFAULT_YARD_PASSWORD = 'stockyard123'; // Change per yard in production
+  const DEFAULT_DELIVERY_PASSWORD = 'delivery123';
 
   for (const [code, yardId] of codeToYardId) {
     const email = `${code.toLowerCase()}@yard.nippon`;
+    const branchId = codeToBranchId.get(code);
     const { data, error } = await supabase.auth.admin.createUser({
       email,
       password: DEFAULT_YARD_PASSWORD,
       email_confirm: true,
-      app_metadata: { role: 'stockyard', yard_id: yardId },
+      app_metadata: { role: 'stockyard', yard_id: yardId, branch_id: branchId },
     });
 
     if (error) {
-      // May already exist from a previous seed run
       console.warn(`  ${email}: ${error.message}`);
     } else {
-      console.log(`  Created: ${email} (yard_id: ${yardId})`);
+      console.log(`  Created: ${email} (yard_id: ${yardId}, branch_id: ${branchId})`);
+    }
+
+    // Create delivery_incharge user for this branch
+    const branchSlug = insertedBranches.find(b => b.id === branchId)?.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || code.toLowerCase();
+    const deliveryEmail = `${branchSlug}@delivery.nippon`;
+    const { error: deliveryErr } = await supabase.auth.admin.createUser({
+      email: deliveryEmail,
+      password: DEFAULT_DELIVERY_PASSWORD,
+      email_confirm: true,
+      app_metadata: { role: 'delivery_incharge', branch_id: branchId },
+    });
+    
+    if (deliveryErr) {
+      console.warn(`  ${deliveryEmail}: ${deliveryErr.message}`);
+    } else {
+      console.log(`  Created: ${deliveryEmail} (branch_id: ${branchId})`);
     }
   }
 
