@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getAdminBranches, createAdminBranch, updateAdminBranch, assignBranchYards } from "../api.js";
 import { yards } from "../stockyardLogic.js";
-import "../branchManagement.css";
+import "../corporate-modern.css";
 
 export function BranchesTab() {
   const [branches, setBranches] = useState([]);
