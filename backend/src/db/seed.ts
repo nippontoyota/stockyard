@@ -41,49 +41,64 @@ async function seed() {
   console.log('Seeding yards...');
 
   // Insert yards — each row is a separate physical location even when codes repeat
-  const insertedYards = await db
+  await db
     .insert(yards)
     .values(YARD_DATA.map((y) => ({ ...y })))
-    .returning({ id: yards.id, code: yards.code, name: yards.name, city: yards.city });
+    .onConflictDoNothing();
 
-  console.log(`Inserted ${insertedYards.length} yards`);
+  const insertedYards = await db.select().from(yards);
+  console.log(`Loaded ${insertedYards.length} yards`);
 
-  // Create Branches based on cities and codes
+  // Clear existing branch data
+  await db.delete(branchYards);
+  await db.delete(branches);
+
+  // Create Branches based on exact NIPPON_BRANCHES list
   console.log('Seeding branches...');
-  const branchMap = new Map<string, { name: string; yardIds: string[] }>();
-  for (const y of insertedYards) {
-    const branchKey = y.code;
-    const branchName = `${y.city || 'Unknown'} (${y.code})`;
-    if (!branchMap.has(branchKey)) {
-      branchMap.set(branchKey, { name: branchName, yardIds: [] });
-    }
-    branchMap.get(branchKey)!.yardIds.push(y.id);
-  }
+  const NIPPON_BRANCHES = [
+    { name: 'Enchakkal', yardCodes: ['TR01C'] },
+    { name: 'Kazhakootam', yardCodes: ['TR01A'] },
+    { name: 'Kochuveli', yardCodes: [] },
+    { name: 'Kalamassery (Nippon Towers)', yardCodes: ['CO01B'] },
+    { name: 'Nettoor', yardCodes: ['CO01A'] },
+    { name: 'Muvattupuzha', yardCodes: ['MV01A'] },
+    { name: 'Puzhakkal (Ayyanthole)', yardCodes: ['TI01A'] },
+    { name: 'Nadathara', yardCodes: [] },
+    { name: 'Vellangallur (Irinjalakuda)', yardCodes: ['IR01A'] },
+    { name: 'Nattakom', yardCodes: ['KT01A'] },
+    { name: 'Thellakom', yardCodes: [] },
+    { name: 'Pala', yardCodes: [] },
+    { name: 'Kottiyam (Kollam)', yardCodes: ['KL01A', 'KL01B'] },
+    { name: 'Pathanamthitta', yardCodes: ['PH01A'] },
+    { name: 'Thiruvalla', yardCodes: ['TL01A'] },
+    { name: 'Kayamkulam', yardCodes: ['KY01A'] }
+  ];
 
-  const branchData = Array.from(branchMap.entries()).map(([code, data]) => ({ code, name: data.name, yardIds: data.yardIds }));
-  const insertedBranches = await db.insert(branches).values(branchData.map(b => ({ name: b.name }))).returning({ id: branches.id, name: branches.name });
+  const insertedBranches = await db.insert(branches).values(NIPPON_BRANCHES.map(b => ({ name: b.name }))).returning({ id: branches.id, name: branches.name });
   
   // Link branches and yards
   const branchYardInserts = [];
   const codeToBranchId = new Map<string, string>();
-  for (let i = 0; i < branchData.length; i++) {
+  for (let i = 0; i < NIPPON_BRANCHES.length; i++) {
+    const branchConf = NIPPON_BRANCHES[i];
     const bId = insertedBranches[i].id;
-    const bCode = branchData[i].code;
-    codeToBranchId.set(bCode, bId);
-    for (const yId of branchData[i].yardIds) {
-      branchYardInserts.push({ branch_id: bId, yard_id: yId });
+    for (const code of branchConf.yardCodes) {
+      codeToBranchId.set(code, bId);
+      const matchingYards = insertedYards.filter(y => y.code === code);
+      for (const y of matchingYards) {
+        branchYardInserts.push({ branch_id: bId, yard_id: y.id });
+      }
     }
   }
   
-  await db.insert(branchYards).values(branchYardInserts);
+  if (branchYardInserts.length > 0) {
+    await db.insert(branchYards).values(branchYardInserts);
+  }
   console.log(`Inserted ${insertedBranches.length} branches and mapped yards.`);
 
   // Create Supabase Auth users for each unique yard code
-  // Multiple physical locations share one code → one login per code
   const codeToYardId = new Map<string, string>();
   for (const y of insertedYards) {
-    // Use the first yard ID for each code (login maps to a code, not a physical yard)
-    // The frontend will let users pick the specific physical yard after login
     if (!codeToYardId.has(y.code)) {
       codeToYardId.set(y.code, y.id);
     }
@@ -95,7 +110,7 @@ async function seed() {
 
   for (const [code, yardId] of codeToYardId) {
     const email = `${code.toLowerCase()}@yard.nippon`;
-    const branchId = codeToBranchId.get(code);
+    const branchId = codeToBranchId.get(code); // Might be undefined
     const { data, error } = await supabase.auth.admin.createUser({
       email,
       password: DEFAULT_YARD_PASSWORD,
@@ -106,23 +121,26 @@ async function seed() {
     if (error) {
       console.warn(`  ${email}: ${error.message}`);
     } else {
-      console.log(`  Created: ${email} (yard_id: ${yardId}, branch_id: ${branchId})`);
+      console.log(`  Created: ${email} (yard_id: ${yardId}, branch_id: ${branchId || 'unassigned'})`);
     }
+  }
 
-    // Create delivery_incharge user for this branch
-    const branchSlug = insertedBranches.find(b => b.id === branchId)?.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || code.toLowerCase();
+  // Create delivery_incharge user for each branch
+  console.log('Creating delivery_incharge users for branches...');
+  for (const branch of insertedBranches) {
+    const branchSlug = branch.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const deliveryEmail = `${branchSlug}@delivery.nippon`;
     const { error: deliveryErr } = await supabase.auth.admin.createUser({
       email: deliveryEmail,
       password: DEFAULT_DELIVERY_PASSWORD,
       email_confirm: true,
-      app_metadata: { role: 'delivery_incharge', branch_id: branchId },
+      app_metadata: { role: 'delivery_incharge', branch_id: branch.id },
     });
     
     if (deliveryErr) {
       console.warn(`  ${deliveryEmail}: ${deliveryErr.message}`);
     } else {
-      console.log(`  Created: ${deliveryEmail} (branch_id: ${branchId})`);
+      console.log(`  Created: ${deliveryEmail} (branch_id: ${branch.id})`);
     }
   }
 

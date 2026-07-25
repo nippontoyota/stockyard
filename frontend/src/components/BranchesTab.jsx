@@ -163,7 +163,7 @@ export function BranchesTab() {
             {b.yards && b.yards.length > 0 && (
               <div className="row wrap gap-xs mt-sm">
                 {b.yards.map(y => (
-                  <span key={y.id} className="pill muted">{y.code}</span>
+                  <span key={y.id} className="pill muted">{y.name}</span>
                 ))}
               </div>
             )}
