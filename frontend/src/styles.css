@@ -97,9 +97,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px;
   border-color: #EB0A1E; background: #EB0A1E; color: #fff;
 }
-.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: #d3e4fe; border-radius: 8px; }
-.segmented button { min-height: 44px; border: 0; border-radius: 6px; background: transparent; font-weight: 700; color: #44474e; }
-.segmented .active { background: #000; color: #fff; }
+.segmented { display: flex; gap: 4px; padding: 4px; background: #d3e4fe; border-radius: 8px; width: 100%; box-sizing: border-box; }
+.segmented button { flex: 1; min-height: 44px; border: 0; border-radius: 6px; background: transparent; font-weight: 700; color: #44474e; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.segmented button:hover:not(.active) { background: rgba(0, 0, 0, 0.04); }
+.segmented .active { background: #000; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 .login .segmented { background: #f1f1f1; border: 1px solid rgba(88, 89, 91, .18); }
 .login .segmented .active { background: #000; color: #fff; }
 .segmented .out { background: #475569; }
