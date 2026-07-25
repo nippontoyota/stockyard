@@ -257,7 +257,7 @@ export default function App() {
 
   if (!session) return <Login onLogin={(nextSession) => {
     setSession(nextSession);
-    const initialView = nextSession.role === "admin" ? "dashboard" : "scan";
+    const initialView = nextSession.role === "admin" ? "dashboard" : nextSession.role === "delivery_incharge" ? "requisitions" : "scan";
     setView(initialView);
     window.history.replaceState(null, "", getRoutePath(initialView, nextSession.role));
   }} />;
@@ -301,6 +301,7 @@ export default function App() {
 function Login({ onLogin }) {
   const [role, setRole] = useState("stockyard");
   const [yardId, setYardId] = useState(yards[0].id);
+  const [deliveryUsername, setDeliveryUsername] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -323,12 +324,16 @@ function Login({ onLogin }) {
 
     const cleanPassword = passwordInput.trim();
     const targetYard = yards.find((y) => y.id === yardId) || yards[0];
-    const cleanUsername = role === "admin" ? "ADMIN123@nippon.com" : `${targetYard.id}@nippon.com`;
+    const cleanUsername = role === "admin" ? "ADMIN123@nippon.com" : role === "delivery_incharge" ? deliveryUsername.trim() : `${targetYard.id}@nippon.com`;
 
     // 1. Evaluate local credential validity (handles default & custom saved credentials)
     let isLocalValid = false;
     if (role === "admin") {
       if (cleanPassword === "ADMIN123@nippon.com" || cleanPassword === "ADMIN123") {
+        isLocalValid = true;
+      }
+    } else if (role === "delivery_incharge") {
+      if (cleanPassword === "delivery123") {
         isLocalValid = true;
       }
     } else {
@@ -357,6 +362,8 @@ function Login({ onLogin }) {
       if (res && res.user) {
         if (res.user.role === "admin") {
           onLogin({ role: "admin", yardId: null, name: "Admin Console" });
+        } else if (res.user.role === "delivery_incharge") {
+          onLogin({ role: "delivery_incharge", branchId: res.user.branch_id, name: "Delivery Incharge" });
         } else {
           const yard = yards.find((y) => y.id === res.user.yardId || y.code === res.user.yardId) || targetYard;
           onLogin({ role: "stockyard", yardId: yard.id, name: yard.name });
@@ -368,6 +375,8 @@ function Login({ onLogin }) {
       if (isLocalValid) {
         if (role === "admin") {
           onLogin({ role: "admin", yardId: null, name: "Admin Console" });
+        } else if (role === "delivery_incharge") {
+          onLogin({ role: "delivery_incharge", branchId: "mock-branch-id", name: "Delivery Incharge" });
         } else {
           onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
         }
@@ -379,6 +388,8 @@ function Login({ onLogin }) {
     if (isLocalValid) {
       if (role === "admin") {
         onLogin({ role: "admin", yardId: null, name: "Admin Console" });
+      } else if (role === "delivery_incharge") {
+        onLogin({ role: "delivery_incharge", branchId: "mock-branch-id", name: "Delivery Incharge" });
       } else {
         onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
       }
@@ -420,8 +431,9 @@ function Login({ onLogin }) {
           <form onSubmit={submit} className="stack">
             <label>Account Role</label>
             <div className="segmented">
-              <button type="button" className={role === "stockyard" ? "active" : ""} onClick={() => handleRoleChange("stockyard")}>Stockyard Worker</button>
-              <button type="button" className={role === "admin" ? "active" : ""} onClick={() => handleRoleChange("admin")}>Admin Console</button>
+              <button type="button" className={role === "stockyard" ? "active" : ""} onClick={() => handleRoleChange("stockyard")}>Stockyard</button>
+              <button type="button" className={role === "delivery_incharge" ? "active" : ""} onClick={() => handleRoleChange("delivery_incharge")}>Delivery</button>
+              <button type="button" className={role === "admin" ? "active" : ""} onClick={() => handleRoleChange("admin")}>Admin</button>
             </div>
 
             {role === "stockyard" && (
@@ -433,6 +445,20 @@ function Login({ onLogin }) {
               </>
             )}
 
+            {role === "delivery_incharge" && (
+              <>
+                <label htmlFor="deliveryUsername">Username / Email</label>
+                <input
+                  id="deliveryUsername"
+                  type="email"
+                  required
+                  value={deliveryUsername}
+                  onChange={(e) => setDeliveryUsername(e.target.value)}
+                  placeholder="e.g., kalamassery@delivery.nippon"
+                />
+              </>
+            )}
+
             <label htmlFor="password">Password</label>
             <div className="password-field-wrapper">
               <input
@@ -441,7 +467,7 @@ function Login({ onLogin }) {
                 required
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder={role === "admin" ? "Enter Admin Password" : `Enter Password for ${selectedYardObj?.code || yardId}`}
+                placeholder={role === "admin" ? "Enter Admin Password" : role === "delivery_incharge" ? "Enter Password" : `Enter Password for ${selectedYardObj?.code || yardId}`}
               />
               <button
                 type="button"
