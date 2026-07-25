@@ -24,9 +24,15 @@ import {
   DwellByModelChart,
 } from "./AnalyticsCharts.jsx";
 import {
-  bulkSync, getVehicles, getAdminDashboard, getFlags, getScans, resolveFlag as apiResolveFlag, adminOverrideVehicle, loginApi
+  bulkSync, getVehicles, getAdminDashboard, getFlags, getScans, resolveFlag as apiResolveFlag, adminOverrideVehicle, loginApi,
+  getNotifications, getRequisitions, markAllNotificationsRead, markNotificationRead
 } from "./api.js";
 import "./styles.css";
+
+// Import new components
+import { RequisitionsTab } from "./components/RequisitionsTab.jsx";
+import { NotificationBell } from "./components/NotificationBell.jsx";
+import { BranchesTab } from "./components/BranchesTab.jsx";
 
 function flagLabel(type) {
   return {
@@ -46,10 +52,19 @@ function getRoutePath(viewName, role) {
     if (viewName === "stock") return "/stock";
     if (viewName === "delivered") return "/delivered";
     if (viewName === "admin") return "/admin";
+    if (viewName === "branches") return "/admin-branches";
     return "/dashboard";
   }
+  if (role === "delivery_incharge") {
+    if (viewName === "dashboard") return "/dash";
+    if (viewName === "stock") return "/stock";
+    if (viewName === "requisitions") return "/requisitions";
+    return "/requisitions";
+  }
+  // stockyard
   if (viewName === "dashboard") return "/dash";
   if (viewName === "stock") return "/stock";
+  if (viewName === "requisitions") return "/requisitions";
   return "/scan";
 }
 
@@ -59,11 +74,20 @@ function getViewFromPath(pathname, role) {
     if (path === "/admin") return "admin";
     if (path === "/delivered") return "delivered";
     if (path === "/stock") return "stock";
+    if (path === "/admin-branches") return "branches";
     if (path === "/dashboard" || path === "/dash") return "dashboard";
     return "dashboard";
   }
+  if (role === "delivery_incharge") {
+    if (path === "/stock") return "stock";
+    if (path === "/dash" || path === "/dashboard") return "dashboard";
+    if (path === "/requisitions") return "requisitions";
+    return "requisitions";
+  }
+  // stockyard
   if (path === "/stock") return "stock";
   if (path === "/dash" || path === "/dashboard") return "dashboard";
+  if (path === "/requisitions") return "requisitions";
   return "scan";
 }
 
@@ -112,10 +136,13 @@ export default function App() {
   const fetchServerData = useCallback(async () => {
     if (!session || !online) return;
     try {
-      const [vehiclesData, flagsData, scansData] = await Promise.all([
+      const isDeliveryOrYard = session.role === 'delivery_incharge' || session.role === 'stockyard';
+      const [vehiclesData, flagsData, scansData, notifsData, reqsData] = await Promise.all([
         getVehicles().catch(() => []),
         getFlags().catch(() => []),
         getScans().catch(() => []),
+        isDeliveryOrYard ? getNotifications().catch(() => []) : Promise.resolve([]),
+        isDeliveryOrYard ? getRequisitions().catch(() => ({ incoming: [], outgoing: [] })) : Promise.resolve({ incoming: [], outgoing: [] }),
       ]);
       
       const mappedVehicles = {};
@@ -170,6 +197,8 @@ export default function App() {
           vehicles: mappedVehicles,
           flags: mappedFlags,
           scans: mappedScans,
+          notifications: notifsData || [],
+          requisitions: reqsData || { incoming: [], outgoing: [] },
         };
       });
     } catch (err) {
@@ -241,6 +270,7 @@ export default function App() {
       <Header
         session={session}
         online={online}
+        notifications={state.notifications}
         onLogout={() => {
           setSession(null);
           window.history.replaceState(null, "", "/");
@@ -252,11 +282,15 @@ export default function App() {
         {view === "dashboard" && (isAdmin ? <AdminHome stats={stats} state={state} setState={setState} /> : <DashboardView state={state} stats={stats} session={session} setState={setState} />)}
         {view === "delivered" && isAdmin && <DeliveredUpload state={state} setState={setState} />}
         {view === "admin" && isAdmin && <AdminView state={state} setState={setState} />}
+        {view === "requisitions" && <RequisitionsTab state={state} session={session} />}
+        {view === "branches" && isAdmin && <BranchesTab session={session} />}
       </main>
       <nav className="bottom-nav">
-        {!isAdmin && <NavButton icon="barcode_scanner" label="Scan" active={view === "scan"} onClick={() => navigateTo("scan")} />}
+        {session.role === "stockyard" && <NavButton icon="barcode_scanner" label="Scan" active={view === "scan"} onClick={() => navigateTo("scan")} />}
         <NavButton icon="inventory_2" label="Stock" active={view === "stock"} onClick={() => navigateTo("stock")} />
         <NavButton icon="dashboard" label="Dash" active={view === "dashboard"} onClick={() => navigateTo("dashboard")} />
+        {(session.role === "stockyard" || session.role === "delivery_incharge") && <NavButton icon="swap_horiz" label="Requests" active={view === "requisitions"} onClick={() => navigateTo("requisitions")} />}
+        {isAdmin && <NavButton icon="account_tree" label="Branches" active={view === "branches"} onClick={() => navigateTo("branches")} />}
         {isAdmin && <NavButton icon="upload_file" label="Delivered" active={view === "delivered"} onClick={() => navigateTo("delivered")} />}
         {isAdmin && <NavButton icon="admin_panel_settings" label="Admin" active={view === "admin"} onClick={() => navigateTo("admin")} />}
       </nav>
@@ -433,7 +467,7 @@ function Login({ onLogin }) {
   );
 }
 
-function Header({ session, online, onLogout }) {
+function Header({ session, online, notifications, onLogout }) {
   return (
     <header className="topbar">
       <div>
@@ -441,6 +475,7 @@ function Header({ session, online, onLogout }) {
         <small>{session.role === "admin" ? "Admin Console" : session.name}</small>
       </div>
       <div className="top-actions">
+        {session.role !== "admin" && <NotificationBell notifications={notifications || []} />}
         <span className={online ? "pill ok" : "pill warn"}>{online ? "Online" : "Offline"}</span>
         <button className="icon-btn" onClick={onLogout} aria-label="Log out"><span className="material-symbols-outlined">logout</span></button>
       </div>

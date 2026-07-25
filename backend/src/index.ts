@@ -9,6 +9,10 @@ import scanRoutes from './routes/scans.js';
 import vehicleRoutes from './routes/vehicles.js';
 import yardRoutes from './routes/yards.js';
 import adminRoutes from './routes/admin.js';
+import adminBranchesRoutes from './routes/adminBranches.js';
+import branchRoutes from './routes/branches.js';
+import requisitionRoutes from './routes/requisitions.js';
+import notificationRoutes from './routes/notifications.js';
 import { authRouter } from './routes/auth.js';
 import { authenticate } from './middleware/auth.js';
 
@@ -52,7 +56,11 @@ app.use('/api/auth', authRouter);
 app.use('/api/scans', scanRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/yards', yardRoutes);
+app.use('/api/branches', branchRoutes);
+app.use('/api/requisitions', requisitionRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', authRouter);
+app.use('/api/admin/branches', adminBranchesRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Global error handler
