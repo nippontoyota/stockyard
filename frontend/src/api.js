@@ -130,3 +130,76 @@ export async function uploadTransitListApi(vehicles) {
     body: JSON.stringify({ vehicles }),
   });
 }
+
+// --- Branches & Requisitions ---
+
+export async function getAdminBranches() {
+  return apiFetch("/api/admin/branches");
+}
+
+export async function createAdminBranch(name) {
+  return apiFetch("/api/admin/branches", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function updateAdminBranch(id, data) {
+  return apiFetch(`/api/admin/branches/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function assignBranchYards(id, yardIds) {
+  return apiFetch(`/api/admin/branches/${id}/yards`, {
+    method: "POST",
+    body: JSON.stringify({ yard_ids: yardIds }),
+  });
+}
+
+export async function getBranchStock(branchId) {
+  return apiFetch(`/api/branches/${branchId}/stock`);
+}
+
+export async function getRequisitions() {
+  return apiFetch("/api/requisitions");
+}
+
+export async function createRequisition(sourceBranchId, vehicleId) {
+  return apiFetch("/api/requisitions", {
+    method: "POST",
+    body: JSON.stringify({ source_branch_id: sourceBranchId, vehicle_id: vehicleId }),
+  });
+}
+
+export async function approveRequisition(id) {
+  return apiFetch(`/api/requisitions/${id}/approve`, {
+    method: "POST"
+  });
+}
+
+export async function rejectRequisition(id, reason) {
+  return apiFetch(`/api/requisitions/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+// --- Notifications ---
+
+export async function getNotifications() {
+  return apiFetch("/api/notifications");
+}
+
+export async function markNotificationRead(id) {
+  return apiFetch(`/api/notifications/${id}/read`, {
+    method: "POST"
+  });
+}
+
+export async function markAllNotificationsRead() {
+  return apiFetch("/api/notifications/read-all", {
+    method: "POST"
+  });
+}
