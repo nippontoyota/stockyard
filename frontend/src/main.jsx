@@ -14,6 +14,7 @@ import {
   resolveFlag,
   updateVehicleAdmin,
   yards,
+  fallbackBranches,
 } from "./stockyardLogic.js";
 import {
   ExecutiveKpiCards,
@@ -301,8 +302,8 @@ export default function App() {
 function Login({ onLogin }) {
   const [role, setRole] = useState("stockyard");
   const [yardId, setYardId] = useState(yards[0].id);
-  const [branches, setBranches] = useState([]);
-  const [branchId, setBranchId] = useState("");
+  const [branches, setBranches] = useState(fallbackBranches);
+  const [branchId, setBranchId] = useState(fallbackBranches[0].id);
   const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -310,8 +311,10 @@ function Login({ onLogin }) {
 
   useEffect(() => {
     getAdminBranches().then(res => {
-      setBranches(res || []);
-      if (res && res.length > 0) setBranchId(res[0].id);
+      if (res && res.length > 0) {
+        setBranches(res);
+        setBranchId(prev => res.some(b => b.id === prev) ? prev : res[0].id);
+      }
     }).catch(console.error);
   }, []);
 
@@ -458,7 +461,6 @@ function Login({ onLogin }) {
               <>
                 <label htmlFor="branchSelect">Select Branch Location</label>
                 <select id="branchSelect" value={branchId} onChange={(e) => { setBranchId(e.target.value); setErrorMsg(""); }} required>
-                  {branches.length === 0 && <option value="">Loading branches...</option>}
                   {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </>
