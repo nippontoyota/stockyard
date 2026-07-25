@@ -25,7 +25,7 @@ import {
 } from "./AnalyticsCharts.jsx";
 import {
   bulkSync, getVehicles, getAdminDashboard, getFlags, getScans, resolveFlag as apiResolveFlag, adminOverrideVehicle, loginApi,
-  getNotifications, getRequisitions, markAllNotificationsRead, markNotificationRead
+  getNotifications, getRequisitions, markAllNotificationsRead, markNotificationRead, getAdminBranches
 } from "./api.js";
 import "./styles.css";
 
@@ -301,11 +301,19 @@ export default function App() {
 function Login({ onLogin }) {
   const [role, setRole] = useState("stockyard");
   const [yardId, setYardId] = useState(yards[0].id);
-  const [deliveryUsername, setDeliveryUsername] = useState("");
+  const [branches, setBranches] = useState([]);
+  const [branchId, setBranchId] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    getAdminBranches().then(res => {
+      setBranches(res || []);
+      if (res && res.length > 0) setBranchId(res[0].id);
+    }).catch(console.error);
+  }, []);
 
   const handleRoleChange = (newRole) => {
     setRole(newRole);
@@ -324,7 +332,8 @@ function Login({ onLogin }) {
 
     const cleanPassword = passwordInput.trim();
     const targetYard = yards.find((y) => y.id === yardId) || yards[0];
-    const cleanUsername = role === "admin" ? "ADMIN123@nippon.com" : role === "delivery_incharge" ? deliveryUsername.trim() : `${targetYard.id}@nippon.com`;
+    const targetBranch = branches.find((b) => b.id === branchId);
+    const cleanUsername = role === "admin" ? "ADMIN123@nippon.com" : role === "delivery_incharge" ? (targetBranch ? `${targetBranch.id}@nippon.com` : "") : `${targetYard.id}@nippon.com`;
 
     // 1. Evaluate local credential validity (handles default & custom saved credentials)
     let isLocalValid = false;
@@ -363,7 +372,7 @@ function Login({ onLogin }) {
         if (res.user.role === "admin") {
           onLogin({ role: "admin", yardId: null, name: "Admin Console" });
         } else if (res.user.role === "delivery_incharge") {
-          onLogin({ role: "delivery_incharge", branchId: res.user.branch_id, name: "Delivery Incharge" });
+          onLogin({ role: "delivery_incharge", branchId: res.user.branch_id || branchId, name: "Delivery Incharge" });
         } else {
           const yard = yards.find((y) => y.id === res.user.yardId || y.code === res.user.yardId) || targetYard;
           onLogin({ role: "stockyard", yardId: yard.id, name: yard.name });
@@ -376,7 +385,7 @@ function Login({ onLogin }) {
         if (role === "admin") {
           onLogin({ role: "admin", yardId: null, name: "Admin Console" });
         } else if (role === "delivery_incharge") {
-          onLogin({ role: "delivery_incharge", branchId: "mock-branch-id", name: "Delivery Incharge" });
+          onLogin({ role: "delivery_incharge", branchId: branchId, name: "Delivery Incharge" });
         } else {
           onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
         }
@@ -389,7 +398,7 @@ function Login({ onLogin }) {
       if (role === "admin") {
         onLogin({ role: "admin", yardId: null, name: "Admin Console" });
       } else if (role === "delivery_incharge") {
-        onLogin({ role: "delivery_incharge", branchId: "mock-branch-id", name: "Delivery Incharge" });
+        onLogin({ role: "delivery_incharge", branchId: branchId, name: "Delivery Incharge" });
       } else {
         onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
       }
@@ -447,15 +456,11 @@ function Login({ onLogin }) {
 
             {role === "delivery_incharge" && (
               <>
-                <label htmlFor="deliveryUsername">Username / Email</label>
-                <input
-                  id="deliveryUsername"
-                  type="email"
-                  required
-                  value={deliveryUsername}
-                  onChange={(e) => setDeliveryUsername(e.target.value)}
-                  placeholder="e.g., kalamassery@delivery.nippon"
-                />
+                <label htmlFor="branchSelect">Select Branch Location</label>
+                <select id="branchSelect" value={branchId} onChange={(e) => { setBranchId(e.target.value); setErrorMsg(""); }} required>
+                  {branches.length === 0 && <option value="">Loading branches...</option>}
+                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
               </>
             )}
 
@@ -467,7 +472,7 @@ function Login({ onLogin }) {
                 required
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder={role === "admin" ? "Enter Admin Password" : role === "delivery_incharge" ? "Enter Password" : `Enter Password for ${selectedYardObj?.code || yardId}`}
+                placeholder={role === "admin" ? "Enter Admin Password" : role === "delivery_incharge" ? "Enter Delivery Password" : `Enter Password for ${selectedYardObj?.code || yardId}`}
               />
               <button
                 type="button"
