@@ -159,6 +159,7 @@ export default function App() {
           currentYardId: v.current_yard_id,
           lastChangedAt: v.last_changed_at,
           outRemark: v.out_remark,
+          keyNo: v.key_no || v.keyNo || "",
         };
       });
       
@@ -189,6 +190,7 @@ export default function App() {
         outRemark: s.outRemark || "",
         transferDestinationYardId: s.transferDestinationYardId || "",
         transferRequestedBy: s.transferRequestedBy || "",
+        keyNo: s.keyNo || s.key_no || "",
         syncStatus: "synced",
       }));
       
@@ -577,6 +579,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
   const [outRemark, setOutRemark] = useState("");
   const [transferDestinationYardId, setTransferDestinationYardId] = useState("");
   const [transferRequestedBy, setTransferRequestedBy] = useState("");
+  const [keyNo, setKeyNo] = useState("");
   const [damaged, setDamaged] = useState(false);
   const [damageRemark, setDamageRemark] = useState("");
   const [damageImage, setDamageImage] = useState("");
@@ -822,7 +825,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
     if (!online) return setMessage({ kind: "error", text: "No connection. This scan was not saved." });
 
     const gps = { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
-    const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, transferDestinationYardId, transferRequestedBy, damaged, damageRemark, damageImage, online });
+    const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, transferDestinationYardId, transferRequestedBy, keyNo, damaged, damageRemark, damageImage, online });
     const result = applyScan(state, scan);
     if (!result.accepted) return setMessage({ kind: "error", text: result.message });
 
@@ -834,6 +837,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
       setOutRemark("");
       setTransferDestinationYardId("");
       setTransferRequestedBy("");
+      setKeyNo("");
       setDamaged(false);
       setDamageRemark("");
       setDamageImage("");
@@ -935,6 +939,14 @@ function ScanView({ state, setState, session, online, onRefresh }) {
                   />
                 </>
               )}
+              <input
+                value={keyNo}
+                onChange={(event) => {
+                  setKeyNo(event.target.value);
+                  setMessage(null);
+                }}
+                placeholder="Key No (optional, e.g. K-101)"
+              />
               {isFlagged && (
                 <div className="notice warn" style={{ marginTop: '12px', marginBottom: '12px' }}>
                   <strong>Active Flag:</strong> A photo of the vehicle is required to complete this scan.
@@ -1002,6 +1014,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
               setOutRemark("");
               setTransferDestinationYardId("");
               setTransferRequestedBy("");
+              setKeyNo("");
               setDamaged(false);
               setDamageRemark("");
               setDamageImage("");
@@ -1049,6 +1062,13 @@ function ScanView({ state, setState, session, online, onRefresh }) {
                 )}
               </>
             )}
+            <label htmlFor="keyNo">Key No.</label>
+            <input
+              id="keyNo"
+              value={keyNo}
+              onChange={(event) => setKeyNo(event.target.value)}
+              placeholder="Key No (optional, e.g. K-101)"
+            />
             <label className="check"><input type="checkbox" checked={damaged} onChange={(event) => {
               setDamaged(event.target.checked);
               if (!event.target.checked) {
@@ -1248,7 +1268,7 @@ function VehicleCard({ vehicle, flags }) {
         <div>
           <strong>{vehicle.vin}</strong>
           <span>{vehicle.model}</span>
-          <small>{vehicle.variant || "Standard"} · {vehicle.colour || "Not set"}</small>
+          <small>{vehicle.variant || "Standard"} · {vehicle.colour || "Not set"}{vehicle.keyNo ? ` · Key No: ${vehicle.keyNo}` : ""}</small>
         </div>
       </div>
       <div className="vehicle-yard">

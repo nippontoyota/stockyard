@@ -46,6 +46,7 @@ export async function bulkSync(scans) {
     longitude: s.gps?.longitude,
     gps_accuracy_meters: s.gps?.accuracy,
     device_fingerprint: s.deviceId,
+    key_no: s.keyNo || undefined,
     damaged: s.damaged || false,
     damage_remark: s.damageRemark || undefined,
     damage_image: s.damageImage || undefined,

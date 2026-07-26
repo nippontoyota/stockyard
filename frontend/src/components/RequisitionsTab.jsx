@@ -71,7 +71,8 @@ function RequisitionCard({ req, type }) {
   const statusClass = {
     pending: "warning",
     approved: "success",
-    rejected: "error"
+    rejected: "error",
+    fulfilled: "success"
   }[req.status] || "neutral";
 
   async function handleApprove() {
