@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { eq, and, count, desc } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { scans, vehicles, vehicleStatus, devices, flags, yards } from '../db/schema.js';
+import { scans, vehicles, vehicleStatus, devices, flags, yards, requisitions, notifications } from '../db/schema.js';
 import { isValidVin, detectModel, resolveVehicleMetadata } from '../lib/vin.js';
 import { haversineMeters } from '../lib/geo.js';
 import { authenticate } from '../middleware/auth.js';
@@ -21,6 +21,7 @@ const scanInBase = z.object({
   gps_accuracy_meters: z.number().nullish(),
   device_fingerprint: z.string().min(1),
   client_scan_id: z.string().min(1),
+  key_no: z.string().optional(),
   damaged: z.boolean().optional(),
   damage_remark: z.string().optional(),
   damage_image: z.string().optional(),
@@ -129,21 +130,21 @@ async function processScanIn(body: ScanIn, yardId: string) {
 
   if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id === yardId) {
     const [scan] = await db.insert(scans).values({
-      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), status: 'rejected',
+      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, status: 'rejected',
     }).returning();
     return { scan_id: scan.id, status: 'rejected', error: 'Vehicle is already marked IN at this yard' };
   }
 
   const [scan] = await db.insert(scans).values({
-    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
+    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
   }).returning();
 
   const scanTime = new Date(body.scanned_at);
   if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
     await db.insert(vehicleStatus).values({
-      vehicle_id: vehicleId, current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime,
+      vehicle_id: vehicleId, current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no,
     }).onConflictDoUpdate({
-      target: vehicleStatus.vehicle_id, set: { current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, override_reason: null },
+      target: vehicleStatus.vehicle_id, set: { current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null },
     });
   }
 
@@ -180,15 +181,15 @@ async function processScanOut(body: ScanOut, yardId: string) {
   const [currentStatus] = await db.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
   const [scan] = await db.insert(scans).values({
-    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
+    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
   }).returning();
 
   const scanTime = new Date(body.scanned_at);
   if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
     await db.insert(vehicleStatus).values({
-      vehicle_id: vehicleId, current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime,
+      vehicle_id: vehicleId, current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no,
     }).onConflictDoUpdate({
-      target: vehicleStatus.vehicle_id, set: { current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime, override_reason: null },
+      target: vehicleStatus.vehicle_id, set: { current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null },
     });
   }
 
@@ -197,6 +198,29 @@ async function processScanOut(body: ScanOut, yardId: string) {
   if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`); flagsList.push('invalid_vin'); }
   if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported'); flagsList.push('damage_reported'); }
   await checkGps(yardId, body.latitude ?? undefined, body.longitude ?? undefined, vehicleId, scan.id);
+
+  if (body.out_remark === 'stockyard_transfer') {
+    const [reqRecord] = await db
+      .update(requisitions)
+      .set({ status: 'fulfilled', fulfilled_at: scanTime })
+      .where(
+        and(
+          eq(requisitions.vehicle_id, vehicleId),
+          eq(requisitions.status, 'approved')
+        )
+      )
+      .returning();
+
+    if (reqRecord) {
+      await db.insert(notifications).values({
+        user_role: 'delivery_incharge',
+        branch_id: reqRecord.requesting_branch_id,
+        message: 'Vehicle transfer initiated. Requisition fulfilled.',
+        type: 'requisition_fulfilled',
+        related_req_id: reqRecord.id,
+      });
+    }
+  }
 
   return { scan_id: scan.id, status: 'accepted', flags: flagsList };
 }
@@ -272,6 +296,7 @@ router.get('/', async (req, res, next) => {
         outRemark: scans.out_remark,
         transferDestinationYardId: scans.transfer_destination_yard_id,
         transferRequestedBy: scans.transfer_requested_by,
+        keyNo: scans.key_no,
         status: scans.status,
       })
       .from(scans)

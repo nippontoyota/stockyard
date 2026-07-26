@@ -72,6 +72,7 @@ export const scans = pgTable(
     out_remark: text('out_remark'), // 'customer_acquisition' | 'stockyard_transfer'
     transfer_destination_yard_id: text('transfer_destination_yard_id').references(() => yards.id),
     transfer_requested_by: text('transfer_requested_by'),
+    key_no: text('key_no'),
     damaged: boolean('damaged'),
     damage_remark: text('damage_remark'),
     damage_image: text('damage_image'),
@@ -95,6 +96,7 @@ export const vehicleStatus = pgTable(
     last_in_scan_id: uuid('last_in_scan_id').references(() => scans.id),
     last_out_scan_id: uuid('last_out_scan_id').references(() => scans.id),
     last_changed_at: timestamp('last_changed_at', { withTimezone: true }).defaultNow().notNull(),
+    key_no: text('key_no'),
     override_reason: text('override_reason'),
   },
   (t) => [
