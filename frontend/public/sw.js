@@ -33,3 +33,28 @@ self.addEventListener("fetch", (event) => {
     fetch(event.request).catch(() => caches.match(event.request))
   );
 });
+
+self.addEventListener("push", (event) => {
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      const options = {
+        body: data.body || "New update in Stockyard",
+        icon: "/pwa-192x192.png",
+        badge: "/pwa-192x192.png",
+        vibrate: [100, 50, 100],
+        data: data.url || "/",
+      };
+      event.waitUntil(self.registration.showNotification(data.title || "Stockyard Notification", options));
+    } catch (e) {
+      console.error("Push parsing failed", e);
+    }
+  }
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  if (event.notification.data) {
+    event.waitUntil(clients.openWindow(event.notification.data));
+  }
+});

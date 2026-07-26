@@ -7,6 +7,8 @@ import { isValidVin, detectModel, resolveVehicleMetadata } from '../lib/vin.js';
 import { haversineMeters } from '../lib/geo.js';
 import { authenticate } from '../middleware/auth.js';
 import { emitScanEvent, emitFlagEvent } from '../lib/socket.js';
+import { uploadBase64Image } from '../lib/supabase.js';
+import { notifyRoleAtBranch } from '../lib/webPush.js';
 
 const router = Router();
 router.use(authenticate);
@@ -137,6 +139,10 @@ async function processScanIn(body: ScanIn, yardId: string) {
     return { scan_id: scan.id, status: 'rejected', error: 'Vehicle is already marked IN at this yard' };
   }
 
+  if (body.damage_image) {
+    body.damage_image = await uploadBase64Image(body.damage_image) || body.damage_image;
+  }
+
   const [scan] = await db.insert(scans).values({
     client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
   }).returning();
@@ -182,6 +188,10 @@ async function processScanOut(body: ScanOut, yardId: string) {
   const deviceId = await findOrCreateDevice(body.device_fingerprint);
   const [currentStatus] = await db.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
+  if (body.damage_image) {
+    body.damage_image = await uploadBase64Image(body.damage_image) || body.damage_image;
+  }
+
   const [scan] = await db.insert(scans).values({
     client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
   }).returning();
@@ -220,6 +230,11 @@ async function processScanOut(body: ScanOut, yardId: string) {
         message: 'Vehicle transfer initiated. Requisition fulfilled.',
         type: 'requisition_fulfilled',
         related_req_id: reqRecord.id,
+      });
+      await notifyRoleAtBranch('delivery_incharge', reqRecord.requesting_branch_id, {
+        title: 'Requisition Fulfilled',
+        body: 'Vehicle transfer initiated for requisition.',
+        url: '/admin',
       });
     }
   }
