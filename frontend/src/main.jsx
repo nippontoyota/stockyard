@@ -15,6 +15,7 @@ import {
   updateVehicleAdmin,
   yards,
   fallbackBranches,
+  setConfig
 } from "./stockyardLogic.js";
 import {
   ExecutiveKpiCards,
@@ -26,7 +27,7 @@ import {
 } from "./AnalyticsCharts.jsx";
 import {
   bulkSync, getVehicles, getAdminDashboard, getFlags, getScans, resolveFlag as apiResolveFlag, adminOverrideVehicle, loginApi,
-  getNotifications, getRequisitions, markAllNotificationsRead, markNotificationRead, getAdminBranches
+  getNotifications, getRequisitions, markAllNotificationsRead, markNotificationRead, getAdminBranches, getYards, getBranches
 } from "./api.js";
 import "./styles.css";
 
@@ -34,6 +35,11 @@ import "./styles.css";
 import { RequisitionsTab } from "./components/RequisitionsTab.jsx";
 import { NotificationBell } from "./components/NotificationBell.jsx";
 import { BranchesTab } from "./components/BranchesTab.jsx";
+import { useSocket } from "./useSocket.js";
+import { ScanOverlay } from "./components/ScanOverlay.jsx";
+import { GpsStatus } from "./components/GpsStatus.jsx";
+import { enqueueScan, getPendingCount, drainQueue } from "./offlineQueue.js";
+import { usePwaInstall } from "./usePwaInstall.js";
 
 function flagLabel(type) {
   return {
@@ -107,6 +113,17 @@ export default function App() {
     if (!session) return "login";
     return getViewFromPath(window.location.pathname, session.role);
   });
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  useEffect(() => {
+    Promise.all([getYards(), getBranches()]).then(([newYards, newBranches]) => {
+      setConfig(newYards, newBranches);
+      setConfigLoaded(true);
+    }).catch(e => {
+      console.error("Failed to load config", e);
+      setConfigLoaded(true); // continue anyway with defaults
+    });
+  }, []);
 
   useEffect(() => {
     // Drop scans saved by versions that queued data only in this browser.
@@ -220,14 +237,14 @@ export default function App() {
     window.addEventListener("focus", onFocus);
     window.addEventListener("visibilitychange", onVisibilityChange);
     
-    const intervalId = setInterval(fetchServerData, 5000);
-    
     return () => {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("visibilitychange", onVisibilityChange);
-      clearInterval(intervalId);
     };
   }, [fetchServerData]);
+
+  // §1.1 — Socket.io event-driven updates
+  useSocket(fetchServerData);
 
   useEffect(() => {
     if (!session) return;
@@ -257,6 +274,17 @@ export default function App() {
       window.history.pushState(null, "", nextPath);
     }
   };
+
+  if (!configLoaded) {
+    return (
+      <div className="login" style={{ display: 'grid', placeItems: 'center' }}>
+        <div className="skeleton skeleton-card" style={{ width: 300, height: 160, alignItems: 'center', justifyContent: 'center' }}>
+          <div className="skeleton-card-title"></div>
+          <div className="skeleton-card-line"></div>
+        </div>
+      </div>
+    );
+  }
 
   if (!session) return <Login onLogin={(nextSession) => {
     setSession(nextSession);
@@ -494,6 +522,8 @@ function Login({ onLogin }) {
 }
 
 function Header({ session, online, notifications, onLogout }) {
+  const { isInstallable, promptInstall } = usePwaInstall();
+
   return (
     <header className="topbar">
       <div>
@@ -501,6 +531,11 @@ function Header({ session, online, notifications, onLogout }) {
         <small>{session.role === "admin" ? "Admin Console" : session.name}</small>
       </div>
       <div className="top-actions">
+        {isInstallable && (
+          <button className="primary pwa-install-btn" onClick={promptInstall}>
+            <span className="material-symbols-outlined">install_mobile</span> Install App
+          </button>
+        )}
         {session.role !== "admin" && <NotificationBell notifications={notifications || []} />}
         <span className={online ? "pill ok" : "pill warn"}>{online ? "Online" : "Offline"}</span>
         <button className="icon-btn" onClick={onLogout} aria-label="Log out"><span className="material-symbols-outlined">logout</span></button>
@@ -588,7 +623,9 @@ function ScanView({ state, setState, session, online, onRefresh }) {
   const [torchOn, setTorchOn] = useState(false);
   const [supportsTorch, setSupportsTorch] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(null);
-  const [message, setMessage] = useState(null);
+  const [overlayResult, setOverlayResult] = useState(null);
+  const [gpsData, setGpsData] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
   const damagePhotoInputRef = useRef(null);
@@ -601,13 +638,28 @@ function ScanView({ state, setState, session, online, onRefresh }) {
   const activeFlag = state.flags?.find((f) => f.vin === pendingVin && !f.resolved);
   const isFlagged = Boolean(activeFlag);
 
+  useEffect(() => {
+    getPendingCount().then(setPendingCount);
+  }, []);
+
+  useEffect(() => {
+    if (online) {
+      drainQueue(bulkSync).then(res => {
+        if (res.synced > 0) {
+          getPendingCount().then(setPendingCount);
+          onRefresh();
+        }
+      });
+    }
+  }, [online, onRefresh]);
+
   async function handleDamagePhotoSelect(event) {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
       const compressed = await compressImage(file, 1000, 0.8);
       setDamageImage(compressed);
-      setMessage(null);
+      setOverlayResult(null);
     } catch {
       setDamageImage("");
     }
@@ -640,7 +692,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
       scanLockedRef.current = true;
       setVin(scannedVin);
       setScanSuccess(scannedVin);
-      setMessage({ kind: "ok", text: `VIN ${scannedVin} scanned.` });
+      setOverlayResult(null);
       setCameraOpen(false);
       setTorchOn(false);
       signalScanSuccess();
@@ -811,47 +863,60 @@ function ScanView({ state, setState, session, online, onRefresh }) {
 
   async function submit(event) {
     event.preventDefault();
-    if (!vin.trim()) return setMessage({ kind: "error", text: "Enter or scan a VIN." });
-    if (scanType === "out" && !outRemark) return setMessage({ kind: "error", text: "Select an OUT reason." });
-    if (outRemark === "stockyard_transfer" && !transferDestinationYardId) return setMessage({ kind: "error", text: "Select destination yard for transfer." });
-    if (outRemark === "stockyard_transfer" && !transferRequestedBy.trim()) return setMessage({ kind: "error", text: "Enter the name of person who requested the transfer." });
+    if (!vin.trim()) return setOverlayResult({ type: "error", message: "Enter or scan a VIN." });
+    if (scanType === "out" && !outRemark) return setOverlayResult({ type: "error", message: "Select an OUT reason." });
+    if (outRemark === "stockyard_transfer" && !transferDestinationYardId) return setOverlayResult({ type: "error", message: "Select destination yard for transfer." });
+    if (outRemark === "stockyard_transfer" && !transferRequestedBy.trim()) return setOverlayResult({ type: "error", message: "Enter the name of person who requested the transfer." });
     if (damaged) {
-      if (!damageRemark.trim()) return setMessage({ kind: "error", text: "Add the damage remark." });
-      if (!damageImage) return setMessage({ kind: "error", text: "Attach or capture a photo of the vehicle damage." });
+      if (!damageRemark.trim()) return setOverlayResult({ type: "error", message: "Add the damage remark." });
+      if (!damageImage) return setOverlayResult({ type: "error", message: "Attach or capture a photo of the vehicle damage." });
     }
     if (isFlagged && !damageImage) {
-      return setMessage({ kind: "error", text: "This vehicle has an active flag. You must attach a photo to proceed." });
+      return setOverlayResult({ type: "error", message: "This vehicle has an active flag. You must attach a photo to proceed." });
     }
-    if (!online) return setMessage({ kind: "error", text: "No connection. This scan was not saved." });
 
-    const gps = { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
+    const gps = gpsData || { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
     const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, transferDestinationYardId, transferRequestedBy, keyNo, damaged, damageRemark, damageImage, online });
     const result = applyScan(state, scan);
-    if (!result.accepted) return setMessage({ kind: "error", text: result.message });
+    
+    if (!result.accepted) return setOverlayResult({ type: "error", message: result.message });
+
+    const newFlags = result.state.flags.filter(f => f.vin === scan.vin && !f.resolved);
+    const resultType = newFlags.length ? "flagged" : "success";
 
     try {
+      if (!online) throw new Error("Offline");
       await bulkSync([scan]);
-      setState(result.state);
-      setMessage({ kind: "ok", text: result.message });
-      setVin("");
-      setOutRemark("");
-      setTransferDestinationYardId("");
-      setTransferRequestedBy("");
-      setKeyNo("");
-      setDamaged(false);
-      setDamageRemark("");
-      setDamageImage("");
-      setScanSuccess(null);
-      scanLockedRef.current = false;
-      onRefresh();
+      finishSubmit(result.state, resultType, result.message, newFlags.map(f => flagLabel(f.type)));
     } catch (err) {
-      console.error("Backend sync failed:", err);
-      setMessage({ kind: "error", text: "Server did not save this scan. Please try again." });
+      // Offline or failed, enqueue it
+      await enqueueScan(scan);
+      setPendingCount(c => c + 1);
+      finishSubmit(result.state, resultType, result.message + " (Saved offline)", newFlags.map(f => flagLabel(f.type)));
     }
   }
 
+  function finishSubmit(newState, type, msg, flags) {
+    setState(newState);
+    setOverlayResult({ type, vin, message: msg, flags });
+    setVin("");
+    setOutRemark("");
+    setTransferDestinationYardId("");
+    setTransferRequestedBy("");
+    setKeyNo("");
+    setDamaged(false);
+    setDamageRemark("");
+    setDamageImage("");
+    setScanSuccess(null);
+    scanLockedRef.current = false;
+    onRefresh();
+  }
+
+
   return (
     <section className="scan-grid">
+      <GpsStatus onGpsReady={setGpsData} onGpsOverride={setGpsData} />
+      {pendingCount > 0 && <div className="offline-badge">Offline Mode <span className="pending-count-badge">{pendingCount}</span></div>}
       <form className="scan-card stack" onSubmit={submit}>
         <div className="scan-ticket">
           <span className={`scan-badge ${scanType}`}>{scanType.toUpperCase()}</span>
@@ -859,13 +924,12 @@ function ScanView({ state, setState, session, online, onRefresh }) {
             <h1>{yard.code}</h1>
             <p>{yard.name}</p>
           </div>
-          <span className={online ? "status-dot ok" : "status-dot warn"}>{online ? "Online" : "Offline"}</span>
         </div>
         <div className="camera">
           <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => {
             scanLockedRef.current = false;
             setScanSuccess(null);
-            setMessage(null);
+            setOverlayResult(null);
             setTorchOn(false);
             setCameraOpen(true);
           }} aria-label="Open camera scanner">
@@ -911,7 +975,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
                     setTransferDestinationYardId("");
                     setTransferRequestedBy("");
                   }
-                  setMessage(null);
+                  setOverlayResult(null);
                 }} aria-label="OUT reason">
                   <option value="">Select OUT reason</option>
                   <option value="customer_acquisition">Customer Acquisition</option>
@@ -922,7 +986,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
                 <>
                   <select value={transferDestinationYardId} onChange={(event) => {
                     setTransferDestinationYardId(event.target.value);
-                    setMessage(null);
+                    setOverlayResult(null);
                   }} aria-label="Destination yard">
                     <option value="">Select destination yard</option>
                     {yards.filter((y) => y.id !== yard.id).map((y) => (
@@ -1098,6 +1162,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
         )}
         {message && !scanSuccess && <p className={`notice ${message.kind}`}>{message.text}</p>}
       </form>
+      <ScanOverlay result={overlayResult} onDismiss={() => setOverlayResult(null)} />
       <aside className="panel yard-card">
         <span className="eyebrow">Assigned yard</span>
         <h2>{yard.name}</h2>

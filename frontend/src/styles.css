@@ -1649,3 +1649,256 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .badge-out { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
 .badge-transfer { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 .badge-unknown { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   §3.2 — Scan Overlay
+   ═══════════════════════════════════════════════════════════════════════ */
+.scan-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  animation: overlayFadeIn 0.2s ease-out;
+}
+@keyframes overlayFadeIn {
+  from { opacity: 0; transform: scale(1.05); }
+  to { opacity: 1; transform: scale(1); }
+}
+.scan-overlay-content {
+  text-align: center; color: #fff; padding: 40px 24px;
+  max-width: 360px; width: 100%;
+}
+.scan-overlay-icon {
+  font-size: 72px; line-height: 1;
+  width: 120px; height: 120px;
+  border-radius: 50%; background: rgba(255,255,255,0.2);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 24px;
+}
+.scan-overlay-title { font-size: 24px; font-weight: 700; margin: 0 0 8px; }
+.scan-overlay-vin { font-size: 18px; font-family: monospace; margin: 4px 0; opacity: 0.9; }
+.scan-overlay-model { font-size: 14px; opacity: 0.8; margin: 4px 0; }
+.scan-overlay-message { font-size: 14px; opacity: 0.9; margin: 12px 0; }
+.scan-overlay-flags { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+.scan-overlay-flag-pill {
+  background: rgba(255,255,255,0.25); padding: 4px 10px;
+  border-radius: 12px; font-size: 12px;
+}
+.scan-overlay-dismiss {
+  margin-top: 28px; padding: 12px 32px;
+  background: rgba(255,255,255,0.25); border: 2px solid #fff;
+  border-radius: 8px; color: #fff; font-weight: 600; font-size: 16px;
+  cursor: pointer; transition: background 0.2s;
+}
+.scan-overlay-dismiss:hover { background: rgba(255,255,255,0.4); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   §3.5 — GPS Status Badge
+   ═══════════════════════════════════════════════════════════════════════ */
+.gps-status {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 12px; border-radius: 8px; font-size: 13px;
+}
+.gps-acquiring { background: #fffbeb; color: #92400e; }
+.gps-locked { background: #f0fdf4; color: #166534; }
+.gps-unavailable { background: #fef2f2; color: #991b1b; }
+.gps-badge { display: flex; align-items: center; gap: 4px; }
+.gps-emoji { font-size: 16px; }
+.gps-spinner {
+  width: 14px; height: 14px; border: 2px solid #d97706;
+  border-top-color: transparent; border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.gps-override-btn {
+  padding: 4px 12px; border: 1px solid currentColor;
+  border-radius: 6px; background: transparent; color: inherit;
+  font-size: 12px; cursor: pointer; font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   §3.9 — Skeleton Loading
+   ═══════════════════════════════════════════════════════════════════════ */
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+.skeleton {
+  background: #e5e7eb; border-radius: 8px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.skeleton-kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.skeleton-kpi { height: 80px; }
+.skeleton-table { display: flex; flex-direction: column; gap: 8px; }
+.skeleton-table-header { height: 40px; border-radius: 8px 8px 0 0; }
+.skeleton-table-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.skeleton-cell { height: 36px; }
+.skeleton-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.skeleton-card { padding: 16px; height: 120px; display: flex; flex-direction: column; gap: 8px; }
+.skeleton-card-title { height: 20px; width: 60%; }
+.skeleton-card-line { height: 14px; width: 80%; }
+.skeleton-card-line.short { width: 40%; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   §4.2 — Vehicle Timeline
+   ═══════════════════════════════════════════════════════════════════════ */
+.vehicle-timeline { padding: 16px 0; }
+.timeline-header { font-size: 16px; font-weight: 700; margin: 0 0 16px; }
+.timeline-track { display: flex; flex-direction: column; }
+.timeline-event { display: flex; gap: 12px; }
+.timeline-marker-col {
+  display: flex; flex-direction: column; align-items: center;
+  width: 28px; flex-shrink: 0;
+}
+.timeline-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 3px solid; flex-shrink: 0;
+}
+.dot-in { border-color: #16a34a; background: #dcfce7; }
+.dot-out { border-color: #dc2626; background: #fee2e2; }
+.timeline-connector {
+  flex: 1; width: 2px; background: #d1d5db;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 40px; position: relative;
+}
+.timeline-dwell {
+  position: absolute; left: 12px; white-space: nowrap;
+  font-size: 11px; color: #6b7280; font-weight: 500;
+}
+.timeline-card {
+  flex: 1; background: #fff; border: 1px solid #e5e7eb;
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;
+  cursor: pointer; transition: box-shadow 0.2s;
+}
+.timeline-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.timeline-card-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.timeline-pill {
+  padding: 2px 8px; border-radius: 4px; font-size: 11px;
+  font-weight: 700; text-transform: uppercase;
+}
+.pill-in { background: #dcfce7; color: #166534; }
+.pill-out { background: #fee2e2; color: #991b1b; }
+.timeline-time { font-size: 13px; color: #374151; }
+.timeline-yard { font-size: 12px; color: #6b7280; margin-left: auto; }
+.timeline-details {
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6;
+  font-size: 13px; color: #4b5563;
+}
+.timeline-details p { margin: 4px 0; }
+.timeline-damage { color: #dc2626; }
+.timeline-force-close {
+  margin-top: 16px; padding: 10px 20px;
+  background: #dc2626; color: #fff; border: 0;
+  border-radius: 8px; font-weight: 600; cursor: pointer;
+}
+.timeline-force-close:hover { background: #b91c1c; }
+.timeline-empty { text-align: center; padding: 40px; color: #9ca3af; font-size: 14px; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   §3.6 — FAB Scan Button (center of bottom nav)
+   ═══════════════════════════════════════════════════════════════════════ */
+.nav-fab {
+  width: 56px !important; height: 56px !important;
+  border-radius: 50% !important; background: #EB0A1E !important;
+  color: #fff !important; border: 0 !important;
+  box-shadow: 0 4px 16px rgba(235, 10, 30, 0.35);
+  transform: translateY(-8px);
+  display: flex !important; align-items: center; justify-content: center;
+  font-size: 24px !important; transition: transform 0.2s, box-shadow 0.2s;
+}
+.nav-fab:hover { transform: translateY(-10px); box-shadow: 0 6px 20px rgba(235, 10, 30, 0.45); }
+.nav-fab:active { transform: translateY(-6px); }
+.nav-active-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #EB0A1E; margin-top: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   §3.7 — Card-Based Stock View
+   ═══════════════════════════════════════════════════════════════════════ */
+.stock-card {
+  background: #fff; border: 1px solid #e5e7eb;
+  border-radius: 10px; padding: 14px 16px;
+  transition: box-shadow 0.2s;
+}
+.stock-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.stock-card-vin { font-family: monospace; font-weight: 700; font-size: 14px; color: #111827; }
+.stock-card-model { font-size: 13px; color: #4b5563; margin-top: 2px; }
+.stock-card-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.stock-card-status {
+  padding: 2px 10px; border-radius: 99px; font-size: 11px;
+  font-weight: 700; text-transform: uppercase;
+}
+.status-in { background: #dcfce7; color: #166534; }
+.status-out { background: #fee2e2; color: #991b1b; }
+.status-flagged { background: #fef3c7; color: #92400e; }
+.stock-card-yard { font-size: 12px; color: #6b7280; }
+.stock-card-divider { border-top: 1px solid #f3f4f6; margin: 8px 0; }
+.stock-card-dwell { font-size: 12px; color: #9ca3af; }
+.stock-card-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Offline indicator / PWA install
+   ═══════════════════════════════════════════════════════════════════════ */
+.offline-badge {
+  position: fixed; top: calc(60px + env(safe-area-inset-top, 0px));
+  left: 50%; transform: translateX(-50%); z-index: 200;
+  background: #fbbf24; color: #78350f; padding: 6px 16px;
+  border-radius: 0 0 8px 8px; font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.pending-count-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; border-radius: 9px;
+  background: #ef4444; color: #fff; font-size: 10px; font-weight: 700;
+  padding: 0 4px; position: absolute; top: -4px; right: -4px;
+}
+.install-btn {
+  padding: 8px 16px; background: #059669; color: #fff;
+  border: 0; border-radius: 8px; font-weight: 600;
+  font-size: 13px; cursor: pointer;
+}
+.install-btn:hover { background: #047857; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   §3.3 — Manual VIN Entry
+   ═══════════════════════════════════════════════════════════════════════ */
+.vin-manual-input {
+  font-size: 20px; text-transform: uppercase;
+  letter-spacing: 0.08em; font-family: monospace;
+  text-align: center; width: 100%; padding: 14px;
+  border: 2px solid #d1d5db; border-radius: 8px;
+  transition: border-color 0.2s;
+}
+.vin-manual-input:focus { border-color: #EB0A1E; outline: none; }
+.vin-char-count {
+  text-align: center; font-size: 13px; color: #6b7280; margin-top: 4px;
+}
+.vin-char-count.complete { color: #16a34a; font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   §3.10 — Inline Validation
+   ═══════════════════════════════════════════════════════════════════════ */
+.field-error {
+  color: #dc2626; font-size: 12px; margin-top: 4px;
+  display: flex; align-items: center; gap: 4px;
+}
+.field-valid {
+  color: #16a34a; font-size: 12px; margin-top: 4px;
+}
+.input-error { border-color: #dc2626 !important; }
+.input-valid { border-color: #16a34a !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Reduced Motion
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .scan-overlay { animation: none; }
+  .gps-spinner { animation: none; }
+  .skeleton { animation: none; opacity: 0.8; }
+  .nav-fab { transform: translateY(0); transition: none; }
+}
+
