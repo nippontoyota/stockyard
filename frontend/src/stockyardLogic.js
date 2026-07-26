@@ -56,7 +56,7 @@ export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, gps, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", damaged = false, damageRemark = "", damageImage = "" }) {
+export function createScan({ vin, type, yardId, gps, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "" }) {
   return {
     id: crypto.randomUUID(),
     clientScanId: createClientScanId(),
@@ -67,6 +67,7 @@ export function createScan({ vin, type, yardId, gps, outRemark = "", transferDes
     outRemark,
     transferDestinationYardId,
     transferRequestedBy,
+    keyNo,
     damaged,
     damageRemark,
     damageImage,
@@ -223,11 +224,12 @@ export function applyScan(state, scan) {
     currentStatus: scan.type,
     currentYardId: scan.type === "in" ? scan.yardId : existing?.currentYardId || scan.yardId,
     lastChangedAt: scan.scannedAt,
+    keyNo: scan.keyNo || existing?.keyNo || "",
   };
   const next = {
     ...state,
     vehicles: { ...state.vehicles, [vin]: vehicle },
-    scans: [...state.scans, { ...scan, vin, status: flags.length ? "flagged" : "accepted" }],
+    scans: [...state.scans, { ...scan, vin, keyNo: scan.keyNo || "", status: flags.length ? "flagged" : "accepted" }],
     flags: [...state.flags, ...capacityFlags(state, scan, vin), ...flags],
   };
   return { state: next, accepted: true, message: flags.length ? "Scan accepted with admin flag." : "Scan accepted." };

@@ -19,6 +19,7 @@ const baseScan = {
   vinRaw: "JTMBA38V70D123456",
   type: "in",
   yardId: "CO01B-1",
+  keyNo: "K-901",
   gps: { latitude: 10.0529, longitude: 76.3157, accuracy: 20 },
   deviceId: "device-1",
   scannedAt: new Date().toISOString(),
@@ -31,6 +32,7 @@ assert.equal(Object.hasOwn(createInitialState(), "queue"), false);
 const firstScanResult = applyScan(createInitialState(), baseScan);
 assert.equal(firstScanResult.accepted, true);
 assert.equal(firstScanResult.state.vehicles.JTMBA38V70D123456.currentYardId, "CO01B-1");
+assert.equal(firstScanResult.state.vehicles.JTMBA38V70D123456.keyNo, "K-901");
 
 // Second scan at the SAME yard: should be rejected silently
 const sameYardDuplicate = applyScan(firstScanResult.state, { ...baseScan, clientScanId: "client-2" });

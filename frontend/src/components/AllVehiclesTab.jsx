@@ -65,6 +65,7 @@ export function AllVehiclesTab({ state }) {
             <tr>
               <th>VIN</th>
               <th>Model</th>
+              <th>Key No</th>
               <th>Status</th>
               <th>Current/Last Yard</th>
               <th>Last Updated</th>
@@ -73,7 +74,7 @@ export function AllVehiclesTab({ state }) {
           <tbody>
             {filteredVehicles.length === 0 ? (
               <tr>
-                <td colSpan="5" className="empty-state-cell">
+                <td colSpan="6" className="empty-state-cell">
                   No vehicles found.
                 </td>
               </tr>
@@ -84,6 +85,7 @@ export function AllVehiclesTab({ state }) {
                   <tr key={v.vin}>
                     <td className="mono">{v.vin}</td>
                     <td>{v.model}</td>
+                    <td className="mono">{v.keyNo || "-"}</td>
                     <td>
                       <span className={`status-badge ${derivedStatus.badgeClass}`}>
                         {derivedStatus.label}

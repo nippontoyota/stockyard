@@ -120,7 +120,7 @@ export function YardVehiclesModal({ yard, state, onClose }) {
                           <span className="badge bad">{flagLabel(activeFlag.type)}</span>
                         )}
                       </div>
-                      <small>{displayModel} · {displayVariant}</small>
+                      <small>{displayModel} · {displayVariant}{vehicle.keyNo ? ` · Key No: ${vehicle.keyNo}` : ""}</small>
                     </div>
                     <div className="v-row-status">
                       <span className={`status-tag ${vehicle.currentStatus}`}>

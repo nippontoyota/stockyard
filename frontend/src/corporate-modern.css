@@ -371,3 +371,18 @@
 .bm-modal-footer button:hover {
   background-color: var(--bm-primary);
 }
+
+.bm-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.bm-badge-warning { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.bm-badge-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.bm-badge-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.bm-badge-neutral { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }

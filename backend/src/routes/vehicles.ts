@@ -44,6 +44,7 @@ router.get('/', async (req, res, next) => {
         current_status: vehicleStatus.current_status,
         current_yard_id: vehicleStatus.current_yard_id,
         last_changed_at: vehicleStatus.last_changed_at,
+        key_no: vehicleStatus.key_no,
         out_remark: scans.out_remark,
       })
       .from(vehicles)
@@ -81,6 +82,7 @@ router.get('/:vin', async (req, res, next) => {
         last_in_scan_id: vehicleStatus.last_in_scan_id,
         last_out_scan_id: vehicleStatus.last_out_scan_id,
         last_changed_at: vehicleStatus.last_changed_at,
+        key_no: vehicleStatus.key_no,
         override_reason: vehicleStatus.override_reason,
       })
       .from(vehicles)
@@ -138,6 +140,7 @@ router.get('/:vin/history', async (req, res, next) => {
         scanned_at: scans.scanned_at,
         status: scans.status,
         out_remark: scans.out_remark,
+        key_no: scans.key_no,
         damaged: scans.damaged,
         damage_remark: scans.damage_remark,
         latitude: scans.latitude,
