@@ -9,54 +9,76 @@ export function RequisitionsTab({ state, session }) {
   const isDelivery = session.role === "delivery_incharge";
 
   return (
-    <div className="bm-container">
-      <header className="bm-header">
-        <div>
+    <div className="req-container">
+      <header className="req-header">
+        <div className="req-header-text">
           <h2>Vehicle Requisitions</h2>
-          <p className="bm-subtitle">Branch-to-branch transfers.</p>
+          <p>Manage branch-to-branch inventory transfers</p>
         </div>
         {isDelivery && (
-          <button className="bm-btn bm-btn-primary" onClick={() => setShowCreate(true)}>
+          <button className="bm-btn bm-btn-primary req-header-btn" onClick={() => setShowCreate(true)}>
             <span className="material-symbols-outlined">add</span> Request Vehicle
           </button>
         )}
       </header>
 
-      <div className="bm-segmented-control" style={{ marginBottom: '24px' }}>
+      <div className="req-tabs">
         <button 
-          className={`bm-segmented-btn ${activeTab === "incoming" ? "active" : ""}`}
+          className={`req-tab ${activeTab === "incoming" ? "active" : ""}`}
           onClick={() => setActiveTab("incoming")}
         >
-          Incoming ({incoming.length})
+          Incoming <span className="req-tab-count">{incoming.length}</span>
         </button>
         {isDelivery && (
           <button 
-            className={`bm-segmented-btn ${activeTab === "outgoing" ? "active" : ""}`}
+            className={`req-tab ${activeTab === "outgoing" ? "active" : ""}`}
             onClick={() => setActiveTab("outgoing")}
           >
-            Outgoing ({outgoing.length})
+            Outgoing <span className="req-tab-count">{outgoing.length}</span>
           </button>
         )}
       </div>
 
-      <div className="bm-list-grid">
+      <div className="req-table-container">
         {activeTab === "incoming" && incoming.length === 0 && (
-          <div className="bm-empty-state">
-            <span className="material-symbols-outlined bm-empty-icon">inbox</span>
-            <h3>No Incoming Requests</h3>
-            <p>You don't have any vehicle requests from other branches.</p>
+          <div className="req-empty">
+            <span className="material-symbols-outlined">inbox</span>
+            <h3>No incoming requests</h3>
+            <p>You don't have any pending vehicle requests from other branches.</p>
           </div>
         )}
-        {activeTab === "incoming" && incoming.map(req => <RequisitionCard key={req.id} req={req} type="incoming" />)}
+        {activeTab === "incoming" && incoming.length > 0 && (
+          <div className="req-list">
+            <div className="req-list-header">
+              <div className="req-col-vehicle">Vehicle</div>
+              <div className="req-col-branch">Requested By</div>
+              <div className="req-col-date">Date</div>
+              <div className="req-col-status">Status</div>
+              <div className="req-col-actions"></div>
+            </div>
+            {incoming.map(req => <RequisitionRow key={req.id} req={req} type="incoming" />)}
+          </div>
+        )}
         
         {activeTab === "outgoing" && outgoing.length === 0 && (
-          <div className="bm-empty-state">
-            <span className="material-symbols-outlined bm-empty-icon">outbox</span>
-            <h3>No Outgoing Requests</h3>
+          <div className="req-empty">
+            <span className="material-symbols-outlined">outbox</span>
+            <h3>No outgoing requests</h3>
             <p>You haven't requested any vehicles from other branches.</p>
           </div>
         )}
-        {activeTab === "outgoing" && outgoing.map(req => <RequisitionCard key={req.id} req={req} type="outgoing" />)}
+        {activeTab === "outgoing" && outgoing.length > 0 && (
+          <div className="req-list">
+            <div className="req-list-header">
+              <div className="req-col-vehicle">Vehicle</div>
+              <div className="req-col-branch">Requested From</div>
+              <div className="req-col-date">Date</div>
+              <div className="req-col-status">Status</div>
+              <div className="req-col-actions"></div>
+            </div>
+            {outgoing.map(req => <RequisitionRow key={req.id} req={req} type="outgoing" />)}
+          </div>
+        )}
       </div>
 
       {showCreate && <CreateRequisitionModal onClose={() => setShowCreate(false)} />}
@@ -64,9 +86,10 @@ export function RequisitionsTab({ state, session }) {
   );
 }
 
-function RequisitionCard({ req, type }) {
+function RequisitionRow({ req, type }) {
   const [rejectReason, setRejectReason] = useState("");
   const [isRejecting, setIsRejecting] = useState(false);
+  const [isActioning, setIsActioning] = useState(false);
 
   const statusClass = {
     pending: "warning",
@@ -76,70 +99,92 @@ function RequisitionCard({ req, type }) {
   }[req.status] || "neutral";
 
   async function handleApprove() {
+    setIsActioning(true);
     try {
       await approveRequisition(req.id);
     } catch (e) {
       alert(e.message);
+      setIsActioning(false);
     }
   }
 
   async function handleReject(e) {
     e.preventDefault();
+    setIsActioning(true);
     try {
       await rejectRequisition(req.id, rejectReason);
       setIsRejecting(false);
     } catch (e) {
       alert(e.message);
+      setIsActioning(false);
     }
   }
 
+  const branchName = type === "incoming" 
+    ? (req.requesting_branch?.name || "Unknown")
+    : (req.source_branch?.name || "Unknown");
+
   return (
-    <div className="bm-card">
-      <div className="bm-card-header">
-        <div>
-          <h3 className="bm-card-title">{req.vehicle?.model}</h3>
-          <p className="bm-card-subtitle font-mono">{req.vehicle?.vin}</p>
+    <div className="req-row">
+      <div className="req-row-main">
+        <div className="req-col-vehicle">
+          <strong>{req.vehicle?.model}</strong>
+          <span className="req-vin">{req.vehicle?.vin}</span>
         </div>
-        <span className={`bm-badge bm-badge-${statusClass}`}>{req.status.toUpperCase()}</span>
+        <div className="req-col-branch">
+          {branchName}
+        </div>
+        <div className="req-col-date">
+          {new Date(req.requested_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        </div>
+        <div className="req-col-status">
+          <span className={`bm-badge bm-badge-${statusClass}`}>{req.status}</span>
+        </div>
+        <div className="req-col-actions">
+          {type === "incoming" && req.status === "pending" && !isRejecting && (
+            <div className="req-action-buttons">
+              <button 
+                className="bm-btn bm-btn-secondary req-btn-reject" 
+                onClick={() => setIsRejecting(true)}
+                disabled={isActioning}
+                title="Reject Request"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+              <button 
+                className="bm-btn bm-btn-primary req-btn-approve" 
+                onClick={handleApprove}
+                disabled={isActioning}
+                title="Approve Request"
+              >
+                <span className="material-symbols-outlined">check</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       
-      <div className="bm-card-body" style={{ fontSize: '0.875rem', marginBottom: '16px' }}>
-        {type === "incoming" ? (
-          <p>Requested by: <strong>{req.requesting_branch?.name || "Unknown Branch"}</strong></p>
-        ) : (
-          <p>Requested from: <strong>{req.source_branch?.name || "Unknown Branch"}</strong></p>
-        )}
-        <p className="bm-subtitle" style={{ marginTop: '4px' }}>On: {new Date(req.requested_at).toLocaleString()}</p>
-      </div>
-
       {req.status === "rejected" && req.rejection_reason && (
-        <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '6px', color: '#b91c1c', fontSize: '0.875rem', marginBottom: '16px' }}>
-          <strong>Reason:</strong> {req.rejection_reason}
-        </div>
-      )}
-
-      {type === "incoming" && req.status === "pending" && !isRejecting && (
-        <div className="bm-card-actions">
-          <button className="bm-btn bm-btn-primary" onClick={handleApprove} style={{ flex: 1 }}>Approve</button>
-          <button className="bm-btn bm-btn-secondary" onClick={() => setIsRejecting(true)} style={{ flex: 1 }}>Reject</button>
+        <div className="req-row-detail error">
+          <span className="material-symbols-outlined">info</span>
+          <strong>Rejected:</strong> {req.rejection_reason}
         </div>
       )}
 
       {isRejecting && (
-        <form onSubmit={handleReject} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <form className="req-row-detail actioning" onSubmit={handleReject}>
           <input 
             type="text" 
             className="bm-input"
-            placeholder="Reason for rejection" 
+            placeholder="Reason for rejection..." 
             value={rejectReason} 
             onChange={e => setRejectReason(e.target.value)} 
             required 
             autoFocus
+            disabled={isActioning}
           />
-          <div className="bm-card-actions">
-            <button type="submit" className="bm-btn bm-btn-danger" style={{ flex: 1 }}>Confirm</button>
-            <button type="button" className="bm-btn bm-btn-secondary" onClick={() => setIsRejecting(false)} style={{ flex: 1 }}>Cancel</button>
-          </div>
+          <button type="button" className="bm-btn bm-btn-secondary" onClick={() => setIsRejecting(false)} disabled={isActioning}>Cancel</button>
+          <button type="submit" className="bm-btn bm-btn-danger" disabled={isActioning || !rejectReason.trim()}>Confirm Rejection</button>
         </form>
       )}
     </div>
@@ -192,16 +237,16 @@ function CreateRequisitionModal({ onClose }) {
   }
 
   return (
-    <div className="bm-modal-overlay">
+    <div className="bm-modal-overlay req-modal">
       <div className="bm-modal-content">
         <header className="bm-modal-header">
-          <h3 className="bm-modal-title">Request Vehicle</h3>
+          <h3 className="bm-modal-title">Request Vehicle Transfer</h3>
           <button type="button" className="bm-btn-icon" onClick={onClose} aria-label="Close">
             <span className="material-symbols-outlined">close</span>
           </button>
         </header>
 
-        <form onSubmit={handleSubmit} className="bm-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <form onSubmit={handleSubmit} className="bm-modal-body">
           <div className="bm-form-group">
             <label className="bm-label">Source Branch</label>
             <div className="bm-select-wrapper">
@@ -211,7 +256,7 @@ function CreateRequisitionModal({ onClose }) {
                 onChange={e => setSelectedBranchId(e.target.value)} 
                 required
               >
-                <option value="">-- Select Branch --</option>
+                <option value="">Select a branch to request from...</option>
                 {branches.map(b => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
@@ -221,32 +266,23 @@ function CreateRequisitionModal({ onClose }) {
 
           {selectedBranchId && (
             <div className="bm-form-group">
-              <label className="bm-label">Select Vehicle in Stock</label>
+              <label className="bm-label">Available Stock</label>
               {loading ? (
-                <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
-                  <span className="material-symbols-outlined">sync</span>
-                  <p style={{ marginTop: '8px' }}>Loading stock...</p>
+                <div className="req-loading">
+                  <span className="material-symbols-outlined spin">sync</span>
+                  <span>Fetching inventory...</span>
                 </div>
               ) : stock.length === 0 ? (
-                <div style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', padding: '16px', borderRadius: '8px', color: '#b45309', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="material-symbols-outlined">warning</span>
-                  No vehicles currently available at this branch.
+                <div className="req-empty-stock">
+                  <span className="material-symbols-outlined">inventory_2</span>
+                  <span>No vehicles currently available at this branch.</span>
                 </div>
               ) : (
-                <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <div className="req-stock-list">
                   {stock.map(v => (
                     <label 
                       key={v.vin} 
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '12px', 
-                        padding: '12px 16px', 
-                        borderBottom: '1px solid #e2e8f0',
-                        cursor: 'pointer',
-                        backgroundColor: selectedVin === v.vin ? '#f1f5f9' : 'transparent',
-                        transition: 'background-color 0.2s'
-                      }}
+                      className={`req-stock-item ${selectedVin === v.vin ? 'selected' : ''}`}
                     >
                       <input 
                         type="radio" 
@@ -255,11 +291,10 @@ function CreateRequisitionModal({ onClose }) {
                         checked={selectedVin === v.vin}
                         onChange={() => setSelectedVin(v.vin)} 
                         required
-                        style={{ accentColor: '#002046', width: '16px', height: '16px' }}
                       />
-                      <div>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>{v.model}</strong>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace', marginTop: '2px' }}>{v.vin}</div>
+                      <div className="req-stock-info">
+                        <strong>{v.model}</strong>
+                        <span className="req-vin font-mono">{v.vin}</span>
                       </div>
                     </label>
                   ))}
@@ -271,7 +306,7 @@ function CreateRequisitionModal({ onClose }) {
           <div className="bm-modal-footer">
             <button type="button" className="bm-btn bm-btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="bm-btn bm-btn-primary" disabled={submitting || !selectedVin}>
-              {submitting ? "Submitting..." : "Submit Request"}
+              {submitting ? "Requesting..." : "Submit Request"}
             </button>
           </div>
         </form>
