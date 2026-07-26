@@ -26,7 +26,7 @@ export async function getAuthHeaders() {
   };
 }
 
-async function apiFetch(endpoint, options = {}) {
+export async function apiFetch(endpoint, options = {}) {
   const headers = await getAuthHeaders();
   const response = await fetchWithRetry(`${API_BASE}${endpoint}`, {
     ...options,

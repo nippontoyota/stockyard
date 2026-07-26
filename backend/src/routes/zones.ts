@@ -72,7 +72,7 @@ const updateZoneBody = z.object({
 router.patch('/:id', requireRole('admin'), async (req, res, next) => {
   try {
     const body = updateZoneBody.parse(req.body);
-    const [updated] = await db.update(zones).set(body).where(eq(zones.id, req.params.id)).returning();
+    const [updated] = await db.update(zones).set(body).where(eq(zones.id, req.params.id as string)).returning();
     if (!updated) { res.status(404).json({ error: 'Zone not found' }); return; }
     res.json(updated);
   } catch (err) { next(err); }
@@ -81,7 +81,7 @@ router.patch('/:id', requireRole('admin'), async (req, res, next) => {
 // ─── DELETE /:id ────────────────────────────────────────────────────
 router.delete('/:id', requireRole('admin'), async (req, res, next) => {
   try {
-    const [deleted] = await db.update(zones).set({ active: false }).where(eq(zones.id, req.params.id)).returning();
+    const [deleted] = await db.update(zones).set({ active: false }).where(eq(zones.id, req.params.id as string)).returning();
     if (!deleted) { res.status(404).json({ error: 'Zone not found' }); return; }
     res.json({ ok: true });
   } catch (err) { next(err); }
