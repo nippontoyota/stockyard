@@ -6,6 +6,7 @@ import { scans, vehicles, vehicleStatus, devices, flags, yards, requisitions, no
 import { isValidVin, detectModel, resolveVehicleMetadata } from '../lib/vin.js';
 import { haversineMeters } from '../lib/geo.js';
 import { authenticate } from '../middleware/auth.js';
+import { emitScanEvent, emitFlagEvent } from '../lib/socket.js';
 
 const router = Router();
 router.use(authenticate);
@@ -93,8 +94,9 @@ async function findOrCreateVehicle(vinRaw: string): Promise<{ id: string; vinVal
   return { id: result[0].id, vinValid };
 }
 
-async function createFlag(vehicleId: string, scanId: string | null, flagType: string, message: string) {
-  await db.insert(flags).values({ vehicle_id: vehicleId, scan_id: scanId, flag_type: flagType, message });
+async function createFlag(vehicleId: string, scanId: string | null, flagType: string, message: string, vin?: string) {
+  const [flag] = await db.insert(flags).values({ vehicle_id: vehicleId, scan_id: scanId, flag_type: flagType, message }).returning();
+  emitFlagEvent({ id: flag.id, vehicleId, vin: vin ?? '', flagType, message });
 }
 
 async function checkGps(yardId: string, lat: number | undefined, lon: number | undefined, vehicleId: string, scanId: string) {
@@ -234,6 +236,9 @@ router.post('/in', async (req, res, next) => {
     if (!yardId) { res.status(400).json({ error: 'Yard ID is required for scan' }); return; }
     
     const result = await processScanIn(parsed, yardId);
+    if (result.status === 'accepted') {
+      emitScanEvent({ type: 'in', vin: parsed.vin, model: null, yardId, timestamp: parsed.scanned_at, status: 'accepted', flagType: result.flags?.[0] });
+    }
     if (result.status === 'rejected') res.status(409).json(result);
     else res.status(result.status === 'already_processed' ? 200 : 201).json(result);
   } catch (err) { next(err); }
@@ -248,6 +253,9 @@ router.post('/out', async (req, res, next) => {
     if (!yardId) { res.status(400).json({ error: 'Yard ID is required for scan' }); return; }
 
     const result = await processScanOut(parsed, yardId);
+    if (result.status === 'accepted') {
+      emitScanEvent({ type: 'out', vin: parsed.vin, model: null, yardId, timestamp: parsed.scanned_at, status: 'accepted', flagType: result.flags?.[0] });
+    }
     res.status(result.status === 'already_processed' ? 200 : 201).json(result);
   } catch (err) { next(err); }
 });

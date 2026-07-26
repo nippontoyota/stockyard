@@ -1,45 +1,10 @@
-export const yards = [
-  ["CO01A-1", "CO01A", "Nettur Showroom, Cochin", 125, 9.9369, 76.3149, 250],
-  ["CO01B-1", "CO01B", "Kalamasery, Cochin", 200, 10.0529, 76.3157, 250],
-  ["CO01B-2", "CO01B", "Nippon Tower - 7th floor, Cochin", 80, 9.9667, 76.2999, 120],
-  ["KY01A-1", "KY01A", "Showroom, Kayamkulam", 60, 9.1746, 76.5004, 250],
-  ["KY01A-2", "KY01A", "Ramapuram East, Kayamkulam", 210, 9.185, 76.517, 300],
-  ["KY01A-3", "KY01A", "Ramapuram West, Kayamkulam", 80, 9.184, 76.493, 300],
-  ["KY01A-4", "KY01A", "Evoor Yard, Kayamkulam", 110, 9.1923, 76.482, 300],
-  ["IR01A-1", "IR01A", "Showroom, Irinjalakuda", 30, 10.342, 76.211, 200],
-  ["KL01A-1", "KL01A", "Showroom, Kollam", 55, 8.8932, 76.6141, 200],
-  ["KL01B-1", "KL01B", "Thazhuthala, Kollam", 225, 8.8795, 76.645, 300],
-  ["TI01A-1", "TI01A", "Peramangalam, Trissur", 175, 10.588, 76.172, 300],
-  ["MV01A-1", "MV01A", "Muvattupuzha", 105, 9.9849, 76.5773, 250],
-  ["PH01A-1", "PH01A", "Pathanamthitta", 70, 9.2648, 76.787, 250],
-  ["TL01A-1", "TL01A", "Thiruvalla", 45, 9.3835, 76.5741, 250],
-  ["TR01C-1", "TR01C", "Vallakkadavu, Trivandrum", 45, 8.482, 76.928, 200],
-  ["TR01C-2", "TR01C", "Enchakkal, Trivandrum", 20, 8.4827, 76.919, 200],
-  ["TR01A-1", "TR01A", "Showroom, Kazhakuttam, Trivandrum", 40, 8.568, 76.873, 200],
-  ["TR01A-2", "TR01A", "Yard-1, Kazhakuttam, Trivandrum", 130, 8.571, 76.875, 250],
-  ["TR01A-3", "TR01A", "Yard-2, Kazhakuttam, Trivandrum", 65, 8.573, 76.877, 250],
-  ["TR01A-4", "TR01A", "Yard-3, Kazhakuttam, Trivandrum", 130, 8.575, 76.879, 250],
-  ["KT01A-1", "KT01A", "Kottayam, behind the showroom", 300, 9.5916, 76.5222, 300],
-].map(([id, code, name, capacity, latitude, longitude, gpsRadiusMeters]) => ({ id, code, name, capacity, latitude, longitude, gpsRadiusMeters }));
+export let yards = [];
+export let fallbackBranches = [];
 
-export const fallbackBranches = [
-  { id: "f2b0b744-9897-4d34-abac-fae239d547e6", name: "Enchakkal" },
-  { id: "27803e2a-4f62-4097-8270-d1150ed738b4", name: "Kalamassery (Nippon Towers)" },
-  { id: "5eedbae1-79f5-45a4-8b05-02fd1152bc99", name: "Kayamkulam" },
-  { id: "de871bf9-bc24-4f4c-af0d-b494180fea8a", name: "Kazhakootam" },
-  { id: "1557f329-a055-4762-a9c1-de986778c97b", name: "Kochuveli" },
-  { id: "5fc2e50d-9920-42be-8582-cd4d7cc710a2", name: "Kottiyam (Kollam)" },
-  { id: "a3d7675d-4811-4ea5-a270-bcc7aeb923a0", name: "Muvattupuzha" },
-  { id: "37ef85fd-0d8d-4b05-8a9a-e2e5fae90a18", name: "Nadathara" },
-  { id: "4afa5c46-33c7-47ad-8535-55cffa08666f", name: "Nattakom" },
-  { id: "05b6a32b-6aed-452a-966b-93bd15636dd1", name: "Nettoor" },
-  { id: "22c5bd37-02c4-4068-a4e1-89f0dfa327c9", name: "Pala" },
-  { id: "5d543b6d-adab-4026-a483-07f94e2a8e45", name: "Pathanamthitta" },
-  { id: "d3bdfff1-da7c-4b4b-9914-f335197aedcf", name: "Puzhakkal (Ayyanthole)" },
-  { id: "7aea1c90-21a1-464f-aa1d-d564c94f5525", name: "Thellakom" },
-  { id: "d59ed15e-0b0d-4183-9c9f-504fae005dd5", name: "Thiruvalla" },
-  { id: "96e60915-16f0-4fdb-b14a-adb04e4deb66", name: "Vellangallur (Irinjalakuda)" }
-];
+export function setConfig(newYards, newBranches) {
+  if (newYards?.length) yards = newYards;
+  if (newBranches?.length) fallbackBranches = newBranches;
+}
 
 export function createInitialState(now = new Date().toISOString()) {
   const deviceId = localStorage.getItem("yardDeviceId") || crypto.randomUUID();

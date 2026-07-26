@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { decodeVinDetails, flagLabel } from "../stockyardLogic.js";
+import { VehicleTimeline } from "./VehicleTimeline.jsx";
 
 export function YardVehiclesModal({ yard, state, onClose }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedVin, setSelectedVin] = useState(null);
 
   useEffect(() => {
     if (!yard) return;
@@ -107,7 +109,7 @@ export function YardVehiclesModal({ yard, state, onClose }) {
                 const displayVariant = vehicle.variant && vehicle.variant !== "Standard" ? vehicle.variant : decoded.variant;
 
                 return (
-                  <div key={vehicle.vin} className={`vehicle-row-card ${vehicle.currentStatus} ${activeFlag ? "flagged" : ""}`}>
+                  <div key={vehicle.vin} className={`vehicle-row-card ${vehicle.currentStatus} ${activeFlag ? "flagged" : ""}`} onClick={() => setSelectedVin(vehicle.vin)} style={{ cursor: "pointer" }}>
                     <div className="v-row-mark">
                       <span className="material-symbols-outlined">
                         {vehicle.currentStatus === "in" ? "directions_car" : "logout"}
@@ -134,6 +136,22 @@ export function YardVehiclesModal({ yard, state, onClose }) {
             )}
           </div>
         </div>
+
+        {selectedVin && (
+          <div className="modal-overlay" style={{ zIndex: 9999 }}>
+            <div className="modal-content" style={{ padding: '20px', maxWidth: '600px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0 }}>Vehicle History</h3>
+                <button className="close-modal-btn" onClick={() => setSelectedVin(null)}><span className="material-symbols-outlined">close</span></button>
+              </div>
+              <VehicleTimeline 
+                vin={selectedVin} 
+                scans={state?.scans?.filter(s => s.vin === selectedVin) || []}
+                onForceClose={() => setSelectedVin(null)}
+              />
+            </div>
+          </div>
+        )}
 
         <footer className="modal-footer">
           <span className="modal-footer-note">Scroll to view all cars</span>

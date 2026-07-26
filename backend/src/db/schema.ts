@@ -168,6 +168,46 @@ export const notifications = pgTable('notifications', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── zones (F2) ─────────────────────────────────────────────────────
+export const zones = pgTable('zones', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  yard_id: text('yard_id').notNull().references(() => yards.id),
+  code: text('code').notNull(), // "A1", "B2"
+  label: text('label'),
+  max_capacity: integer('max_capacity').default(50).notNull(),
+  active: boolean('active').default(true).notNull(),
+});
+
+// ─── audit_logs (F9) ────────────────────────────────────────────────
+export const auditLogs = pgTable(
+  'audit_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    user_id: text('user_id').notNull(),
+    action: text('action').notNull(),
+    resource_type: text('resource_type').notNull(),
+    resource_id: text('resource_id'),
+    details: text('details'), // JSON stringified
+    ip_address: text('ip_address'),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('audit_logs_user_idx').on(t.user_id),
+    index('audit_logs_action_idx').on(t.action),
+    index('audit_logs_created_idx').on(t.created_at),
+  ],
+);
+
+// ─── push_subscriptions (F4) ────────────────────────────────────────
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  user_id: text('user_id').notNull(),
+  endpoint: text('endpoint').notNull().unique(),
+  keys_p256dh: text('keys_p256dh').notNull(),
+  keys_auth: text('keys_auth').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ─── Relations ───────────────────────────────────────────────────────
 export const vehiclesRelations = relations(vehicles, ({ one, many }) => ({
   status: one(vehicleStatus, { fields: [vehicles.id], references: [vehicleStatus.vehicle_id] }),
@@ -217,3 +257,8 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   branch: one(branches, { fields: [notifications.branch_id], references: [branches.id] }),
   requisition: one(requisitions, { fields: [notifications.related_req_id], references: [requisitions.id] }),
 }));
+
+export const zonesRelations = relations(zones, ({ one }) => ({
+  yard: one(yards, { fields: [zones.yard_id], references: [yards.id] }),
+}));
+

@@ -1,11 +1,25 @@
-import { yards } from "./stockyardLogic.js";
-
 const API_BASE = import.meta.env.VITE_API_URL || "https://stockyard-00s6.onrender.com";
+
+// §2.2 — Retry with exponential backoff
+async function fetchWithRetry(url, options = {}, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res;
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+    }
+  }
+}
 
 export async function getAuthHeaders() {
   const session = JSON.parse(localStorage.getItem("yardSession") || "null");
   if (!session) return {};
-  const token = session.role === "admin" ? "mock-admin" : `mock-yard-${session.yardId}`;
+  const token = session.token || (session.role === "admin" ? "mock-admin"
+    : session.role === "delivery_incharge" ? `mock-delivery-${session.branchId}`
+    : `mock-yard-${session.yardId}`);
   return {
     "Authorization": `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -14,28 +28,69 @@ export async function getAuthHeaders() {
 
 async function apiFetch(endpoint, options = {}) {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const response = await fetchWithRetry(`${API_BASE}${endpoint}`, {
     ...options,
     headers: { ...headers, ...options.headers },
     cache: "no-store",
   });
-  if (!response.ok) {
-    let errMessage = "Server request failed. Please try again.";
-    try {
-      const body = await response.json();
-      if (body.error && !body.error.toLowerCase().includes("failed query") && !body.error.toLowerCase().includes("select ") && !body.error.toLowerCase().includes("sql")) {
-        errMessage = body.error;
-      } else {
-        errMessage = "Incorrect password or credentials. Please try again.";
-      }
-    } catch (e) {}
+  let errMessage = "Server request failed. Please try again.";
+  try {
+    const body = await response.json();
+    return body;
+  } catch (e) {
     throw new Error(errMessage);
   }
-  return response.json();
+}
+
+// §A3 — Dynamic yards/branches with localStorage cache
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function getCached(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return data;
+  } catch { return null; }
+}
+
+function setCache(key, data) {
+  localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
+}
+
+export async function getYards() {
+  const cached = getCached('cache:yards');
+  if (cached) return cached;
+  const response = await apiFetch("/api/yards");
+  const data = response.data || response;
+  setCache('cache:yards', data);
+  return data;
+}
+
+export async function getBranches() {
+  const cached = getCached('cache:branches');
+  if (cached) return cached;
+  try {
+    const response = await apiFetch("/api/admin/branches");
+    const data = Array.isArray(response) ? response : (response.data || response);
+    setCache('cache:branches', data);
+    return data;
+  } catch {
+    // fallback for non-admin
+    try {
+      const response = await apiFetch("/api/branches");
+      const data = Array.isArray(response) ? response : (response.data || response);
+      setCache('cache:branches', data);
+      return data;
+    } catch { return []; }
+  }
 }
 
 export async function bulkSync(scans) {
-  // Format scans to match API expected shape
   const formattedScans = scans.map(s => ({
     scan_type: s.type,
     client_scan_id: s.clientScanId,
@@ -63,8 +118,14 @@ export async function bulkSync(scans) {
   });
 }
 
-export async function getVehicles() {
-  const response = await apiFetch("/api/vehicles?limit=1000");
+// §1.3 — Paginated vehicle list
+export async function getVehicles(params = {}) {
+  const { page = 1, limit = 1000, yardId, status, model } = params;
+  let url = `/api/vehicles?page=${page}&limit=${limit}`;
+  if (yardId) url += `&yard_id=${yardId}`;
+  if (status) url += `&status=${status}`;
+  if (model) url += `&model=${encodeURIComponent(model)}`;
+  const response = await apiFetch(url);
   return response.data || [];
 }
 
@@ -83,8 +144,14 @@ export async function getAdminDashboard() {
 }
 
 export async function resolveFlag(id) {
-  return apiFetch(`/api/admin/flags/${id}/resolve`, {
-    method: "PATCH"
+  return apiFetch(`/api/admin/flags/${id}/resolve`, { method: "PATCH" });
+}
+
+// §4.1 — Bulk flag resolution
+export async function bulkResolveFlags(flagIds) {
+  return apiFetch("/api/admin/flags/bulk-resolve", {
+    method: "PATCH",
+    body: JSON.stringify({ flag_ids: flagIds }),
   });
 }
 
@@ -175,16 +242,11 @@ export async function createRequisition(sourceBranchId, vehicleId) {
 }
 
 export async function approveRequisition(id) {
-  return apiFetch(`/api/requisitions/${id}/approve`, {
-    method: "POST"
-  });
+  return apiFetch(`/api/requisitions/${id}/approve`, { method: "POST" });
 }
 
-export async function rejectRequisition(id, reason) {
-  return apiFetch(`/api/requisitions/${id}/reject`, {
-    method: "POST",
-    body: JSON.stringify({ reason }),
-  });
+export async function rejectRequisition(id) {
+  return apiFetch(`/api/requisitions/${id}/reject`, { method: "POST" });
 }
 
 // --- Notifications ---
@@ -194,13 +256,65 @@ export async function getNotifications() {
 }
 
 export async function markNotificationRead(id) {
-  return apiFetch(`/api/notifications/${id}/read`, {
-    method: "POST"
-  });
+  return apiFetch(`/api/notifications/${id}/read`, { method: "POST" });
 }
 
 export async function markAllNotificationsRead() {
-  return apiFetch("/api/notifications/read-all", {
-    method: "POST"
+  return apiFetch("/api/notifications/read-all", { method: "POST" });
+}
+
+// --- §4.4 Data Export ---
+
+export function getExportUrl(type, params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return `${API_BASE}/api/export/${type}${query ? '?' + query : ''}`;
+}
+
+// --- §4.2 Vehicle History ---
+
+export async function getVehicleHistory(vin) {
+  const response = await apiFetch(`/api/vehicles/${vin}`);
+  return response;
+}
+
+export async function getVehicleScans(vin) {
+  const response = await apiFetch(`/api/scans?limit=100`);
+  // Filter client-side for now (backend could add vin filter)
+  return (response.data || []).filter(s => (s.vin || s.vinRaw || '').toUpperCase() === vin.toUpperCase());
+}
+
+// --- F2 Zones ---
+
+export async function getZones(yardId) {
+  const url = yardId ? `/api/zones?yard_id=${yardId}` : '/api/zones';
+  const response = await apiFetch(url);
+  return response.data || [];
+}
+
+export async function createZone(data) {
+  return apiFetch("/api/zones", {
+    method: "POST",
+    body: JSON.stringify(data),
   });
+}
+
+// --- F7 Analytics ---
+
+export async function getAnalyticsTrends(from, to) {
+  return apiFetch(`/api/analytics/trends?from=${from}&to=${to}`);
+}
+
+export async function getAnalyticsThroughput(days = 30) {
+  return apiFetch(`/api/analytics/throughput?days=${days}`);
+}
+
+export async function getAnalyticsDamageRate(days = 30) {
+  return apiFetch(`/api/analytics/damage-rate?days=${days}`);
+}
+
+// --- F9 Audit Logs ---
+
+export async function getAuditLogs(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return apiFetch(`/api/admin/audit-logs${query ? '?' + query : ''}`);
 }

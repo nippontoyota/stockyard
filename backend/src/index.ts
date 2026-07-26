@@ -1,6 +1,8 @@
 import 'dotenv/config';
+import { createServer } from 'http';
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import { ZodError } from 'zod';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
@@ -13,10 +15,23 @@ import adminBranchesRoutes from './routes/adminBranches.js';
 import branchRoutes from './routes/branches.js';
 import requisitionRoutes from './routes/requisitions.js';
 import notificationRoutes from './routes/notifications.js';
+import exportRoutes from './routes/export.js';
+import zoneRoutes from './routes/zones.js';
+import analyticsRoutes from './routes/analytics.js';
+import auditLogRoutes from './routes/auditLogs.js';
 import { authRouter } from './routes/auth.js';
 import { authenticate } from './middleware/auth.js';
+import { initSocket } from './lib/socket.js';
+import { checkDwellAlerts } from './lib/dwellCheck.js';
 
 const app = express();
+const httpServer = createServer(app);
+
+// §1.1 — Initialize Socket.io
+initSocket(httpServer);
+
+// §1.2 — Response compression (60-80% smaller payloads)
+app.use(compression());
 
 app.use(cors());
 app.use(express.json({ limit: '5mb' })); // bulk-sync payloads can be large
@@ -33,11 +48,21 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// Prevent caching of API routes
+// §1.6 — Per-endpoint cache control
+// Stats/aggregate endpoints get short-lived caching; mutation endpoints get no-store
 app.use('/api', (req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+  // Dashboard and stats endpoints can be cached briefly
+  const isStatsEndpoint =
+    req.path === '/admin/dashboard' ||
+    req.path.endsWith('/stats');
+
+  if (isStatsEndpoint && req.method === 'GET') {
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+  } else {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
   next();
 });
 
@@ -59,6 +84,10 @@ app.use('/api/yards', yardRoutes);
 app.use('/api/branches', branchRoutes);
 app.use('/api/requisitions', requisitionRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/export', exportRoutes);
+app.use('/api/zones', zoneRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/admin/audit-logs', auditLogRoutes);
 app.use('/api/admin', authRouter);
 app.use('/api/admin/branches', adminBranchesRoutes);
 app.use('/api/admin', adminRoutes);
@@ -81,6 +110,10 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 
 const port = Number(process.env.PORT) || 3000;
-app.listen(port, () => {
+httpServer.listen(port, () => {
   console.log(`Stockyard API listening on port ${port}`);
+
+  // F6 — Run dwell check every 6 hours
+  checkDwellAlerts().catch(console.error);
+  setInterval(() => checkDwellAlerts().catch(console.error), 6 * 60 * 60 * 1000);
 });

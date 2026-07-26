@@ -190,6 +190,33 @@ router.patch('/flags/:id/resolve', async (req, res, next) => {
   }
 });
 
+// ─── PATCH /flags/bulk-resolve (§4.1) ────────────────────────────────
+
+const bulkResolveBody = z.object({
+  flag_ids: z.array(z.string().uuid()).min(1).max(500),
+});
+
+router.patch('/flags/bulk-resolve', async (req, res, next) => {
+  try {
+    const body = bulkResolveBody.parse(req.body);
+    const now = new Date();
+    let resolved = 0;
+
+    for (const id of body.flag_ids) {
+      const [updated] = await db
+        .update(flags)
+        .set({ resolved: true, resolved_by: req.user!.id, resolved_at: now })
+        .where(and(eq(flags.id, id), eq(flags.resolved, false)))
+        .returning();
+      if (updated) resolved++;
+    }
+
+    res.json({ resolved, total: body.flag_ids.length });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── PATCH /vehicles/:vin/status ─────────────────────────────────────
 
 const overrideBody = z.object({
