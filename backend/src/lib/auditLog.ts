@@ -19,7 +19,7 @@ export async function logAudit(
       action,
       resource_type: resourceType,
       resource_id: resourceId,
-      details,
+      details: details && Object.keys(details).length > 0 ? JSON.stringify(details) : null,
       ip_address: ipAddress ?? null,
     });
   } catch (err) {
