@@ -3,6 +3,7 @@ import { db } from '../db/client.js';
 import { requisitions, notifications, vehicleStatus, vehicles, branches } from '../db/schema.js';
 import { eq, or, and, desc } from 'drizzle-orm';
 import { authenticate } from '../middleware/auth.js';
+import { notifyRoleAtBranch } from '../lib/webPush.js';
 import { z } from 'zod';
 
 const router = Router();
@@ -121,6 +122,17 @@ router.post('/', async (req, res, next) => {
       }
     ];
     await db.insert(notifications).values(notifValues);
+    
+    await notifyRoleAtBranch('stockyard', source_branch_id, {
+      title: 'New Requisition',
+      body: `Vehicle ${vehicle_id} requested`,
+      url: '/admin'
+    });
+    await notifyRoleAtBranch('delivery_incharge', source_branch_id, {
+      title: 'New Requisition',
+      body: `Vehicle ${vehicle_id} requested`,
+      url: '/admin'
+    });
 
     res.json(reqRecord);
   } catch (err) {
@@ -163,6 +175,12 @@ router.post('/:id/approve', async (req, res, next) => {
       related_req_id: updated.id,
     });
 
+    await notifyRoleAtBranch('delivery_incharge', updated.requesting_branch_id, {
+      title: 'Requisition Approved',
+      body: 'Your vehicle requisition was approved.',
+      url: '/admin'
+    });
+
     res.json(updated);
   } catch (err) {
     next(err);
@@ -198,6 +216,12 @@ router.post('/:id/reject', async (req, res, next) => {
       message: 'Vehicle requisition rejected',
       type: 'requisition_rejected',
       related_req_id: updated.id,
+    });
+
+    await notifyRoleAtBranch('delivery_incharge', updated.requesting_branch_id, {
+      title: 'Requisition Rejected',
+      body: `Your vehicle requisition was rejected: ${reason}`,
+      url: '/admin'
     });
 
     res.json(updated);

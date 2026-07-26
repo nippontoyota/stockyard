@@ -23,6 +23,9 @@ import { authRouter } from './routes/auth.js';
 import { authenticate } from './middleware/auth.js';
 import { initSocket } from './lib/socket.js';
 import { checkDwellAlerts } from './lib/dwellCheck.js';
+import { ensureBuckets } from './lib/supabase.js';
+import uploadRoutes from './routes/upload.js';
+import pushRoutes from './routes/pushSubscriptions.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -88,6 +91,8 @@ app.use('/api/export', exportRoutes);
 app.use('/api/zones', zoneRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin/audit-logs', auditLogRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/push', pushRoutes);
 app.use('/api/admin', authRouter);
 app.use('/api/admin/branches', adminBranchesRoutes);
 app.use('/api/admin', adminRoutes);
@@ -112,6 +117,8 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 const port = Number(process.env.PORT) || 3000;
 httpServer.listen(port, () => {
   console.log(`Stockyard API listening on port ${port}`);
+
+  ensureBuckets();
 
   // F6 — Run dwell check every 6 hours
   checkDwellAlerts().catch(console.error);
