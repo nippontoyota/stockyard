@@ -14,6 +14,7 @@ import { TransitUploadTab } from "./TransitUploadTab.jsx";
 import { AllVehiclesTab } from "./AllVehiclesTab.jsx";
 import { flagLabel, resolveFlag, yards, detectModel } from "../stockyardLogic.js";
 import { resolveFlag as apiResolveFlag, adminOverrideVehicle } from "../api.js";
+import { useWebPush } from "../hooks/useWebPush.js";
 
 function exportAnalyticsReport(stats) {
   const yardSheet = XLSX.utils.json_to_sheet(
@@ -46,6 +47,7 @@ export function AdminHome({ stats, state, setState }) {
   const [showFilterBar, setShowFilterBar] = useState(false);
   const [riskFilter, setRiskFilter] = useState("all");
   const [toastMessage, setToastMessage] = useState("");
+  const { isSubscribed, permission, subscribe, unsubscribe } = useWebPush();
   const [selectedYardModal, setSelectedYardModal] = useState(null);
   const [selectedPhotoModal, setSelectedPhotoModal] = useState(null);
   const [expandedDamagedRows, setExpandedDamagedRows] = useState(new Set());
@@ -180,9 +182,24 @@ export function AdminHome({ stats, state, setState }) {
             {transitCount > 0 && <span className="rail-badge info" style={{ background: 'var(--brand)', color: 'white' }}>{transitCount}</span>}
           </button>
         </div>
-        <div className="rail-note">
-          <b>{healthyYards}/{stats.yards.length}</b>
-          <span>yards healthy</span>
+        <div className="rail-note" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div>
+            <b>{healthyYards}/{stats.yards.length}</b>
+            <span>yards healthy</span>
+          </div>
+          {permission !== 'denied' && (
+            <button 
+              type="button" 
+              className="btn btn-outline" 
+              style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+              onClick={isSubscribed ? unsubscribe : subscribe}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                {isSubscribed ? 'notifications_active' : 'notifications'}
+              </span>
+              {isSubscribed ? 'Disable Push' : 'Enable Push'}
+            </button>
+          )}
         </div>
       </aside>
 
