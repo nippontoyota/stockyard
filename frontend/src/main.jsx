@@ -162,7 +162,7 @@ export default function App() {
         isDeliveryOrYard ? getNotifications().catch(() => []) : Promise.resolve([]),
         isDeliveryOrYard ? getRequisitions().catch(() => ({ incoming: [], outgoing: [] })) : Promise.resolve({ incoming: [], outgoing: [] }),
       ]);
-      
+
       const mappedVehicles = {};
       vehiclesData.forEach(v => {
         const decoded = decodeVinDetails(v.vin);
@@ -179,7 +179,7 @@ export default function App() {
           keyNo: v.key_no || v.keyNo || "",
         };
       });
-      
+
       const mappedFlags = flagsData.map(f => ({
         id: f.id,
         vin: f.vin,
@@ -210,7 +210,7 @@ export default function App() {
         keyNo: s.keyNo || s.key_no || "",
         syncStatus: "synced",
       }));
-      
+
       setState(s => {
         return {
           ...s,
@@ -228,7 +228,7 @@ export default function App() {
 
   useEffect(() => {
     fetchServerData();
-    
+
     const onFocus = () => fetchServerData();
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") fetchServerData();
@@ -236,7 +236,7 @@ export default function App() {
 
     window.addEventListener("focus", onFocus);
     window.addEventListener("visibilitychange", onVisibilityChange);
-    
+
     return () => {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("visibilitychange", onVisibilityChange);
@@ -255,7 +255,7 @@ export default function App() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").then((reg) => {
         reg.update();
-      }).catch(() => {});
+      }).catch(() => { });
     }
     const up = () => setOnline(true);
     const down = () => setOnline(false);
@@ -396,13 +396,13 @@ function Login({ onLogin }) {
       if (matched && matched.password === cleanPassword) {
         isLocalValid = true;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // 2. Try online server login (or skip wait if locally valid)
     if (isLocalValid) {
       // Fire and forget, don't wait for the sleepy backend
-      loginApi(cleanUsername, cleanPassword).catch(() => {});
-      
+      loginApi(cleanUsername, cleanPassword).catch(() => { });
+
       if (role === "admin") {
         onLogin({ role: "admin", yardId: null, name: "Admin Console" });
       } else if (role === "delivery_incharge") {
@@ -430,7 +430,7 @@ function Login({ onLogin }) {
       // Backend failed and local was false, show error
       setErrorMsg("Invalid credentials. Please try again.");
     }
-    
+
     setIsLoading(false);
   }
 
@@ -683,7 +683,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
       oscillator.start();
       oscillator.stop(context.currentTime + 0.16);
       oscillator.onended = () => context.close();
-    } catch {}
+    } catch { }
   }, []);
 
   const handleQrText = useCallback((text) => {
@@ -720,7 +720,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
       const supportedConstraints = navigator.mediaDevices?.getSupportedConstraints?.() || {};
       const canUseTorch = Boolean(caps.torch || supportedConstraints.torch);
       setSupportsTorch(canUseTorch);
-      if (canUseTorch) track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+      if (canUseTorch) track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => { });
     };
 
     async function startNativeScanner() {
@@ -816,7 +816,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
   }, [cameraOpen, handleQrText]);
 
   function closeCamera() {
-    trackRef.current?.applyConstraints?.({ advanced: [{ torch: false }] }).catch(() => {});
+    trackRef.current?.applyConstraints?.({ advanced: [{ torch: false }] }).catch(() => { });
     setTorchOn(false);
     setCameraOpen(false);
   }
@@ -879,7 +879,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
     const gps = gpsData || { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
     const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, transferDestinationYardId, transferRequestedBy, keyNo, damaged, damageRemark, damageImage, online });
     const result = applyScan(state, scan);
-    
+
     if (!result.accepted) return setOverlayResult({ type: "error", message: result.message });
 
     const newFlags = result.state.flags.filter(f => f.vin === scan.vin && !f.resolved);
