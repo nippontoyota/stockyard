@@ -406,7 +406,7 @@ function Login({ onLogin }) {
       if (role === "admin") {
         onLogin({ role: "admin", yardId: null, name: "Admin Console" });
       } else if (role === "delivery_incharge") {
-        onLogin({ role: "delivery_incharge", branchId: branchId, name: "Delivery Incharge" });
+        onLogin({ role: "delivery_incharge", branchId: branchId, name: `Delivery: ${targetBranch ? targetBranch.name : branchId}` });
       } else {
         onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
       }
@@ -419,7 +419,9 @@ function Login({ onLogin }) {
         if (res.user.role === "admin") {
           onLogin({ role: "admin", yardId: null, name: "Admin Console" });
         } else if (res.user.role === "delivery_incharge") {
-          onLogin({ role: "delivery_incharge", branchId: res.user.branch_id || branchId, name: "Delivery Incharge" });
+          const userBranchId = res.user.branch_id || branchId;
+          const userBranch = branches.find(b => b.id === userBranchId);
+          onLogin({ role: "delivery_incharge", branchId: userBranchId, name: `Delivery: ${userBranch ? userBranch.name : userBranchId}` });
         } else {
           const yard = yards.find((y) => y.id === res.user.yardId || y.code === res.user.yardId) || targetYard;
           onLogin({ role: "stockyard", yardId: yard.id, name: yard.name });
@@ -526,9 +528,11 @@ function Header({ session, online, notifications, onLogout }) {
 
   return (
     <header className="topbar">
-      <div>
-        <strong>Nippon Yard Scan</strong>
-        <small>{session.role === "admin" ? "Admin Console" : session.name}</small>
+      <div className="topbar-brand-section">
+        <strong className="topbar-brand">Nippon Yard Scan</strong>
+        <div className="topbar-badge">
+          {session.role === "admin" ? "Admin Console" : session.name}
+        </div>
       </div>
       <div className="top-actions">
         {isInstallable && (
