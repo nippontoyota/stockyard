@@ -16,7 +16,7 @@ export function ScanOverlay({ result, onDismiss }) {
     // Haptic feedback
     if (result.type === 'success') {
       scanHaptic('success');
-      timerRef.current = setTimeout(onDismiss, 3000);
+      timerRef.current = setTimeout(onDismiss, 800);
     } else if (result.type === 'error') {
       scanHaptic('error');
     } else if (result.type === 'flagged') {
