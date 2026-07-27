@@ -626,6 +626,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
   const [overlayResult, setOverlayResult] = useState(null);
   const [gpsData, setGpsData] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [message, setMessage] = useState(null);
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
   const damagePhotoInputRef = useRef(null);
