@@ -27,8 +27,10 @@ button { cursor: pointer; }
   display: flex; align-items: center; justify-content: space-between;
   background: #fff; border-bottom: 1px solid #c4c6cf; width: 100%; max-width: 100%;
 }
-.topbar strong, h1 { text-transform: uppercase; letter-spacing: 0; color: #000; }
-.topbar small { display: block; color: #58595B; }
+.topbar-brand-section { display: flex; flex-direction: column; gap: 2px; }
+.topbar-brand { text-transform: uppercase; letter-spacing: 0; color: #000; font-size: 15px; font-weight: 700; line-height: 1; }
+.topbar-badge { display: inline-block; font-size: 11px; font-weight: 600; color: #EB0A1E; background: #FDE8E9; padding: 3px 6px; border-radius: 4px; width: fit-content; line-height: 1.2; text-transform: uppercase; }
+h1 { text-transform: uppercase; letter-spacing: 0; color: #000; }
 .top-actions { display: flex; gap: 8px; align-items: center; }
 .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; color: #000; }
 .bottom-nav {
