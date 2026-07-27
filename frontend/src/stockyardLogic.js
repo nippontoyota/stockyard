@@ -213,6 +213,7 @@ function duplicateMessage(currentYardId, scanYardId) {
 function capacityFlags(state, scan, vin) {
   if (scan.type !== "in") return [];
   const yard = yards.find((item) => item.id === scan.yardId);
+  if (!yard) return [];
   const count = Object.values(state.vehicles).filter((vehicle) => vehicle.currentStatus === "in" && vehicle.currentYardId === scan.yardId).length;
   return count + 1 > yard.capacity ? [flag(vin, "yard_capacity_exceeded", `${yard.name} is above capacity.`)] : [];
 }
