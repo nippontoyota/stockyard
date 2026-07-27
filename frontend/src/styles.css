@@ -178,6 +178,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .scan-result-popover b { font-size: 16px; line-height: 1.25; overflow-wrap: anywhere; }
 .scan-result-popover small { display: block; margin-top: 4px; color: #58595B; font-size: 12px; font-weight: 700; }
 .scan-result-popover select,
+.scan-result-popover > input,
 .scan-result-popover textarea,
 .scan-result-popover .damage-inputs,
 .scan-result-popover .scan-damage-check,
@@ -186,7 +187,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .scan-result-popover .notice {
   grid-column: 1 / -1;
 }
-.scan-result-popover select { min-height: 44px; }
+.scan-result-popover select,
+.scan-result-popover > input { min-height: 44px; }
 .scan-result-popover textarea { min-height: 64px; resize: vertical; }
 .damage-inputs { display: flex; flex-direction: column; gap: 8px; }
 .damage-photo-upload-row { display: flex; align-items: center; gap: 12px; }
