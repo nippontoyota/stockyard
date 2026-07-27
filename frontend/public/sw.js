@@ -1,4 +1,4 @@
-const CACHE = "yard-scan-v3";
+const CACHE = "yard-scan-v4";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -29,8 +29,17 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Network-first for assets, and cache them for offline PWA launch
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200 && !event.request.url.includes("supabase.co")) {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
 
