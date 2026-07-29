@@ -28,6 +28,7 @@ const scanInBase = z.object({
   damaged: z.boolean().optional(),
   damage_remark: z.string().optional(),
   damage_image: z.string().optional(),
+  drive_type: z.enum(['neo_drive', 'hybrid', 'petrol', 'diesel']).optional(),
 });
 
 const scanInBody = scanInBase.refine((d) => !d.damaged || (d.damage_remark && d.damage_remark.length > 0), {
@@ -80,17 +81,17 @@ async function findOrCreateDevice(fingerprint: string): Promise<string> {
   return result[0].id;
 }
 
-async function findOrCreateVehicle(vinRaw: string): Promise<{ id: string; vinValid: boolean }> {
+async function findOrCreateVehicle(vinRaw: string, driveType?: string): Promise<{ id: string; vinValid: boolean }> {
   const vin = vinRaw.toUpperCase().trim();
   const vinValid = isValidVin(vin);
   const model = await resolveVehicleMetadata(vin);
 
   const result = await db
     .insert(vehicles)
-    .values({ vin, model, vin_valid: vinValid })
+    .values({ vin, model, drive_type: driveType, vin_valid: vinValid })
     .onConflictDoUpdate({
       target: vehicles.vin,
-      set: { updated_at: new Date(), ...(model ? { model } : {}), vin_valid: vinValid },
+      set: { updated_at: new Date(), ...(model ? { model } : {}), ...(driveType ? { drive_type: driveType } : {}), vin_valid: vinValid },
     })
     .returning({ id: vehicles.id });
   return { id: result[0].id, vinValid };
@@ -128,7 +129,7 @@ async function processScanIn(body: ScanIn, yardId: string) {
   const [existing] = await db.select({ id: scans.id }).from(scans).where(eq(scans.client_scan_id, body.client_scan_id));
   if (existing) return { scan_id: existing.id, status: 'already_processed' };
 
-  const { id: vehicleId, vinValid } = await findOrCreateVehicle(body.vin);
+  const { id: vehicleId, vinValid } = await findOrCreateVehicle(body.vin, body.drive_type);
   const deviceId = await findOrCreateDevice(body.device_fingerprint);
   const [currentStatus] = await db.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
@@ -184,7 +185,7 @@ async function processScanOut(body: ScanOut, yardId: string) {
   const [existing] = await db.select({ id: scans.id }).from(scans).where(eq(scans.client_scan_id, body.client_scan_id));
   if (existing) return { scan_id: existing.id, status: 'already_processed' };
 
-  const { id: vehicleId, vinValid } = await findOrCreateVehicle(body.vin);
+  const { id: vehicleId, vinValid } = await findOrCreateVehicle(body.vin, body.drive_type);
   const deviceId = await findOrCreateDevice(body.device_fingerprint);
   const [currentStatus] = await db.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 

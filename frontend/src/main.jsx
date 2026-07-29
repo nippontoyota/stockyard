@@ -49,6 +49,7 @@ function flagLabel(type) {
     yard_capacity_exceeded: "Capacity Exceeded",
     duplicate_yard_status: "Duplicate Status",
     invalid_vin: "Invalid VIN Format",
+    dwell_exceeded: "Dwell Time Exceeded",
     manual_admin_override: "Admin Override",
   }[type] || String(type || "Flag").replace(/_/g, " ");
 }
@@ -171,6 +172,7 @@ export default function App() {
           model: v.model && v.model !== "Unknown" && v.model !== "Toyota Vehicle" ? v.model : decoded.model,
           variant: v.variant && v.variant !== "Standard" ? v.variant : decoded.variant,
           colour: v.colour && v.colour !== "Not set" ? v.colour : decoded.colour,
+          driveType: v.drive_type,
           vinValid: v.vin_valid,
           currentStatus: v.current_status,
           currentYardId: v.current_yard_id,
@@ -622,6 +624,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
   const [damaged, setDamaged] = useState(false);
   const [damageRemark, setDamageRemark] = useState("");
   const [damageImage, setDamageImage] = useState("");
+  const [driveType, setDriveType] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [torchOn, setTorchOn] = useState(false);
@@ -642,6 +645,20 @@ function ScanView({ state, setState, session, online, onRefresh }) {
   const scanType = isCarInCurrentYard ? "out" : "in";
   const activeFlag = state.flags?.find((f) => f.vin === pendingVin && !f.resolved);
   const isFlagged = Boolean(activeFlag);
+
+  // F12 indoor GPS fallback
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === 'F12') {
+        e.preventDefault();
+        if (!gpsData) {
+          setGpsData({ latitude: yard.latitude, longitude: yard.longitude, accuracy: null });
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [gpsData, yard]);
 
   useEffect(() => {
     getPendingCount().then(setPendingCount);
@@ -881,7 +898,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
     }
 
     const gps = gpsData || { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
-    const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, transferDestinationYardId, transferRequestedBy, keyNo, damaged, damageRemark, damageImage, online });
+    const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, transferDestinationYardId, transferRequestedBy, keyNo, damaged, damageRemark, damageImage, driveType, online });
     const result = applyScan(state, scan);
 
     if (!result.accepted) return setOverlayResult({ type: "error", message: result.message });
@@ -909,6 +926,7 @@ function ScanView({ state, setState, session, online, onRefresh }) {
     setTransferDestinationYardId("");
     setTransferRequestedBy("");
     setKeyNo("");
+    setDriveType("");
     setDamaged(false);
     setDamageRemark("");
     setDamageImage("");
@@ -1016,6 +1034,21 @@ function ScanView({ state, setState, session, online, onRefresh }) {
                 }}
                 placeholder="Key No (optional, e.g. K-101)"
               />
+              <select
+                value={driveType}
+                onChange={(event) => {
+                  setDriveType(event.target.value);
+                  setMessage(null);
+                }}
+                aria-label="Drive type"
+                style={{ marginTop: '8px' }}
+              >
+                <option value="">Select Drive Type</option>
+                <option value="neo_drive">Neo Drive</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="petrol">Petrol</option>
+                <option value="diesel">Diesel</option>
+              </select>
               {isFlagged && (
                 <div className="notice warn" style={{ marginTop: '12px', marginBottom: '12px' }}>
                   <strong>Active Flag:</strong> A photo of the vehicle is required to complete this scan.
@@ -1138,6 +1171,18 @@ function ScanView({ state, setState, session, online, onRefresh }) {
               onChange={(event) => setKeyNo(event.target.value)}
               placeholder="Key No (optional, e.g. K-101)"
             />
+            <label htmlFor="driveType">Drive Type</label>
+            <select
+              id="driveType"
+              value={driveType}
+              onChange={(event) => setDriveType(event.target.value)}
+            >
+              <option value="">Select Drive Type</option>
+              <option value="neo_drive">Neo Drive</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="petrol">Petrol</option>
+              <option value="diesel">Diesel</option>
+            </select>
             <label className="check"><input type="checkbox" checked={damaged} onChange={(event) => {
               setDamaged(event.target.checked);
               if (!event.target.checked) {
@@ -1360,6 +1405,16 @@ function DashboardView({ state, stats, session, setState }) {
   return (
     <section className="stack">
       <ExecutiveKpiCards stats={stats} />
+
+      {stats.dwellAlertCount > 0 && (
+        <div className="notice warn" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>alarm</span>
+          <div>
+            <strong>{stats.dwellAlertCount} vehicle{stats.dwellAlertCount > 1 ? 's' : ''} exceed{stats.dwellAlertCount === 1 ? 's' : ''} dwell time threshold.</strong>
+            <small style={{ display: 'block' }}>Review in the Flags tab to resolve.</small>
+          </div>
+        </div>
+      )}
 
       <div className="segmented">
         <button type="button" className={tab === "charts" ? "active" : ""} onClick={() => setTab("charts")}>Analytics Charts</button>
