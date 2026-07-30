@@ -243,8 +243,11 @@ export async function approveRequisition(id) {
   return apiFetch(`/api/requisitions/${id}/approve`, { method: "POST" });
 }
 
-export async function rejectRequisition(id) {
-  return apiFetch(`/api/requisitions/${id}/reject`, { method: "POST" });
+export async function rejectRequisition(id, reason = '') {
+  return apiFetch(`/api/requisitions/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
 }
 
 // --- Notifications ---

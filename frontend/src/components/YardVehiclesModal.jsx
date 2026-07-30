@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { decodeVinDetails, flagLabel, createScan, applyScan, yards } from "../stockyardLogic.js";
+import { decodeVinDetails, flagLabel, createScan, applyScan, yards, findApprovedTransferReq } from "../stockyardLogic.js";
 import { bulkSync } from "../api.js";
 import { VehicleTimeline } from "./VehicleTimeline.jsx";
 
-function AdminOutForm({ vin, yard, vehicle, state, setState, onDone }) {
+function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDone }) {
   const [outRemark, setOutRemark] = useState("");
   const [transferDestinationYardId, setTransferDestinationYardId] = useState("");
   const [transferRequestedBy, setTransferRequestedBy] = useState("");
@@ -14,6 +14,15 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, onDone }) {
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const req = findApprovedTransferReq(requisitions, vin);
+    if (!req) return;
+    setOutRemark("stockyard_transfer");
+    setTransferRequestedBy(req.requested_by || "");
+    const destYard = req.requesting_branch?.yards?.[0]?.id;
+    if (destYard) setTransferDestinationYardId(destYard);
+  }, [vin, requisitions]);
 
   const decoded = decodeVinDetails(vin);
   const displayModel =
@@ -403,6 +412,7 @@ export function YardVehiclesModal({ yard, state, setState, onClose }) {
                   vehicle={selectedVehicle}
                   state={state}
                   setState={setState}
+                  requisitions={state?.requisitions}
                   onDone={() => setSelectedVin(null)}
                 />
               )}
