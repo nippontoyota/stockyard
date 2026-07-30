@@ -1007,53 +1007,64 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 }
 .muted-cell { color: #94a3b8; }
 
-/* ─── Credentials Tab Styling (Impeccable Craft) ───────────────────── */
+/* ─── Credentials Tab ─────────────────────────────────────────────── */
 .credentials-workspace {
   gap: 1.25rem;
 }
 
-.credentials-controls {
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
+.credentials-summary {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: 12px;
 }
 
-.credentials-controls .modal-search {
-  flex: 1 1 200px;
+.credentials-summary-copy {
+  display: grid;
+  gap: 6px;
   min-width: 0;
+}
+
+.action-icon-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.action-icon-btn:hover {
+  background: #f1f5f9;
+  color: #002046;
+  border-color: #cbd5e1;
+}
+
+.credentials-controls {
+  margin-top: 0;
 }
 
 .credentials-controls .segmented {
   width: auto;
+  flex: 1 1 240px;
   min-width: 0;
   max-width: 100%;
-  display: flex;
-  flex: 1 1 240px;
   background: #e8f1ff;
   border: 1px solid #cfe0ff;
-  border-radius: 8px;
-  padding: 3px;
   overflow-x: auto;
 }
 
 .credentials-controls .segmented button {
-  flex: 1;
+  flex: 1 0 auto;
   white-space: nowrap;
   padding: 8px 14px;
   font-size: 13px;
-  font-weight: 700;
-  border: 0;
-  background: transparent;
-  color: #475569;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  min-height: 38px;
 }
 
 .credentials-controls .segmented button.active {
@@ -2023,6 +2034,126 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 }
 .timeline-force-close:hover { background: #fee2e2; border-color: #ef4444; }
 .timeline-empty { text-align: center; padding: 40px; color: #9ca3af; font-size: 14px; }
+
+/* Admin OUT from yard vehicle history */
+.vehicle-history-vin {
+  margin: 4px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  color: #4b5563;
+  letter-spacing: 0.02em;
+}
+.admin-out-panel {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.admin-out-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+.admin-out-heading .material-symbols-outlined {
+  color: #EB0A1E;
+  font-size: 28px;
+  line-height: 1;
+}
+.admin-out-heading h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #111827;
+}
+.admin-out-heading p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #4b5563;
+}
+.admin-out-panel label:not(.check) {
+  font-size: 12px;
+  font-weight: 700;
+  color: #374151;
+  margin-top: 4px;
+}
+.admin-out-panel select,
+.admin-out-panel input,
+.admin-out-panel textarea {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font: inherit;
+  background: #fff;
+  color: #111827;
+}
+.admin-out-panel textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+.admin-out-damage-check {
+  margin-top: 6px;
+  font-weight: 600;
+  color: #111827;
+}
+.admin-out-submit {
+  margin-top: 8px;
+  width: 100%;
+}
+.admin-out-confirm h4 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+}
+.admin-out-summary {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.admin-out-summary > div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  font-size: 13px;
+}
+.admin-out-summary dt {
+  margin: 0;
+  color: #6b7280;
+  font-weight: 600;
+}
+.admin-out-summary dd {
+  margin: 0;
+  color: #111827;
+  font-weight: 700;
+  word-break: break-word;
+}
+.admin-out-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+.admin-out-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.admin-out-actions .ghost,
+.admin-out-actions .primary {
+  flex: 1;
+  min-height: 44px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-out-panel {
+    transition: none;
+  }
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    §3.6 — FAB Scan Button (center of bottom nav)

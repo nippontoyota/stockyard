@@ -4,7 +4,7 @@ import React, { useState } from 'react';
  * §4.2 — Vertical vehicle timeline.
  * Shows IN/OUT events with dwell time calculations.
  */
-export function VehicleTimeline({ scans = [], vin, onForceClose }) {
+export function VehicleTimeline({ scans = [], vin }) {
   const [expandedId, setExpandedId] = useState(null);
 
   if (!scans.length) {
@@ -79,11 +79,6 @@ export function VehicleTimeline({ scans = [], vin, onForceClose }) {
           );
         })}
       </div>
-      {onForceClose && (
-        <button className="timeline-force-close" onClick={onForceClose}>
-          Force Close Vehicle
-        </button>
-      )}
     </div>
   );
 }

@@ -1,8 +1,248 @@
 import React, { useState, useEffect } from "react";
-import { decodeVinDetails, flagLabel } from "../stockyardLogic.js";
+import { decodeVinDetails, flagLabel, createScan, applyScan, yards } from "../stockyardLogic.js";
+import { bulkSync } from "../api.js";
 import { VehicleTimeline } from "./VehicleTimeline.jsx";
 
-export function YardVehiclesModal({ yard, state, onClose }) {
+function AdminOutForm({ vin, yard, vehicle, state, setState, onDone }) {
+  const [outRemark, setOutRemark] = useState("");
+  const [transferDestinationYardId, setTransferDestinationYardId] = useState("");
+  const [transferRequestedBy, setTransferRequestedBy] = useState("");
+  const [keyNo, setKeyNo] = useState(vehicle?.keyNo || "");
+  const [driveType, setDriveType] = useState(vehicle?.driveType || "");
+  const [damaged, setDamaged] = useState(false);
+  const [damageRemark, setDamageRemark] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const decoded = decodeVinDetails(vin);
+  const displayModel =
+    vehicle?.model && vehicle.model !== "Unknown" && vehicle.model !== "Toyota Vehicle"
+      ? vehicle.model
+      : decoded.model;
+
+  async function submitOut() {
+    setError("");
+    setLoading(true);
+    try {
+      const scan = createScan({
+        vin,
+        type: "out",
+        yardId: yard.id,
+        gps: {},
+        outRemark,
+        transferDestinationYardId,
+        transferRequestedBy,
+        keyNo,
+        damaged,
+        damageRemark,
+        damageImage: "",
+        driveType,
+      });
+      const prevFlagIds = new Set(state.flags.map((f) => f.id));
+      const result = applyScan(state, scan);
+      if (!result.accepted) {
+        setError(result.message || "OUT rejected.");
+        setLoading(false);
+        return;
+      }
+      // Desk OUT has no GPS — drop the false gps_outside_yard flag applyScan adds
+      const flags = result.state.flags.filter(
+        (f) => prevFlagIds.has(f.id) || f.type !== "gps_outside_yard"
+      );
+      const newNonGps = flags.filter((f) => !prevFlagIds.has(f.id));
+      const scans = result.state.scans.map((s) =>
+        s.clientScanId === scan.clientScanId
+          ? { ...s, status: newNonGps.some((f) => f.vin === vin) ? "flagged" : "accepted" }
+          : s
+      );
+      await bulkSync([scan]);
+      setState({ ...result.state, flags, scans });
+      onDone();
+    } catch (err) {
+      setError(err.message || "OUT failed. Check connection and try again.");
+      setLoading(false);
+    }
+  }
+
+  function validate() {
+    if (!outRemark) return "Select an OUT reason.";
+    if (outRemark === "stockyard_transfer" && !transferDestinationYardId) {
+      return "Select destination yard for transfer.";
+    }
+    if (outRemark === "stockyard_transfer" && !transferRequestedBy.trim()) {
+      return "Enter who requested the transfer.";
+    }
+    if (damaged && !damageRemark.trim()) return "Add the damage remark.";
+    return "";
+  }
+
+  function onSubmit(event) {
+    event.preventDefault();
+    const msg = validate();
+    if (msg) {
+      setError(msg);
+      return;
+    }
+    setError("");
+    setConfirming(true);
+  }
+
+  if (confirming) {
+    return (
+      <div className="admin-out-panel admin-out-confirm" role="status">
+        <h4>Confirm OUT</h4>
+        <dl className="admin-out-summary">
+          <div><dt>VIN</dt><dd>{vin}</dd></div>
+          <div><dt>Model</dt><dd>{displayModel}</dd></div>
+          <div><dt>Reason</dt><dd>{outRemark === "customer_acquisition" ? "Customer Acquisition" : "Stockyard Transfer"}</dd></div>
+          {outRemark === "stockyard_transfer" && (
+            <>
+              <div>
+                <dt>Transfer to</dt>
+                <dd>
+                  {yards.find((y) => y.id === transferDestinationYardId)?.name || transferDestinationYardId}
+                </dd>
+              </div>
+              <div><dt>Requested by</dt><dd>{transferRequestedBy}</dd></div>
+            </>
+          )}
+          {keyNo ? <div><dt>Key No</dt><dd>{keyNo}</dd></div> : null}
+          {driveType ? <div><dt>Drive</dt><dd>{driveType.replace(/_/g, " ")}</dd></div> : null}
+          {damaged ? <div><dt>Damage</dt><dd>{damageRemark}</dd></div> : null}
+        </dl>
+        <p className="admin-out-note">No photo required for admin OUT.</p>
+        {error && <p className="notice bad">{error}</p>}
+        <div className="admin-out-actions">
+          <button type="button" className="ghost" disabled={loading} onClick={() => setConfirming(false)}>
+            Back
+          </button>
+          <button type="button" className="primary" disabled={loading} onClick={submitOut}>
+            {loading ? "Recording…" : "Confirm OUT"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form className="admin-out-panel" onSubmit={onSubmit}>
+      <div className="admin-out-heading">
+        <span className="material-symbols-outlined" aria-hidden="true">logout</span>
+        <div>
+          <h4>Mark vehicle OUT</h4>
+          <p>Same details as a yard OUT scan. Photo skipped.</p>
+        </div>
+      </div>
+
+      <label htmlFor="admin-out-reason">OUT reason</label>
+      <select
+        id="admin-out-reason"
+        value={outRemark}
+        onChange={(e) => {
+          setOutRemark(e.target.value);
+          if (e.target.value !== "stockyard_transfer") {
+            setTransferDestinationYardId("");
+            setTransferRequestedBy("");
+          }
+          setError("");
+        }}
+        required
+      >
+        <option value="">Select reason</option>
+        <option value="customer_acquisition">Customer Acquisition</option>
+        <option value="stockyard_transfer">Stockyard Transfer</option>
+      </select>
+
+      {outRemark === "stockyard_transfer" && (
+        <>
+          <label htmlFor="admin-out-dest">Transfer destination</label>
+          <select
+            id="admin-out-dest"
+            value={transferDestinationYardId}
+            onChange={(e) => {
+              setTransferDestinationYardId(e.target.value);
+              setError("");
+            }}
+            required
+          >
+            <option value="">Select destination yard</option>
+            {yards.filter((y) => y.id !== yard.id).map((y) => (
+              <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
+            ))}
+          </select>
+
+          <label htmlFor="admin-out-requester">Requested by</label>
+          <input
+            id="admin-out-requester"
+            value={transferRequestedBy}
+            onChange={(e) => {
+              setTransferRequestedBy(e.target.value);
+              setError("");
+            }}
+            placeholder="Person who requested transfer"
+            required
+          />
+        </>
+      )}
+
+      <label htmlFor="admin-out-key">Key No.</label>
+      <input
+        id="admin-out-key"
+        value={keyNo}
+        onChange={(e) => setKeyNo(e.target.value)}
+        placeholder="Optional, e.g. K-101"
+      />
+
+      <label htmlFor="admin-out-drive">Drive type</label>
+      <select
+        id="admin-out-drive"
+        value={driveType}
+        onChange={(e) => setDriveType(e.target.value)}
+      >
+        <option value="">Select drive type</option>
+        <option value="neo_drive">Neo Drive</option>
+        <option value="hybrid">Hybrid</option>
+        <option value="petrol">Petrol</option>
+        <option value="diesel">Diesel</option>
+      </select>
+
+      <label className="check admin-out-damage-check">
+        <input
+          type="checkbox"
+          checked={damaged}
+          onChange={(e) => {
+            setDamaged(e.target.checked);
+            if (!e.target.checked) setDamageRemark("");
+            setError("");
+          }}
+        />
+        Car damaged
+      </label>
+
+      {damaged && (
+        <textarea
+          value={damageRemark}
+          onChange={(e) => {
+            setDamageRemark(e.target.value);
+            setError("");
+          }}
+          rows={2}
+          placeholder="Type of damage & details..."
+          required
+        />
+      )}
+
+      {error && <p className="notice bad">{error}</p>}
+
+      <button type="submit" className="primary admin-out-submit">
+        Continue to confirm OUT
+      </button>
+    </form>
+  );
+}
+
+export function YardVehiclesModal({ yard, state, setState, onClose }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedVin, setSelectedVin] = useState(null);
@@ -36,6 +276,8 @@ export function YardVehiclesModal({ yard, state, onClose }) {
   const countIn = yardVehicles.filter((v) => v.currentStatus === "in").length;
   const countOut = yardVehicles.filter((v) => v.currentStatus === "out").length;
   const emptySpace = Math.max(0, yard.capacity - countIn);
+  const selectedVehicle = selectedVin ? state?.vehicles?.[selectedVin] : null;
+  const canMarkOut = selectedVehicle?.currentStatus === "in";
 
   return (
     <div className="modal-overlay" onClick={onClose} aria-modal="true" role="dialog">
@@ -141,16 +383,29 @@ export function YardVehiclesModal({ yard, state, onClose }) {
           <div className="modal-overlay nested-modal-overlay" onClick={() => setSelectedVin(null)}>
             <div className="modal-content vehicle-history-modal" onClick={(e) => e.stopPropagation()}>
               <div className="vehicle-history-header">
-                <h3>Vehicle history</h3>
+                <div>
+                  <h3>Vehicle history</h3>
+                  <p className="vehicle-history-vin">{selectedVin}</p>
+                </div>
                 <button type="button" className="close-modal-btn" onClick={() => setSelectedVin(null)} aria-label="Close history">
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
               <VehicleTimeline
                 vin={selectedVin}
-                scans={state?.scans?.filter(s => s.vin === selectedVin) || []}
-                onForceClose={() => setSelectedVin(null)}
+                scans={state?.scans?.filter((s) => s.vin === selectedVin) || []}
               />
+              {canMarkOut && setState && (
+                <AdminOutForm
+                  key={selectedVin}
+                  vin={selectedVin}
+                  yard={yard}
+                  vehicle={selectedVehicle}
+                  state={state}
+                  setState={setState}
+                  onDone={() => setSelectedVin(null)}
+                />
+              )}
             </div>
           </div>
         )}

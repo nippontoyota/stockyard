@@ -726,6 +726,7 @@ export function AdminHome({ stats, state, setState }) {
       <YardVehiclesModal
         yard={selectedYardModal}
         state={state}
+        setState={setState}
         onClose={() => setSelectedYardModal(null)}
       />
 

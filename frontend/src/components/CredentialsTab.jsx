@@ -140,8 +140,8 @@ export function CredentialsTab() {
 
   return (
     <section className="credentials-workspace stack">
-      <div className="tab-summary">
-        <div>
+      <div className="tab-summary credentials-summary">
+        <div className="credentials-summary-copy">
           <strong>Login passwords</strong>
           <span className="tab-summary-hint">Yard staff sign in with yard code + password. Show a password only when sharing it.</span>
         </div>
@@ -158,17 +158,17 @@ export function CredentialsTab() {
 
       {toastMessage && <div className="notice ok">{toastMessage}</div>}
 
-      <div className="modal-controls credentials-controls">
-          <div className="search-row modal-search">
-            <span className="material-symbols-outlined">search</span>
-            <input
-              className="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search yard code or name…"
-              aria-label="Search credentials"
-            />
-          </div>
+      <div className="controls-row credentials-controls">
+        <div className="search-row inline-search">
+          <span className="material-symbols-outlined">search</span>
+          <input
+            className="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search yard code or name…"
+            aria-label="Search credentials"
+          />
+        </div>
         <div className="segmented" role="tablist" aria-label="Filter by role">
           <button
             type="button"
