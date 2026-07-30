@@ -2,16 +2,15 @@ import { Router } from 'express';
 import { eq, and, count } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { yards, vehicles, vehicleStatus } from '../db/schema.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, optionalAuthenticate } from '../middleware/auth.js';
 
 const router = Router();
-router.use(authenticate);
 
 // ─── GET / ───────────────────────────────────────────────────────────
 
-router.get('/', async (req, res, next) => {
+router.get('/', optionalAuthenticate, async (req, res, next) => {
   try {
-    if (req.user!.role === 'stockyard') {
+    if (req.user?.role === 'stockyard') {
       if (!req.user!.yard_id) {
         res.status(400).json({ error: 'User is not assigned to a yard' });
         return;
