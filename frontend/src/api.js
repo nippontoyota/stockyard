@@ -160,6 +160,13 @@ export async function adminOverrideVehicle(vin, status, reason, yardId) {
   });
 }
 
+export async function adminUpdateVehicle(vin, fields) {
+  return apiFetch(`/api/admin/vehicles/${vin}`, {
+    method: "PATCH",
+    body: JSON.stringify(fields),
+  });
+}
+
 export async function loginApi(username, password) {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",

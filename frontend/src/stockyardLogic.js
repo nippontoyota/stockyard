@@ -1,34 +1,30 @@
-// Static yard list (mirrors backend/src/db/seed.ts YARD_DATA). Not fetched — avoids
+// Static yard list (mirrors backend/src/lib/yardData.ts). Not fetched — avoids
 // filtered /api/yards responses overwriting the login dropdown after logout.
-export let yards = [
-  { id: "CO01A-1", code: "CO01A", name: "Nettur Showroom, Cochin", city: "Cochin", capacity: 125 },
-  { id: "CO01B-1", code: "CO01B", name: "Kalamasery, Cochin", city: "Cochin", capacity: 200 },
-  { id: "CO01B-2", code: "CO01B", name: "Nippon Tower - 7th floor, Cochin", city: "Cochin", capacity: 80 },
-  { id: "KY01A-1", code: "KY01A", name: "Showroom, Kayamkulam", city: "Kayamkulam", capacity: 60 },
-  { id: "KY01A-2", code: "KY01A", name: "Ramapuram East, Kayamkulam", city: "Kayamkulam", capacity: 210 },
-  { id: "KY01A-3", code: "KY01A", name: "Ramapuram West, Kayamkulam", city: "Kayamkulam", capacity: 80 },
-  { id: "KY01A-4", code: "KY01A", name: "Evoor Yard, Kayamkulam", city: "Kayamkulam", capacity: 110 },
-  { id: "IR01A-1", code: "IR01A", name: "Showroom, Irinjalakuda", city: "Irinjalakuda", capacity: 30 },
-  { id: "KL01A-1", code: "KL01A", name: "Showroom, Kollam", city: "Kollam", capacity: 55 },
-  { id: "KL01B-1", code: "KL01B", name: "Thazhuthala, Kollam", city: "Kollam", capacity: 225 },
-  { id: "TI01A-1", code: "TI01A", name: "Peramangalam, Trissur", city: "Trissur", capacity: 175 },
-  { id: "MV01A-1", code: "MV01A", name: "Muvattupuzha", city: "Muvattupuzha", capacity: 105 },
-  { id: "PH01A-1", code: "PH01A", name: "Pathanamthitta", city: "Pathanamthitta", capacity: 70 },
-  { id: "TL01A-1", code: "TL01A", name: "Thiruvalla", city: "Thiruvalla", capacity: 45 },
-  { id: "TR01C-1", code: "TR01C", name: "Vallakkadavu, Trivandrum", city: "Trivandrum", capacity: 45 },
-  { id: "TR01C-2", code: "TR01C", name: "Enchakkal, Trivandrum", city: "Trivandrum", capacity: 20 },
-  { id: "TR01A-1", code: "TR01A", name: "Showroom, Kazhakuttam, Trivandrum", city: "Trivandrum", capacity: 40 },
-  { id: "TR01A-2", code: "TR01A", name: "Yard-1, Kazhakuttam, Trivandrum", city: "Trivandrum", capacity: 130 },
-  { id: "TR01A-3", code: "TR01A", name: "Yard-2, Kazhakuttam, Trivandrum", city: "Trivandrum", capacity: 65 },
-  { id: "TR01A-4", code: "TR01A", name: "Yard-3, Kazhakuttam, Trivandrum", city: "Trivandrum", capacity: 130 },
-  { id: "KT01A-1", code: "KT01A", name: "Kottayam, behind the showroom", city: "Kottayam", capacity: 300 },
-];
+import { YARD_DATA, YARD_REGIONS } from "./yardData.js";
+
+export let yards = [...YARD_DATA];
 export let fallbackBranches = [];
 
-export function setConfig(newYards, newBranches) {
-  if (newYards?.length) yards = newYards;
+/** Hardcoded yards stay authoritative — never overwrite from a filtered API response. */
+export function setConfig(_newYards, newBranches) {
   if (newBranches?.length) fallbackBranches = newBranches;
 }
+
+/** Resolve a yard by unique site id only (codes are shared across sites). */
+export function findYardById(yardId) {
+  if (!yardId) return null;
+  return yards.find((y) => y.id === yardId) || null;
+}
+
+/** Group yards by region for selects / assign UIs. */
+export function yardsByRegion() {
+  return YARD_REGIONS.map((region) => ({
+    region,
+    yards: yards.filter((y) => y.city === region),
+  })).filter((g) => g.yards.length > 0);
+}
+
+export { YARD_REGIONS };
 
 export function createInitialState(now = new Date().toISOString()) {
   const deviceId = localStorage.getItem("yardDeviceId") || crypto.randomUUID();
@@ -226,7 +222,7 @@ export function applyScan(state, scan) {
     ...state,
     vehicles: { ...state.vehicles, [vin]: vehicle },
     scans: [...state.scans, { ...scan, vin, keyNo: scan.keyNo || "", status: flags.length ? "flagged" : "accepted" }],
-    flags: [...state.flags, ...capacityFlags(state, scan, vin), ...flags],
+    flags: [...state.flags, ...flags],
   };
   return { state: next, accepted: true, message: flags.length ? "Scan accepted with admin flag." : "Scan accepted." };
 }
@@ -239,14 +235,6 @@ function duplicateMessage(currentYardId, scanYardId) {
   const currentYard = yards.find((item) => item.id === currentYardId);
   const scanYard = yards.find((item) => item.id === scanYardId);
   return `Vehicle was IN at ${currentYard?.code || currentYardId} (${currentYard?.name || "Unknown"}), now scanned IN at ${scanYard?.code || scanYardId} (${scanYard?.name || "Unknown"}) without prior OUT scan.`;
-}
-
-function capacityFlags(state, scan, vin) {
-  if (scan.type !== "in") return [];
-  const yard = yards.find((item) => item.id === scan.yardId);
-  if (!yard) return [];
-  const count = Object.values(state.vehicles).filter((vehicle) => vehicle.currentStatus === "in" && vehicle.currentYardId === scan.yardId).length;
-  return count + 1 > yard.capacity ? [flag(vin, "yard_capacity_exceeded", `${yard.name} is above capacity.`)] : [];
 }
 
 function gpsFlag(gps, yard) {
@@ -396,6 +384,23 @@ export function updateVehicleAdmin(state, { vin, yardId, status, reason }) {
       [normalized]: { ...existing, currentStatus: status, currentYardId: status === "in" ? yardId : existing.currentYardId, lastChangedAt: new Date().toISOString(), overrideReason: reason },
     },
     flags: [...state.flags, flag(normalized, "manual_admin_override", reason)],
+  };
+}
+
+export function updateVehicleDetails(state, vin, patch) {
+  const normalized = normalizeVin(vin);
+  const existing = state.vehicles[normalized];
+  if (!existing) return state;
+  return {
+    ...state,
+    vehicles: {
+      ...state.vehicles,
+      [normalized]: {
+        ...existing,
+        ...patch,
+        lastChangedAt: patch.lastChangedAt || new Date().toISOString(),
+      },
+    },
   };
 }
 

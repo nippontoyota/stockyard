@@ -17,6 +17,8 @@ import {
   fallbackBranches,
   setConfig,
   findApprovedTransferReq,
+  findYardById,
+  yardsByRegion,
 } from "./stockyardLogic.js";
 import {
   ExecutiveKpiCards,
@@ -42,6 +44,7 @@ import { ScanOverlay } from "./components/ScanOverlay.jsx";
 import { GpsStatus } from "./components/GpsStatus.jsx";
 import { enqueueScan, getPendingCount, drainQueue } from "./offlineQueue.js";
 import { usePwaInstall } from "./usePwaInstall.js";
+import { YARD_REGIONS } from "./yardData.js";
 
 function flagLabel(type) {
   return {
@@ -340,13 +343,25 @@ export default function App() {
 
 function Login({ onLogin }) {
   const [role, setRole] = useState("stockyard");
-  const [yardId, setYardId] = useState(yards[0]?.id || "");
+  const [region, setRegion] = useState(YARD_REGIONS[0]);
+  const [yardId, setYardId] = useState(() => yards.find((y) => y.city === YARD_REGIONS[0])?.id || yards[0]?.id || "");
   const [branches, setBranches] = useState(fallbackBranches);
   const [branchId, setBranchId] = useState(fallbackBranches[0]?.id || "");
   const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const regionYards = useMemo(
+    () => yards.filter((yard) => yard.city === region),
+    [region]
+  );
+
+  useEffect(() => {
+    if (!regionYards.some((yard) => yard.id === yardId)) {
+      setYardId(regionYards[0]?.id || "");
+    }
+  }, [region, regionYards, yardId]);
 
   useEffect(() => {
     getAdminBranches().then(res => {
@@ -359,6 +374,11 @@ function Login({ onLogin }) {
 
   const handleRoleChange = (newRole) => {
     setRole(newRole);
+    setErrorMsg("");
+  };
+
+  const handleRegionChange = (e) => {
+    setRegion(e.target.value);
     setErrorMsg("");
   };
 
@@ -434,7 +454,7 @@ function Login({ onLogin }) {
           const userBranch = branches.find(b => b.id === userBranchId);
           onLogin({ role: "delivery_incharge", branchId: userBranchId, name: `Delivery: ${userBranch ? userBranch.name : userBranchId}` });
         } else {
-          const yard = yards.find((y) => y.id === res.user.yardId || y.code === res.user.yardId) || targetYard;
+          const yard = findYardById(res.user.yardId) || targetYard;
           onLogin({ role: "stockyard", yardId: yard.id, name: yard.name });
         }
         return;
@@ -455,7 +475,7 @@ function Login({ onLogin }) {
         <div className="login-visual" aria-hidden="true">
           <div className="yard-strip">
             <span>Authorised access only</span>
-            <b>{yards.length} active yards</b>
+            <b>{yards.length} yards · {YARD_REGIONS.length} regions</b>
           </div>
         </div>
         <div className="login-form-panel">
@@ -479,12 +499,34 @@ function Login({ onLogin }) {
             </div>
 
             {role === "stockyard" && (
-              <>
-                <label htmlFor="yardSelect">Select Stockyard Location</label>
-                <select id="yardSelect" value={yardId} onChange={handleYardChange}>
-                  {yards.map((yard) => <option key={yard.id} value={yard.id}>{yard.code} · {yard.name}</option>)}
-                </select>
-              </>
+              <div className="login-location-fields stack">
+                <div className="login-field">
+                  <label htmlFor="regionSelect">Region</label>
+                  <select id="regionSelect" value={region} onChange={handleRegionChange}>
+                    {YARD_REGIONS.map((regionName) => {
+                      const count = yards.filter((y) => y.city === regionName).length;
+                      return (
+                        <option key={regionName} value={regionName}>
+                          {regionName} ({count} {count === 1 ? "yard" : "yards"})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div className="login-field">
+                  <label htmlFor="yardSelect">Yard location</label>
+                  <select id="yardSelect" value={yardId} onChange={handleYardChange} required>
+                    {regionYards.map((yard) => (
+                      <option key={yard.id} value={yard.id}>
+                        {yard.code} · {yard.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="login-yard-hint">
+                    Password is the yard code ({selectedYardObj?.code || "e.g. CO01A"}).
+                  </p>
+                </div>
+              </div>
             )}
 
             {role === "delivery_incharge" && (
@@ -653,9 +695,9 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const damagePhotoInputRef = useRef(null);
   const trackRef = useRef(null);
   const scanLockedRef = useRef(false);
-  const yard = yards.find((item) => item.id === session.yardId) || yards[0];
+  const yard = findYardById(session.yardId) || yards[0];
   const pendingVin = normalizeVin(vin);
-  const isCarInCurrentYard = state.vehicles[pendingVin]?.currentStatus === "in" && (state.vehicles[pendingVin]?.currentYardId === yard.id || state.vehicles[pendingVin]?.currentYardId === yard.code);
+  const isCarInCurrentYard = state.vehicles[pendingVin]?.currentStatus === "in" && state.vehicles[pendingVin]?.currentYardId === yard.id;
   const scanType = isCarInCurrentYard ? "out" : "in";
   const activeFlag = state.flags?.find((f) => f.vin === pendingVin && !f.resolved);
   const isFlagged = Boolean(activeFlag);
@@ -966,7 +1008,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       try {
         const liveStatus = await getVehicleStatus(pendingVin);
         if (liveStatus && liveStatus.current_status) {
-          const liveIsIn = liveStatus.current_status === 'in' && (liveStatus.current_yard_id === yard.id || liveStatus.current_yard_id === yard.code);
+          const liveIsIn = liveStatus.current_status === 'in' && liveStatus.current_yard_id === yard.id;
           effectiveType = liveIsIn ? 'out' : 'in';
         }
       } catch {
@@ -1098,9 +1140,17 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                     setOverlayResult(null);
                   }} aria-label="Destination yard">
                     <option value="">Select destination yard</option>
-                    {yards.filter((y) => y.id !== yard.id).map((y) => (
-                      <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
-                    ))}
+                    {yardsByRegion().map(({ region, yards: regionYards }) => {
+                      const options = regionYards.filter((y) => y.id !== yard.id);
+                      if (!options.length) return null;
+                      return (
+                        <optgroup key={region} label={region}>
+                          {options.map((y) => (
+                            <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
                   </select>
                   <input
                     value={transferRequestedBy}
@@ -1264,9 +1314,17 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                     <label htmlFor="transfer-dest">Transfer Destination Yard</label>
                     <select id="transfer-dest" value={transferDestinationYardId} onChange={(event) => setTransferDestinationYardId(event.target.value)}>
                       <option value="">Select destination yard</option>
-                      {yards.filter((y) => y.id !== yard.id).map((y) => (
-                        <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
-                      ))}
+                      {yardsByRegion().map(({ region, yards: regionYards }) => {
+                        const options = regionYards.filter((y) => y.id !== yard.id);
+                        if (!options.length) return null;
+                        return (
+                          <optgroup key={region} label={region}>
+                            {options.map((y) => (
+                              <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
+                            ))}
+                          </optgroup>
+                        );
+                      })}
                     </select>
                     <label htmlFor="transfer-requester">Requested By</label>
                     <input
@@ -1448,7 +1506,13 @@ function StockView({ state, session }) {
               </select>
               <select value={yardId} onChange={(event) => setYardId(event.target.value)} aria-label="Stockyard location filter">
                 <option value="all">Yard: All Locations</option>
-                {yards.map((yard) => <option key={yard.id} value={yard.id}>{yard.name}</option>)}
+                {yardsByRegion().map(({ region, yards: regionYards }) => (
+                  <optgroup key={region} label={region}>
+                    {regionYards.map((yard) => (
+                      <option key={yard.id} value={yard.id}>{yard.code} · {yard.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </div>
           </div>
@@ -1489,7 +1553,7 @@ function StockStat({ icon, label, value, tone = "" }) {
 }
 
 function VehicleCard({ vehicle, flags }) {
-  const yard = yards.find((item) => item.id === vehicle.currentYardId);
+  const yard = findYardById(vehicle.currentYardId);
   const statusText = flags.length ? "Flagged" : vehicle.currentStatus === "in" ? "In yard" : "Out";
   return (
     <article className={`vehicle ${vehicle.currentStatus} ${flags.length ? "flagged" : ""}`}>
@@ -1721,7 +1785,13 @@ function AdminView({ state, setState }) {
               <>
                 <label htmlFor="override-yard">Destination yard</label>
                 <select id="override-yard" value={yardId} onChange={(event) => setYardId(event.target.value)} required>
-                  {yards.map((yard) => <option value={yard.id} key={yard.id}>{yard.code} · {yard.name}</option>)}
+                  {yardsByRegion().map(({ region, yards: regionYards }) => (
+                    <optgroup key={region} label={region}>
+                      {regionYards.map((yard) => (
+                        <option value={yard.id} key={yard.id}>{yard.code} · {yard.name}</option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </>
             )}

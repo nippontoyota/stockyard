@@ -48,6 +48,8 @@ export const vehicles = pgTable('vehicles', {
   id: uuid('id').defaultRandom().primaryKey(),
   vin: text('vin').notNull().unique(),
   model: text('model'),
+  variant: text('variant'),
+  colour: text('colour'),
   drive_type: text('drive_type'), // 'neo_drive' | 'hybrid' | 'petrol' | 'diesel'
   vin_valid: boolean('vin_valid').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

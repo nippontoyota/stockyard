@@ -388,7 +388,7 @@ export function AdminHome({ stats, state, setState }) {
         )}
 
         {activeTab === "all-vehicles" && (
-          <AllVehiclesTab state={state} />
+          <AllVehiclesTab state={state} setState={setState} />
         )}
 
         {activeTab === "yards" && (

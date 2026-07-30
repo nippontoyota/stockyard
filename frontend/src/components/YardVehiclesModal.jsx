@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { decodeVinDetails, flagLabel, createScan, applyScan, yards, findApprovedTransferReq } from "../stockyardLogic.js";
+import { decodeVinDetails, flagLabel, createScan, applyScan, yardsByRegion, findYardById, findApprovedTransferReq } from "../stockyardLogic.js";
 import { bulkSync } from "../api.js";
 import { VehicleTimeline } from "./VehicleTimeline.jsx";
 
@@ -110,7 +110,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
               <div>
                 <dt>Transfer to</dt>
                 <dd>
-                  {yards.find((y) => y.id === transferDestinationYardId)?.name || transferDestinationYardId}
+                  {findYardById(transferDestinationYardId)?.name || transferDestinationYardId}
                 </dd>
               </div>
               <div><dt>Requested by</dt><dd>{transferRequestedBy}</dd></div>
@@ -176,9 +176,17 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
             required
           >
             <option value="">Select destination yard</option>
-            {yards.filter((y) => y.id !== yard.id).map((y) => (
-              <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
-            ))}
+            {yardsByRegion().map(({ region, yards: regionYards }) => {
+              const options = regionYards.filter((y) => y.id !== yard.id);
+              if (!options.length) return null;
+              return (
+                <optgroup key={region} label={region}>
+                  {options.map((y) => (
+                    <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
 
           <label htmlFor="admin-out-requester">Requested by</label>
@@ -268,9 +276,7 @@ export function YardVehiclesModal({ yard, state, setState, onClose }) {
   if (!yard) return null;
 
   const allVehicles = state ? Object.values(state.vehicles) : [];
-  const yardVehicles = allVehicles.filter(
-    (v) => v.currentYardId === yard.id || v.currentYardId === yard.code
-  );
+  const yardVehicles = allVehicles.filter((v) => v.currentYardId === yard.id);
 
   const filteredVehicles = yardVehicles.filter((v) => {
     const matchesStatus = statusFilter === "all" || v.currentStatus === statusFilter;
