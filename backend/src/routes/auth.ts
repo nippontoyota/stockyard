@@ -1,30 +1,102 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/client.js';
-import { credentials, yards } from '../db/schema.js';
+import { credentials, yards, branches } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import {
+  ADMIN_USERNAME,
+  ADMIN_DEFAULT_PASSWORD,
+  DELIVERY_DEFAULT_PASSWORD,
+  LEGACY_ADMIN_USERNAME,
+  yardUsername,
+  deliveryUsername,
+  defaultPasswordForRole,
+  normalizeUsername,
+  legacyUsername,
+} from '../lib/credentials.js';
 
 export const authRouter = Router();
 
-// Seed initial default passwords into database if empty
+async function migrateLegacyCredentials() {
+  try {
+    const rows = await db.select().from(credentials);
+    const yardList = await db.select().from(yards);
+    const yardMap = new Map(yardList.map((y) => [y.id, y]));
+
+    for (const row of rows) {
+      const normalizedUsername = normalizeUsername(row.username);
+      const yard = row.yard_id ? yardMap.get(row.yard_id) : yardMap.get(normalizedUsername);
+      const targetPassword = defaultPasswordForRole(row.role, yard?.code);
+
+      const usernameChanged = normalizedUsername !== row.username;
+      const passwordLooksLegacy =
+        row.password.includes('@nippon.com') ||
+        row.password === row.username ||
+        row.password === LEGACY_ADMIN_USERNAME;
+
+      if (!usernameChanged && !passwordLooksLegacy) continue;
+
+      const nextPassword = passwordLooksLegacy ? targetPassword : row.password;
+
+      if (usernameChanged) {
+        const [existing] = await db
+          .select()
+          .from(credentials)
+          .where(eq(credentials.username, normalizedUsername));
+        if (existing && existing.id !== row.id) {
+          await db.delete(credentials).where(eq(credentials.id, row.id));
+          continue;
+        }
+      }
+
+      await db
+        .update(credentials)
+        .set({
+          username: normalizedUsername,
+          password: nextPassword,
+          updated_at: new Date(),
+        })
+        .where(eq(credentials.id, row.id));
+    }
+  } catch (err) {
+    console.error('Credentials migration warning:', err);
+  }
+}
+
 async function seedDefaultCredentials() {
   try {
+    await migrateLegacyCredentials();
+
     const existing = await db.select().from(credentials);
-    if (existing.length === 0) {
-      const allYards = await db.select().from(yards);
-      const defaultRows = [
-        {
-          username: 'ADMIN123@nippon.com',
-          password: 'ADMIN123@nippon.com',
-          role: 'admin',
-          yard_id: null as string | null,
-        },
-        ...allYards.map((y: { id: string }) => ({
-          username: `${y.id}@nippon.com`,
-          password: `${y.id}@nippon.com`,
-          role: 'yard',
-          yard_id: y.id,
-        })),
-      ];
+    const existingUsernames = new Set(existing.map((row) => row.username));
+
+    const allYards = await db.select().from(yards);
+    const allBranches = await db.select().from(branches);
+
+    const defaultRows = [
+      {
+        username: ADMIN_USERNAME,
+        password: ADMIN_DEFAULT_PASSWORD,
+        role: 'admin',
+        yard_id: null as string | null,
+        branch_id: null as string | null,
+      },
+      ...allYards.map((y) => ({
+        username: yardUsername(y.id),
+        password: defaultPasswordForRole('yard', y.code),
+        role: 'yard',
+        yard_id: y.id,
+        branch_id: null as string | null,
+      })),
+      ...allBranches.map((b) => ({
+        username: deliveryUsername(b.id),
+        password: DELIVERY_DEFAULT_PASSWORD,
+        role: 'delivery_incharge',
+        yard_id: null as string | null,
+        branch_id: b.id,
+      })),
+    ].filter((row) => !existingUsernames.has(row.username));
+
+    if (defaultRows.length > 0) {
       await db.insert(credentials).values(defaultRows).onConflictDoNothing();
     }
   } catch (err) {
@@ -33,6 +105,11 @@ async function seedDefaultCredentials() {
 }
 
 seedDefaultCredentials();
+
+function resolveLoginUsername(rawUsername: string) {
+  const normalized = normalizeUsername(rawUsername);
+  return [normalized, legacyUsername(normalized)];
+}
 
 /**
  * POST /api/auth/login
@@ -44,16 +121,17 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    const cleanUsername = String(username).trim();
     const cleanPassword = String(password).trim();
+    const usernameCandidates = resolveLoginUsername(String(username));
 
-    // Check DB (seed if unpopulated)
-    let found = await db.select().from(credentials).where(eq(credentials.username, cleanUsername));
-    if (found.length === 0) {
-      await seedDefaultCredentials();
-      found = await db.select().from(credentials).where(eq(credentials.username, cleanUsername));
+    await seedDefaultCredentials();
+
+    let found: (typeof credentials.$inferSelect)[] = [];
+    for (const candidate of usernameCandidates) {
+      found = await db.select().from(credentials).where(eq(credentials.username, candidate));
+      if (found.length > 0) break;
     }
-    
+
     if (found.length > 0) {
       const user = found[0];
       if (user.password === cleanPassword) {
@@ -63,6 +141,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
             username: user.username,
             role: user.role,
             yardId: user.yard_id,
+            branch_id: user.branch_id,
           },
         });
       }
@@ -84,21 +163,31 @@ authRouter.get('/credentials', async (req: Request, res: Response) => {
     await seedDefaultCredentials();
     const rows = await db.select().from(credentials);
     const yardList = await db.select().from(yards);
+    const branchList = await db.select().from(branches);
 
     const yardMap = new Map<string, { id: string; name: string; code: string }>(
-      yardList.map((y: { id: string; name: string; code: string }) => [y.id, y])
+      yardList.map((y) => [y.id, y]),
     );
+    const branchMap = new Map(branchList.map((b) => [b.id, b]));
 
-    const result = rows.map((row: { id: string; username: string; password: string; role: string; yard_id: string | null; updated_at: Date }) => {
+    const result = rows.map((row) => {
       const yard = row.yard_id ? yardMap.get(row.yard_id) : null;
+      const branch = row.branch_id ? branchMap.get(row.branch_id) : null;
+      const defaultPassword = defaultPasswordForRole(row.role, yard?.code);
+
       return {
         id: row.id,
         username: row.username,
         password: row.password,
         role: row.role,
         yardId: row.yard_id,
-        yardName: yard ? yard.name : (row.role === 'admin' ? 'System Administrator' : 'Stockyard Account'),
-        isDefault: row.password === row.username,
+        yardCode: yard?.code ?? null,
+        branchId: row.branch_id,
+        yardName:
+          yard?.name ??
+          branch?.name ??
+          (row.role === 'admin' ? 'System Administrator' : 'Account'),
+        isDefault: row.password === defaultPassword,
         updatedAt: row.updated_at,
       };
     });
@@ -119,7 +208,7 @@ authRouter.post('/credentials/update', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Username and new password are required' });
     }
 
-    const cleanUsername = String(username).trim();
+    const cleanUsername = normalizeUsername(String(username));
     const cleanPassword = String(password).trim();
 
     const existing = await db.select().from(credentials).where(eq(credentials.username, cleanUsername));
@@ -130,17 +219,34 @@ authRouter.post('/credentials/update', async (req: Request, res: Response) => {
         .set({ password: cleanPassword, updated_at: new Date() })
         .where(eq(credentials.username, cleanUsername));
     } else {
-      const role = cleanUsername === 'ADMIN123@nippon.com' ? 'admin' : 'yard';
-      const yardId = cleanUsername.endsWith('@nippon.com') ? cleanUsername.replace('@nippon.com', '') : null;
+      const yardList = await db.select().from(yards);
+      const branchList = await db.select().from(branches);
+      const yard = yardList.find((y) => y.id === cleanUsername);
+      const branch = branchList.find((b) => b.id === cleanUsername);
+
+      let role = 'yard';
+      let yardId: string | null = null;
+      let branchId: string | null = null;
+
+      if (cleanUsername === ADMIN_USERNAME) {
+        role = 'admin';
+      } else if (branch) {
+        role = 'delivery_incharge';
+        branchId = branch.id;
+      } else if (yard) {
+        yardId = yard.id;
+      }
+
       await db.insert(credentials).values({
         username: cleanUsername,
         password: cleanPassword,
         role,
         yard_id: yardId,
+        branch_id: branchId,
       });
     }
 
-    return res.json({ success: true, message: `Password for ${cleanUsername} updated successfully.` });
+    return res.json({ success: true, message: `Password updated successfully.` });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
