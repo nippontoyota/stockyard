@@ -336,7 +336,7 @@ export default function App() {
 
 function Login({ onLogin }) {
   const [role, setRole] = useState("stockyard");
-  const [yardId, setYardId] = useState(yards[0].id);
+  const [yardId, setYardId] = useState(yards[0]?.id || "");
   const [branches, setBranches] = useState(fallbackBranches);
   const [branchId, setBranchId] = useState(fallbackBranches[0].id);
   const [passwordInput, setPasswordInput] = useState("");

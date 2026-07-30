@@ -101,3 +101,47 @@ export function requireBranchAccess(branchIdParam: string) {
     res.status(403).json({ error: 'Forbidden branch access' });
   };
 }
+
+/**
+ * Verify Supabase JWT from Authorization header but do not reject if missing.
+ */
+export async function optionalAuthenticate(req: Request, res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : null;
+
+  if (!token) return next();
+
+  if (token === 'mock-admin') {
+    req.user = { id: 'mock-admin-id', role: 'admin', yard_id: null, branch_id: null };
+    return next();
+  }
+  if (token.startsWith('mock-yard-')) {
+    req.user = { id: 'mock-yard-id', role: 'stockyard', yard_id: token.slice(10), branch_id: null };
+    return next();
+  }
+  if (token.startsWith('mock-delivery-')) {
+    req.user = { id: 'mock-delivery-id', role: 'delivery_incharge', yard_id: null, branch_id: token.slice(14) };
+    return next();
+  }
+
+  try {
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: `${process.env.SUPABASE_URL}/auth/v1`,
+      audience: 'authenticated',
+    });
+
+    const appMeta = (payload as Record<string, unknown>).app_metadata as
+      | { role?: string; yard_id?: string; branch_id?: string }
+      | undefined;
+
+    req.user = {
+      id: payload.sub!,
+      role: (appMeta?.role as AuthUser['role']) ?? 'stockyard',
+      yard_id: appMeta?.yard_id ?? null,
+      branch_id: appMeta?.branch_id ?? null,
+    };
+  } catch {
+    // Ignore invalid tokens for optional auth
+  }
+  next();
+}
