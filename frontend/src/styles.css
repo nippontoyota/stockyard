@@ -1114,10 +1114,14 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   color: #ffffff;
 }
 
-.cred-email {
-  font-family: monospace;
+.cred-email,
+.cred-login-hint {
   font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.75);
+}
+
+.cred-email {
+  font-family: monospace;
 }
 
 .cred-field-box {
