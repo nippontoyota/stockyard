@@ -343,8 +343,8 @@ export default function App() {
 
 function Login({ onLogin }) {
   const [role, setRole] = useState("stockyard");
-  const [yardId, setYardId] = useState(() => yards[0]?.id || "");
-  const [yardSearch, setYardSearch] = useState("");
+  const [region, setRegion] = useState(YARD_REGIONS[0]);
+  const [yardId, setYardId] = useState(() => yards.find((y) => y.city === YARD_REGIONS[0])?.id || yards[0]?.id || "");
   const [branches, setBranches] = useState(fallbackBranches);
   const [branchId, setBranchId] = useState(fallbackBranches[0]?.id || "");
   const [passwordInput, setPasswordInput] = useState("");
@@ -352,28 +352,16 @@ function Login({ onLogin }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const filteredYardGroups = useMemo(() => {
-    const q = yardSearch.trim().toLowerCase();
-    return yardsByRegion()
-      .map(({ region, yards: regionYards }) => ({
-        region,
-        yards: q
-          ? regionYards.filter(
-              (y) =>
-                y.name.toLowerCase().includes(q) ||
-                y.code.toLowerCase().includes(q) ||
-                y.id.toLowerCase().includes(q) ||
-                y.city.toLowerCase().includes(q)
-            )
-          : regionYards,
-      }))
-      .filter((g) => g.yards.length > 0);
-  }, [yardSearch]);
-
-  const filteredYardCount = useMemo(
-    () => filteredYardGroups.reduce((n, g) => n + g.yards.length, 0),
-    [filteredYardGroups]
+  const regionYards = useMemo(
+    () => yards.filter((yard) => yard.city === region),
+    [region]
   );
+
+  useEffect(() => {
+    if (!regionYards.some((yard) => yard.id === yardId)) {
+      setYardId(regionYards[0]?.id || "");
+    }
+  }, [region, regionYards, yardId]);
 
   useEffect(() => {
     getAdminBranches().then(res => {
@@ -389,8 +377,13 @@ function Login({ onLogin }) {
     setErrorMsg("");
   };
 
-  const selectYard = (id) => {
-    setYardId(id);
+  const handleRegionChange = (e) => {
+    setRegion(e.target.value);
+    setErrorMsg("");
+  };
+
+  const handleYardChange = (e) => {
+    setYardId(e.target.value);
     setErrorMsg("");
   };
 
@@ -508,67 +501,31 @@ function Login({ onLogin }) {
             {role === "stockyard" && (
               <div className="login-location-fields stack">
                 <div className="login-field">
-                  <label htmlFor="yardSearch">Yard location</label>
-                  <div className="yard-search-wrap">
-                    <span className="material-symbols-outlined yard-search-icon" aria-hidden="true">search</span>
-                    <input
-                      id="yardSearch"
-                      type="search"
-                      className="yard-search-input"
-                      value={yardSearch}
-                      onChange={(e) => setYardSearch(e.target.value)}
-                      placeholder="Search by name, code, or region…"
-                      autoComplete="off"
-                    />
-                    {yardSearch && (
-                      <button
-                        type="button"
-                        className="yard-search-clear"
-                        onClick={() => setYardSearch("")}
-                        aria-label="Clear search"
-                      >
-                        <span className="material-symbols-outlined">close</span>
-                      </button>
-                    )}
-                  </div>
+                  <label htmlFor="regionSelect">Region</label>
+                  <select id="regionSelect" value={region} onChange={handleRegionChange}>
+                    {YARD_REGIONS.map((regionName) => {
+                      const count = yards.filter((y) => y.city === regionName).length;
+                      return (
+                        <option key={regionName} value={regionName}>
+                          {regionName} ({count} {count === 1 ? "yard" : "yards"})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div className="login-field">
+                  <label htmlFor="yardSelect">Yard location</label>
+                  <select id="yardSelect" value={yardId} onChange={handleYardChange} required>
+                    {regionYards.map((yard) => (
+                      <option key={yard.id} value={yard.id}>
+                        {yard.code} · {yard.name}
+                      </option>
+                    ))}
+                  </select>
                   <p className="login-yard-hint">
-                    {yardSearch
-                      ? `${filteredYardCount} match${filteredYardCount === 1 ? "" : "es"}`
-                      : `${yards.length} yards across ${YARD_REGIONS.length} regions`}
-                    {" · "}Password is the yard code ({selectedYardObj?.code || "e.g. CO01A"})
+                    Password is the yard code ({selectedYardObj?.code || "e.g. CO01A"}).
                   </p>
                 </div>
-                <div className="yard-picker-list" role="listbox" aria-label="Yard locations">
-                  {filteredYardGroups.length === 0 ? (
-                    <div className="yard-picker-empty">
-                      <span className="material-symbols-outlined">location_off</span>
-                      <p>No yards match &ldquo;{yardSearch}&rdquo;</p>
-                    </div>
-                  ) : (
-                    filteredYardGroups.map(({ region: regionName, yards: regionYards }) => (
-                      <div key={regionName} className="yard-picker-region">
-                        <div className="yard-picker-region-label">{regionName}</div>
-                        {regionYards.map((yard) => (
-                          <button
-                            key={yard.id}
-                            type="button"
-                            role="option"
-                            aria-selected={yard.id === yardId}
-                            className={`yard-picker-item${yard.id === yardId ? " selected" : ""}`}
-                            onClick={() => selectYard(yard.id)}
-                          >
-                            <span className="yard-picker-code">{yard.code}</span>
-                            <span className="yard-picker-name">{yard.name}</span>
-                            {yard.id === yardId && (
-                              <span className="material-symbols-outlined yard-picker-check" aria-hidden="true">check_circle</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    ))
-                  )}
-                </div>
-                <input type="hidden" name="yardId" value={yardId} required />
               </div>
             )}
 
