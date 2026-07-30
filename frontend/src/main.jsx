@@ -323,7 +323,7 @@ export default function App() {
       </main>
       <nav className={`bottom-nav ${isAdmin ? "bottom-nav-admin" : ""}`}>
         {session.role === "stockyard" && <NavButton icon="barcode_scanner" label="Scan" active={view === "scan"} onClick={() => navigateTo("scan")} />}
-        <NavButton icon="inventory_2" label="Stock" active={view === "stock"} onClick={() => navigateTo("stock")} />}
+        <NavButton icon="inventory_2" label="Stock" active={view === "stock"} onClick={() => navigateTo("stock")} />
         <NavButton icon="dashboard" label={isAdmin ? "Analytics" : "Dash"} active={view === "dashboard"} onClick={() => navigateTo("dashboard")} />
         {(session.role === "stockyard" || session.role === "delivery_incharge") && <NavButton icon="swap_horiz" label="Requests" active={view === "requisitions"} onClick={() => navigateTo("requisitions")} />}
         {isAdmin && <NavButton icon="account_tree" label="Branches" active={view === "branches"} onClick={() => navigateTo("branches")} />}
