@@ -41,6 +41,12 @@ export function createInitialState(now = new Date().toISOString()) {
   return { deviceId, vehicles, scans, flags, notifications, requisitions };
 }
 
+export function findApprovedTransferReq(requisitions, vin) {
+  return requisitions?.incoming?.find(
+    (r) => r.status === "approved" && r.vehicle?.vin === vin
+  ) ?? null;
+}
+
 export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }

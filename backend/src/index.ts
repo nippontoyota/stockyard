@@ -113,7 +113,7 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 
 const port = Number(process.env.PORT) || 3000;
-httpServer.listen(port, () => {
+httpServer.listen(port, '0.0.0.0', () => {
   console.log(`Stockyard API listening on port ${port}`);
 
   ensureBuckets();

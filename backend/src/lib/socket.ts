@@ -60,3 +60,7 @@ export function emitVehicleStatusChange(data: {
 }) {
   if (io) io.emit('vehicle:status-changed', data);
 }
+
+export function emitRequisitionEvent() {
+  if (io) io.emit('requisition:changed');
+}

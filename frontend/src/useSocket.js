@@ -26,6 +26,7 @@ export function useSocket(onDataChange) {
     socket.on('scan:new', () => onDataChange());
     socket.on('flag:created', () => onDataChange());
     socket.on('vehicle:status-changed', () => onDataChange());
+    socket.on('requisition:changed', () => onDataChange());
 
     socket.on('connect', () => {
       // Connected via WebSocket — drop heartbeat to 30s
