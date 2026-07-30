@@ -392,18 +392,19 @@ export function CredentialsTab() {
       {editingAccount && (
         <div className="modal-overlay" onClick={() => setEditingAccount(null)} aria-modal="true" role="dialog">
           <div className="modal-content cred-modal-card" onClick={(e) => e.stopPropagation()}>
-            <header className="modal-header">
-              <div>
-                <span className="eyebrow">
+            <header className="cred-modal-header">
+              <div className="cred-modal-title">
+                <span className="cred-modal-eyebrow">
                   {editingAccount.role === "admin"
-                    ? "ADMIN"
+                    ? "Admin"
                     : editingAccount.role === "delivery_incharge"
-                      ? "DELIVERY"
-                      : editingAccount.yardCode || "YARD"}
+                      ? "Delivery"
+                      : editingAccount.yardCode || "Yard"}
                 </span>
                 <h2>Change password</h2>
               </div>
               <button
+                type="button"
                 className="close-modal-btn"
                 onClick={() => setEditingAccount(null)}
                 aria-label="Close dialog"
@@ -412,45 +413,51 @@ export function CredentialsTab() {
               </button>
             </header>
 
-            <form onSubmit={handleUpdatePassword} className="modal-body stack">
-              <div className="field-group">
-                <label className="field-label">Account</label>
-                <input
-                  className="input-disabled"
-                  value={
-                    editingAccount.role === "admin"
+            <form onSubmit={handleUpdatePassword} className="cred-modal-form">
+              <div className="cred-modal-body">
+                <div className="cred-modal-field">
+                  <span className="cred-modal-label">Account</span>
+                  <p className="cred-modal-account-value">
+                    {editingAccount.role === "admin"
                       ? "Admin console"
                       : editingAccount.role === "delivery_incharge"
                         ? `Delivery · ${editingAccount.yardName}`
-                        : `${editingAccount.yardCode || editingAccount.yardId} · ${editingAccount.yardName}`
-                  }
-                  readOnly
-                  disabled
-                />
+                        : `${editingAccount.yardCode || editingAccount.yardId} · ${editingAccount.yardName}`}
+                  </p>
+                </div>
+
+                <div className="cred-modal-field">
+                  <label className="cred-modal-label" htmlFor="cred-new-password">
+                    New password
+                  </label>
+                  <input
+                    id="cred-new-password"
+                    type="text"
+                    className="cred-modal-input"
+                    value={newPasswordInput}
+                    onChange={(e) => setNewPasswordInput(e.target.value)}
+                    placeholder={placeholder}
+                    required
+                    autoFocus
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <p className="cred-modal-hint">{defaultHint}</p>
+                </div>
               </div>
 
-              <div className="field-group">
-                <label className="field-label">New password</label>
-                <input
-                  type="text"
-                  className="search modal-input"
-                  value={newPasswordInput}
-                  onChange={(e) => setNewPasswordInput(e.target.value)}
-                  placeholder={placeholder}
-                  required
-                  autoFocus
-                />
-                <small className="field-hint">{defaultHint}</small>
-              </div>
-
-              <div className="modal-footer" style={{ padding: 0, marginTop: "1rem" }}>
-                <button type="button" className="secondary" onClick={() => setEditingAccount(null)}>
+              <footer className="cred-modal-footer">
+                <button type="button" className="cred-modal-cancel" onClick={() => setEditingAccount(null)}>
                   Cancel
                 </button>
-                <button type="submit" className="primary" disabled={isSubmitting || !newPasswordInput.trim()}>
+                <button
+                  type="submit"
+                  className="primary cred-modal-save"
+                  disabled={isSubmitting || !newPasswordInput.trim()}
+                >
                   {isSubmitting ? "Saving…" : "Save password"}
                 </button>
-              </div>
+              </footer>
             </form>
           </div>
         </div>
