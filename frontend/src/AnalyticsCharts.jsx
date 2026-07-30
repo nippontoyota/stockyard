@@ -54,6 +54,22 @@ export function ExecutiveKpiCards({ stats }) {
         </div>
       </div>
 
+      <div className={`kpi-card ${stats.dwellAlertCount > 0 ? "bad" : ""}`}>
+        <div className="kpi-header">
+          <span className="material-symbols-outlined kpi-icon">alarm</span>
+          <span className={`kpi-tag ${stats.dwellAlertCount > 0 ? "bad" : "ok"}`}>Dwell Alerts</span>
+        </div>
+        <div className="kpi-value">{stats.dwellAlertCount}</div>
+        <div className="kpi-subtext">Vehicles exceeding dwell threshold</div>
+        <div className="kpi-badge-row">
+          {stats.dwellAlertCount > 0 ? (
+            <span className="badge warn">Review flagged vehicles</span>
+          ) : (
+            <span className="badge ok">No alerts</span>
+          )}
+        </div>
+      </div>
+
       <div className={`kpi-card ${stats.openFlags > 0 ? "bad" : ""}`}>
         <div className="kpi-header">
           <span className="material-symbols-outlined kpi-icon">flag</span>

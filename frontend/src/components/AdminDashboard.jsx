@@ -276,6 +276,16 @@ export function AdminHome({ stats, state, setState }) {
 
             <ExecutiveKpiCards stats={stats} />
 
+            {stats.dwellAlertCount > 0 && (
+              <div className="notice warn" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.5rem' }}>alarm</span>
+                <div>
+                  <strong>{stats.dwellAlertCount} vehicle{stats.dwellAlertCount > 1 ? 's' : ''} exceed{stats.dwellAlertCount === 1 ? 's' : ''} dwell time threshold (30 days).</strong>
+                  <small style={{ display: 'block' }}>Review in the Flags tab to resolve or take action.</small>
+                </div>
+              </div>
+            )}
+
             <div className="analytics-grid-2col">
               <section className="panel chart-panel chart-panel-wide">
                 <div className="chart-panel-header">

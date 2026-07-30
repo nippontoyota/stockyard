@@ -69,8 +69,8 @@ type ScanOut = z.infer<typeof scanOutBody>;
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
-async function findOrCreateDevice(fingerprint: string): Promise<string> {
-  const result = await db
+async function findOrCreateDevice(fingerprint: string, txOrDb: any = db): Promise<string> {
+  const result = await txOrDb
     .insert(devices)
     .values({ device_fingerprint: fingerprint })
     .onConflictDoUpdate({
@@ -81,12 +81,12 @@ async function findOrCreateDevice(fingerprint: string): Promise<string> {
   return result[0].id;
 }
 
-async function findOrCreateVehicle(vinRaw: string, driveType?: string): Promise<{ id: string; vinValid: boolean }> {
+async function findOrCreateVehicle(vinRaw: string, driveType?: string, txOrDb: any = db): Promise<{ id: string; vinValid: boolean }> {
   const vin = vinRaw.toUpperCase().trim();
   const vinValid = isValidVin(vin);
   const model = await resolveVehicleMetadata(vin);
 
-  const result = await db
+  const result = await txOrDb
     .insert(vehicles)
     .values({ vin, model, drive_type: driveType, vin_valid: vinValid })
     .onConflictDoUpdate({
@@ -97,150 +97,164 @@ async function findOrCreateVehicle(vinRaw: string, driveType?: string): Promise<
   return { id: result[0].id, vinValid };
 }
 
-async function createFlag(vehicleId: string, scanId: string | null, flagType: string, message: string, vin?: string) {
-  const [flag] = await db.insert(flags).values({ vehicle_id: vehicleId, scan_id: scanId, flag_type: flagType, message }).returning();
+async function createFlag(vehicleId: string, scanId: string | null, flagType: string, message: string, vin?: string, txOrDb: any = db) {
+  const [flag] = await txOrDb.insert(flags).values({ vehicle_id: vehicleId, scan_id: scanId, flag_type: flagType, message }).returning();
   emitFlagEvent({ id: flag.id, vehicleId, vin: vin ?? '', flagType, message });
 }
 
-async function checkGps(yardId: string, lat: number | undefined, lon: number | undefined, vehicleId: string, scanId: string) {
+async function checkGps(yardId: string, lat: number | undefined, lon: number | undefined, vehicleId: string, scanId: string, txOrDb: any = db) {
   if (lat == null || lon == null) return;
-  const [yard] = await db.select({ latitude: yards.latitude, longitude: yards.longitude, gps_radius_meters: yards.gps_radius_meters }).from(yards).where(eq(yards.id, yardId));
+  const [yard] = await txOrDb.select({ latitude: yards.latitude, longitude: yards.longitude, gps_radius_meters: yards.gps_radius_meters }).from(yards).where(eq(yards.id, yardId));
   if (!yard?.latitude || !yard?.longitude) return;
 
   const distance = haversineMeters(Number(yard.latitude), Number(yard.longitude), lat, lon);
   if (distance > yard.gps_radius_meters) {
-    await createFlag(vehicleId, scanId, 'gps_outside_yard', `Scan GPS is ${Math.round(distance)}m from yard center (radius: ${yard.gps_radius_meters}m)`);
+    await createFlag(vehicleId, scanId, 'gps_outside_yard', `Scan GPS is ${Math.round(distance)}m from yard center (radius: ${yard.gps_radius_meters}m)`, undefined, txOrDb);
   }
 }
 
-async function checkCapacity(yardId: string, vehicleId: string, scanId: string) {
-  const [yard] = await db.select({ capacity: yards.capacity }).from(yards).where(eq(yards.id, yardId));
+async function checkCapacity(yardId: string, vehicleId: string, scanId: string, txOrDb: any = db) {
+  const [yard] = await txOrDb.select({ capacity: yards.capacity }).from(yards).where(eq(yards.id, yardId));
   if (!yard) return;
 
-  const [{ value: currentCount }] = await db.select({ value: count() }).from(vehicleStatus).where(and(eq(vehicleStatus.current_yard_id, yardId), eq(vehicleStatus.current_status, 'in')));
+  const [{ value: currentCount }] = await txOrDb.select({ value: count() }).from(vehicleStatus).where(and(eq(vehicleStatus.current_yard_id, yardId), eq(vehicleStatus.current_status, 'in')));
   if (Number(currentCount) > yard.capacity) {
-    await createFlag(vehicleId, scanId, 'yard_capacity_exceeded', `Yard at ${currentCount}/${yard.capacity} vehicles`);
+    await createFlag(vehicleId, scanId, 'yard_capacity_exceeded', `Yard at ${currentCount}/${yard.capacity} vehicles`, undefined, txOrDb);
   }
 }
 
 // ─── Core Logic ──────────────────────────────────────────────────────
 
 async function processScanIn(body: ScanIn, yardId: string) {
+  // Idempotency check outside transaction
   const [existing] = await db.select({ id: scans.id }).from(scans).where(eq(scans.client_scan_id, body.client_scan_id));
-  if (existing) return { scan_id: existing.id, status: 'already_processed' };
+  if (existing) return { scan_id: existing.id, status: 'already_processed' as const };
 
-  const { id: vehicleId, vinValid } = await findOrCreateVehicle(body.vin, body.drive_type);
-  const deviceId = await findOrCreateDevice(body.device_fingerprint);
-  const [currentStatus] = await db.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
-
-  if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id === yardId) {
-    const [scan] = await db.insert(scans).values({
-      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, status: 'rejected',
-    }).returning();
-    return { scan_id: scan.id, status: 'rejected', error: 'Vehicle is already marked IN at this yard' };
-  }
-
+  // Upload image outside transaction (external I/O)
+  let damageImageUrl: string | undefined = body.damage_image;
   if (body.damage_image) {
-    body.damage_image = await uploadBase64Image(body.damage_image) || body.damage_image;
+    const uploaded = await uploadBase64Image(body.damage_image);
+    damageImageUrl = uploaded ?? undefined;
   }
 
-  const [scan] = await db.insert(scans).values({
-    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
-  }).returning();
+  return db.transaction(async (tx) => {
+    const { id: vehicleId, vinValid } = await findOrCreateVehicle(body.vin, body.drive_type, tx);
+    const deviceId = await findOrCreateDevice(body.device_fingerprint, tx);
+    const [currentStatus] = await tx.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
-  const scanTime = new Date(body.scanned_at);
-  if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
-    await db.insert(vehicleStatus).values({
-      vehicle_id: vehicleId, current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no,
-    }).onConflictDoUpdate({
-      target: vehicleStatus.vehicle_id, set: { current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null },
-    });
-  }
-
-  const flagsList: string[] = [];
-  if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`); flagsList.push('invalid_vin'); }
-  if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported'); flagsList.push('damage_reported'); }
-  
-  if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id !== yardId) {
-    let oldYardCode = String(currentStatus.current_yard_id);
-    if (currentStatus.current_yard_id) {
-      const [oldY] = await db.select({ code: yards.code }).from(yards).where(eq(yards.id, currentStatus.current_yard_id));
-      if (oldY) oldYardCode = oldY.code;
+    if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id === yardId) {
+      const [scan] = await tx.insert(scans).values({
+        client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, status: 'rejected',
+      }).returning();
+      return { scan_id: scan.id, status: 'rejected' as const, error: 'Vehicle is already marked IN at this yard' };
     }
-    let newYardCode = yardId;
-    const [newY] = await db.select({ code: yards.code }).from(yards).where(eq(yards.id, yardId));
-    if (newY) newYardCode = newY.code;
 
-    await createFlag(vehicleId, scan.id, 'duplicate_yard_status', `Vehicle was IN at yard ${oldYardCode}, now scanned IN at ${newYardCode}`);
-    flagsList.push('duplicate_yard_status');
-  }
-  
-  await checkGps(yardId, body.latitude ?? undefined, body.longitude ?? undefined, vehicleId, scan.id);
-  await checkCapacity(yardId, vehicleId, scan.id);
+    const [scan] = await tx.insert(scans).values({
+      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted',
+    }).returning();
 
-  return { scan_id: scan.id, status: 'accepted', flags: flagsList };
+    const scanTime = new Date(body.scanned_at);
+    if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
+      await tx.insert(vehicleStatus).values({
+        vehicle_id: vehicleId, current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no,
+      }).onConflictDoUpdate({
+        target: vehicleStatus.vehicle_id, set: { current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null },
+      });
+    }
+
+    const flagsList: string[] = [];
+    if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`, undefined, tx); flagsList.push('invalid_vin'); }
+    if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported', undefined, tx); flagsList.push('damage_reported'); }
+    if (body.damage_image && !damageImageUrl) { await createFlag(vehicleId, scan.id, 'photo_upload_failed', 'Damage photo upload failed — image not saved', undefined, tx); flagsList.push('photo_upload_failed'); }
+    
+    if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id !== yardId) {
+      let oldYardCode = String(currentStatus.current_yard_id);
+      if (currentStatus.current_yard_id) {
+        const [oldY] = await tx.select({ code: yards.code }).from(yards).where(eq(yards.id, currentStatus.current_yard_id));
+        if (oldY) oldYardCode = oldY.code;
+      }
+      let newYardCode = yardId;
+      const [newY] = await tx.select({ code: yards.code }).from(yards).where(eq(yards.id, yardId));
+      if (newY) newYardCode = newY.code;
+
+      await createFlag(vehicleId, scan.id, 'duplicate_yard_status', `Vehicle was IN at yard ${oldYardCode}, now scanned IN at ${newYardCode}`, undefined, tx);
+      flagsList.push('duplicate_yard_status');
+    }
+    
+    await checkGps(yardId, body.latitude ?? undefined, body.longitude ?? undefined, vehicleId, scan.id, tx);
+    await checkCapacity(yardId, vehicleId, scan.id, tx);
+
+    return { scan_id: scan.id, status: 'accepted' as const, flags: flagsList };
+  });
 }
 
 async function processScanOut(body: ScanOut, yardId: string) {
   const [existing] = await db.select({ id: scans.id }).from(scans).where(eq(scans.client_scan_id, body.client_scan_id));
-  if (existing) return { scan_id: existing.id, status: 'already_processed' };
+  if (existing) return { scan_id: existing.id, status: 'already_processed' as const };
 
-  const { id: vehicleId, vinValid } = await findOrCreateVehicle(body.vin, body.drive_type);
-  const deviceId = await findOrCreateDevice(body.device_fingerprint);
-  const [currentStatus] = await db.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
-
+  // Upload image outside transaction (external I/O)
+  let damageImageUrl: string | undefined = body.damage_image;
   if (body.damage_image) {
-    body.damage_image = await uploadBase64Image(body.damage_image) || body.damage_image;
+    const uploaded = await uploadBase64Image(body.damage_image);
+    damageImageUrl = uploaded ?? undefined;
   }
 
-  const [scan] = await db.insert(scans).values({
-    client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: body.damage_image, status: 'accepted',
-  }).returning();
+  return db.transaction(async (tx) => {
+    const { id: vehicleId, vinValid } = await findOrCreateVehicle(body.vin, body.drive_type, tx);
+    const deviceId = await findOrCreateDevice(body.device_fingerprint, tx);
+    const [currentStatus] = await tx.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
-  const scanTime = new Date(body.scanned_at);
-  if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
-    await db.insert(vehicleStatus).values({
-      vehicle_id: vehicleId, current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no,
-    }).onConflictDoUpdate({
-      target: vehicleStatus.vehicle_id, set: { current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null },
-    });
-  }
+    const [scan] = await tx.insert(scans).values({
+      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted',
+    }).returning();
 
-  const flagsList: string[] = [];
-  if (!currentStatus || currentStatus.current_status !== 'in') { await createFlag(vehicleId, scan.id, 'unverified_in', 'OUT scan with no prior IN record'); flagsList.push('unverified_in'); }
-  if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`); flagsList.push('invalid_vin'); }
-  if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported'); flagsList.push('damage_reported'); }
-  await checkGps(yardId, body.latitude ?? undefined, body.longitude ?? undefined, vehicleId, scan.id);
-
-  if (body.out_remark === 'stockyard_transfer') {
-    const [reqRecord] = await db
-      .update(requisitions)
-      .set({ status: 'fulfilled', fulfilled_at: scanTime })
-      .where(
-        and(
-          eq(requisitions.vehicle_id, vehicleId),
-          eq(requisitions.status, 'approved')
-        )
-      )
-      .returning();
-
-    if (reqRecord) {
-      await db.insert(notifications).values({
-        user_role: 'delivery_incharge',
-        branch_id: reqRecord.requesting_branch_id,
-        message: 'Vehicle transfer initiated. Requisition fulfilled.',
-        type: 'requisition_fulfilled',
-        related_req_id: reqRecord.id,
-      });
-      await notifyRoleAtBranch('delivery_incharge', reqRecord.requesting_branch_id, {
-        title: 'Requisition Fulfilled',
-        body: 'Vehicle transfer initiated for requisition.',
-        url: '/admin',
+    const scanTime = new Date(body.scanned_at);
+    if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
+      await tx.insert(vehicleStatus).values({
+        vehicle_id: vehicleId, current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no,
+      }).onConflictDoUpdate({
+        target: vehicleStatus.vehicle_id, set: { current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null },
       });
     }
-  }
 
-  return { scan_id: scan.id, status: 'accepted', flags: flagsList };
+    const flagsList: string[] = [];
+    if (!currentStatus || currentStatus.current_status !== 'in') { await createFlag(vehicleId, scan.id, 'unverified_in', 'OUT scan with no prior IN record', undefined, tx); flagsList.push('unverified_in'); }
+    if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`, undefined, tx); flagsList.push('invalid_vin'); }
+    if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported', undefined, tx); flagsList.push('damage_reported'); }
+    if (body.damage_image && !damageImageUrl) { await createFlag(vehicleId, scan.id, 'photo_upload_failed', 'Damage photo upload failed — image not saved', undefined, tx); flagsList.push('photo_upload_failed'); }
+    await checkGps(yardId, body.latitude ?? undefined, body.longitude ?? undefined, vehicleId, scan.id, tx);
+
+    if (body.out_remark === 'stockyard_transfer') {
+      const [reqRecord] = await tx
+        .update(requisitions)
+        .set({ status: 'fulfilled', fulfilled_at: scanTime })
+        .where(
+          and(
+            eq(requisitions.vehicle_id, vehicleId),
+            eq(requisitions.status, 'approved')
+          )
+        )
+        .returning();
+
+      if (reqRecord) {
+        await tx.insert(notifications).values({
+          user_role: 'delivery_incharge',
+          branch_id: reqRecord.requesting_branch_id,
+          message: 'Vehicle transfer initiated. Requisition fulfilled.',
+          type: 'requisition_fulfilled',
+          related_req_id: reqRecord.id,
+        });
+        // Push notification is external I/O, safe to call inside tx (fire-and-forget)
+        notifyRoleAtBranch('delivery_incharge', reqRecord.requesting_branch_id, {
+          title: 'Requisition Fulfilled',
+          body: 'Vehicle transfer initiated for requisition.',
+          url: '/admin',
+        }).catch(() => {});
+      }
+    }
+
+    return { scan_id: scan.id, status: 'accepted' as const, flags: flagsList };
+  });
 }
 
 // ─── POST /in ────────────────────────────────────────────────────────

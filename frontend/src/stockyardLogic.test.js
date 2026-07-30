@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { applyScan, createInitialState, dashboard, decodeVinDetails, normalizeVin, parseDeliveredVins, removeDeliveredVehicles } from "./stockyardLogic.js";
+import { applyScan, createInitialState, dashboard, decodeVinDetails, normalizeVin, parseDeliveredVins, removeDeliveredVehicles, setConfig, yards } from "./stockyardLogic.js";
 
 // Verify Toyota Hyryder VIN decoding (from user screenshot VIN MBJUYML1STE225473)
 const hyryderDecoded = decodeVinDetails("MBJUYML1STE225473");
@@ -12,6 +12,11 @@ globalThis.localStorage = {
   getItem(key) { return this.data[key] || null; },
   setItem(key, value) { this.data[key] = String(value); },
 };
+
+setConfig([
+  { id: "CO01B-1", code: "CO01B-1", name: "Test Yard B", capacity: 200 },
+  { id: "CO01A-1", code: "CO01A-1", name: "Test Yard A", capacity: 150 },
+], []);
 
 const baseScan = {
   id: "scan-1",
@@ -66,7 +71,7 @@ assert.deepEqual(deliveredVins, ["JTMBA38V70D123456"]);
 const stateWithVehicle = firstScanResult.state;
 const globalStats = dashboard(stateWithVehicle);
 assert.equal(globalStats.currentStock, 1);
-assert.equal(globalStats.yards.length, 21);
+assert.equal(globalStats.yards.length, 2);
 
 const yardStats = dashboard(stateWithVehicle, "CO01B-1");
 assert.equal(yardStats.currentStock, 1);

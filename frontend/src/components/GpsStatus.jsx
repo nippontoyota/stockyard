@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
  * §3.5 — GPS status badge for scan view.
  * Shows acquiring/locked/unavailable state with accuracy.
  * 15s timeout then offers "Proceed without GPS?" override.
+ * F12 key triggers indoor fallback (yard center coordinates).
  */
 export function GpsStatus({ onGpsReady, onGpsOverride }) {
   const [status, setStatus] = useState('acquiring'); // 'acquiring' | 'locked' | 'unavailable'

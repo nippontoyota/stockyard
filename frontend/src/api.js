@@ -105,6 +105,7 @@ export async function bulkSync(scans) {
     damaged: s.damaged || false,
     damage_remark: s.damageRemark || undefined,
     damage_image: s.damageImage || undefined,
+    drive_type: s.driveType || undefined,
     ...(s.type === 'out' ? {
       out_remark: s.outRemark,
       transfer_destination_yard_id: s.transferDestinationYardId || undefined,
@@ -283,21 +284,6 @@ export async function getVehicleScans(vin) {
   return (response.data || []).filter(s => (s.vin || s.vinRaw || '').toUpperCase() === vin.toUpperCase());
 }
 
-// --- F2 Zones ---
-
-export async function getZones(yardId) {
-  const url = yardId ? `/api/zones?yard_id=${yardId}` : '/api/zones';
-  const response = await apiFetch(url);
-  return response.data || [];
-}
-
-export async function createZone(data) {
-  return apiFetch("/api/zones", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
 // --- F7 Analytics ---
 
 export async function getAnalyticsTrends(from, to) {
@@ -317,4 +303,17 @@ export async function getAnalyticsDamageRate(days = 30) {
 export async function getAuditLogs(params = {}) {
   const query = new URLSearchParams(params).toString();
   return apiFetch(`/api/admin/audit-logs${query ? '?' + query : ''}`);
+}
+
+// Item 2: Live vehicle status check before scan
+export async function getVehicleStatus(vin) {
+  return apiFetch(`/api/vehicles/${encodeURIComponent(vin.toUpperCase())}`);
+}
+
+// Item 3: Backend-synced delivered vehicles
+export async function deliverVehicles(vins) {
+  return apiFetch("/api/vehicles/deliver", {
+    method: "PATCH",
+    body: JSON.stringify({ vins }),
+  });
 }

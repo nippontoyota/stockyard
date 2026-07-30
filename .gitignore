@@ -10,3 +10,4 @@ frontend/.env.*
 backend/.env
 backend/.env.*
 !backend/.env.example
+docs/implemented.md
