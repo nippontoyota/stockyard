@@ -138,14 +138,16 @@ export function YardVehiclesModal({ yard, state, onClose }) {
         </div>
 
         {selectedVin && (
-          <div className="modal-overlay" style={{ zIndex: 9999 }}>
-            <div className="modal-content" style={{ padding: '20px', maxWidth: '600px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0 }}>Vehicle History</h3>
-                <button className="close-modal-btn" onClick={() => setSelectedVin(null)}><span className="material-symbols-outlined">close</span></button>
+          <div className="modal-overlay nested-modal-overlay" onClick={() => setSelectedVin(null)}>
+            <div className="modal-content vehicle-history-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="vehicle-history-header">
+                <h3>Vehicle history</h3>
+                <button type="button" className="close-modal-btn" onClick={() => setSelectedVin(null)} aria-label="Close history">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
               </div>
-              <VehicleTimeline 
-                vin={selectedVin} 
+              <VehicleTimeline
+                vin={selectedVin}
                 scans={state?.scans?.filter(s => s.vin === selectedVin) || []}
                 onForceClose={() => setSelectedVin(null)}
               />
