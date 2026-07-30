@@ -42,6 +42,51 @@ function exportAnalyticsReport(stats) {
   XLSX.writeFile(workbook, `Stockyard_Analytics_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
+function flagDecisionCopy(type) {
+  switch (type) {
+    case "duplicate_yard_status":
+      return {
+        help: "Still marked IN at another yard. Confirm the new yard if that is correct, or close the flag if already fixed.",
+        resolveLabel: "Close flag only",
+      };
+    case "unverified_in":
+      return {
+        help: "Scanned OUT with no prior IN. Reconcile to create the missing IN, or close if no stock change is needed.",
+        resolveLabel: "Close flag only",
+      };
+    case "dwell_exceeded":
+      return {
+        help: "Parked longer than 30 days. Review the vehicle, then close this alert when handled.",
+        resolveLabel: "Mark reviewed",
+      };
+    case "gps_outside_yard":
+      return {
+        help: "Scan GPS was outside the yard radius. Close after verifying the vehicle location.",
+        resolveLabel: "Mark verified",
+      };
+    case "invalid_vin":
+      return {
+        help: "VIN format looks invalid. Close after correcting the record or confirming the plate.",
+        resolveLabel: "Mark reviewed",
+      };
+    case "yard_capacity_exceeded":
+      return {
+        help: "Yard is over configured capacity. Close after redistributing stock or accepting the overflow.",
+        resolveLabel: "Acknowledge",
+      };
+    case "damage_reported":
+      return {
+        help: "Damage was logged on scan. Review evidence in Damaged, then close when handled.",
+        resolveLabel: "Mark handled",
+      };
+    default:
+      return {
+        help: "Review this exception, then close it when no further action is needed.",
+        resolveLabel: "Mark resolved",
+      };
+  }
+}
+
 export function AdminHome({ stats, state, setState }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [showFilterBar, setShowFilterBar] = useState(false);
@@ -148,6 +193,14 @@ export function AdminHome({ stats, state, setState }) {
           </button>
           <button
             type="button"
+            className={activeTab === "all-vehicles" ? "active" : ""}
+            onClick={() => setActiveTab("all-vehicles")}
+          >
+            <span className="material-symbols-outlined">directions_car</span>
+            <span>All Vehicles</span>
+          </button>
+          <button
+            type="button"
             className={activeTab === "yards" ? "active" : ""}
             onClick={() => setActiveTab("yards")}
           >
@@ -169,7 +222,7 @@ export function AdminHome({ stats, state, setState }) {
             onClick={() => setActiveTab("damaged")}
           >
             <span className="material-symbols-outlined">car_crash</span>
-            <span>Damaged Cars</span>
+            <span>Damaged</span>
             {activeDamagedCount > 0 && <span className="rail-badge bad">{activeDamagedCount}</span>}
           </button>
           <button
@@ -179,7 +232,7 @@ export function AdminHome({ stats, state, setState }) {
           >
             <span className="material-symbols-outlined">local_shipping</span>
             <span>In Transit</span>
-            {transitCount > 0 && <span className="rail-badge info" style={{ background: 'var(--brand)', color: 'white' }}>{transitCount}</span>}
+            {transitCount > 0 && <span className="rail-badge info">{transitCount}</span>}
           </button>
         </div>
         <div className="rail-note" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -205,17 +258,17 @@ export function AdminHome({ stats, state, setState }) {
 
       <div className="stack analytical-dashboard">
         <div className="dashboard-header">
-          <div>
-            <span className="eyebrow">Stockyard Intelligence</span>
-            <h1>Admin Analytics Dashboard</h1>
+          <div className="dashboard-header-copy">
+            <h1>Yard Analytics</h1>
+            <p className="dashboard-subtitle">Stock, capacity, flags, and transit across all yards</p>
           </div>
           <div className="dashboard-actions">
             <button
               type="button"
               className="action-icon-btn"
               onClick={handleDownload}
-              title="Download Excel Analytics Report"
-              aria-label="Download Report"
+              title="Download Excel report"
+              aria-label="Download Excel report"
             >
               <span className="material-symbols-outlined">download</span>
             </button>
@@ -223,18 +276,18 @@ export function AdminHome({ stats, state, setState }) {
               type="button"
               className={`action-icon-btn ${showFilterBar || riskFilter !== "all" ? "active" : ""}`}
               onClick={() => setShowFilterBar(!showFilterBar)}
-              title="Tune Dashboard Filters"
-              aria-label="Tune Dashboard Filters"
+              title="Filter yards by capacity risk"
+              aria-label="Filter yards by capacity risk"
             >
               <span className="material-symbols-outlined">tune</span>
             </button>
-            <div className="segmented">
-              <button type="button" className={activeTab === "overview" ? "active" : ""} onClick={() => setActiveTab("overview")}>Overview</button>
-              <button type="button" className={activeTab === "all-vehicles" ? "active" : ""} onClick={() => setActiveTab("all-vehicles")}>All Vehicles</button>
-              <button type="button" className={activeTab === "yards" ? "active" : ""} onClick={() => setActiveTab("yards")}>Yards</button>
-              <button type="button" className={activeTab === "flags" ? "active" : ""} onClick={() => setActiveTab("flags")}>Flags ({stats.openFlags})</button>
-              <button type="button" className={activeTab === "damaged" ? "active" : ""} onClick={() => setActiveTab("damaged")}>Damaged Cars ({activeDamagedCount})</button>
-              <button type="button" className={activeTab === "transit" ? "active" : ""} onClick={() => setActiveTab("transit")}>In Transit</button>
+            <div className="segmented dashboard-mobile-tabs" role="tablist" aria-label="Analytics sections">
+              <button type="button" role="tab" aria-selected={activeTab === "overview"} className={activeTab === "overview" ? "active" : ""} onClick={() => setActiveTab("overview")}>Overview</button>
+              <button type="button" role="tab" aria-selected={activeTab === "all-vehicles"} className={activeTab === "all-vehicles" ? "active" : ""} onClick={() => setActiveTab("all-vehicles")}>Vehicles</button>
+              <button type="button" role="tab" aria-selected={activeTab === "yards"} className={activeTab === "yards" ? "active" : ""} onClick={() => setActiveTab("yards")}>Yards</button>
+              <button type="button" role="tab" aria-selected={activeTab === "flags"} className={activeTab === "flags" ? "active" : ""} onClick={() => setActiveTab("flags")}>Flags{stats.openFlags > 0 ? ` (${stats.openFlags})` : ""}</button>
+              <button type="button" role="tab" aria-selected={activeTab === "damaged"} className={activeTab === "damaged" ? "active" : ""} onClick={() => setActiveTab("damaged")}>Damaged{activeDamagedCount > 0 ? ` (${activeDamagedCount})` : ""}</button>
+              <button type="button" role="tab" aria-selected={activeTab === "transit"} className={activeTab === "transit" ? "active" : ""} onClick={() => setActiveTab("transit")}>Transit</button>
             </div>
           </div>
         </div>
@@ -341,8 +394,8 @@ export function AdminHome({ stats, state, setState }) {
         {activeTab === "yards" && (
           <>
             <div className="tab-summary">
-              <span className="eyebrow">Yard details</span>
-              <strong>{filteredYards.length} stockyard{filteredYards.length === 1 ? "" : "s"} (Tap any card to view cars)</strong>
+              <strong>{filteredYards.length} stockyard{filteredYards.length === 1 ? "" : "s"}</strong>
+              <span className="tab-summary-hint">Tap a yard to see its vehicles</span>
             </div>
             <section className="yard-box-grid">
               {filteredYards.map((yard) => {
@@ -352,7 +405,7 @@ export function AdminHome({ stats, state, setState }) {
                     className={`yard-box clickable ${yard.risk === "critical" ? "risk-critical" : yard.risk === "heavy" ? "risk-heavy" : ""}`}
                     key={yard.id}
                     onClick={() => setSelectedYardModal(yard)}
-                    title={`Click to view all vehicles at ${yard.name}`}
+                    title={`View vehicles at ${yard.name}`}
                   >
                     <div>
                       <span className="eyebrow">{yard.code}</span>
@@ -370,7 +423,7 @@ export function AdminHome({ stats, state, setState }) {
                     </div>
                     <div className="yard-box-tap-hint">
                       <span className="material-symbols-outlined">directions_car</span>
-                      <span>Tap to view vehicles &rarr;</span>
+                      <span>View vehicles</span>
                     </div>
                   </article>
                 );
@@ -382,81 +435,100 @@ export function AdminHome({ stats, state, setState }) {
         {activeTab === "flags" && (
           <section className="panel stack flag-tab-panel">
             <div className="tab-summary">
-              <span className="eyebrow">Flags</span>
-              <strong>{activeFlagsList.length} active operational flag{activeFlagsList.length === 1 ? "" : "s"}</strong>
-              <span className={activeFlagsList.length > 0 ? "pill bad" : "pill ok"}>{activeFlagsList.length > 0 ? "Review Required" : "All Clear"}</span>
+              <strong>{activeFlagsList.length} open flag{activeFlagsList.length === 1 ? "" : "s"}</strong>
+              <span className={activeFlagsList.length > 0 ? "pill bad" : "pill ok"}>
+                {activeFlagsList.length > 0 ? "Action needed" : "All clear"}
+              </span>
+              {activeFlagsList.length > 0 && (
+                <span className="tab-summary-hint">Primary buttons change vehicle status. Secondary only closes the flag.</span>
+              )}
             </div>
             {activeFlagsList.length === 0 ? (
-              <p className="notice ok">No open flags or exceptions. All stockyards operating smoothly.</p>
+              <p className="notice ok">No open flags. Yards are clear of exceptions.</p>
             ) : (
-              activeFlagsList.map((flag) => (
-                <div className="flag-row" key={flag.id}>
-                  <span>
-                    <b>{flag.vin}</b>
-                    <small>
-                      {flag.createdAt && <span className="flag-time">{new Date(flag.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}{" · "}
-                      <strong className="flag-kind">{flagLabel(flag.type)}</strong> {flag.message}
-                    </small>
-                  </span>
-                  {setState && (
-                    <div className="flag-actions">
-                      {flag.type === "duplicate_yard_status" && (
-                        <button
-                          type="button"
-                          className="flag-btn primary-flag"
-                          title="Confirm vehicle is IN at the newly scanned yard and resolve flag"
-                          onClick={async () => {
-                            try {
-                              await apiResolveFlag(flag.id);
-                              setState(resolveFlag(state, flag.id));
-                              setToastMessage(`Flag for VIN ${flag.vin} resolved — Confirmed IN at new yard.`);
-                              setTimeout(() => setToastMessage(""), 3500);
-                            } catch (err) {
-                              alert(err.message);
-                            }
-                          }}
-                        >
-                          Confirm IN at New Yard
-                        </button>
-                      )}
-                      {flag.type === "unverified_in" && (
-                        <button
-                          type="button"
-                          className="flag-btn secondary-flag"
-                          title="Reconcile missing IN record and mark vehicle IN"
-                          onClick={async () => {
-                            try {
-                              await adminOverrideVehicle(flag.vin, "in", "Admin reconciled missing IN record");
-                              await apiResolveFlag(flag.id);
-                              setState(resolveFlag(state, flag.id));
-                              setToastMessage(`Reconciled IN record for VIN ${flag.vin}.`);
-                              setTimeout(() => setToastMessage(""), 3500);
-                            } catch (err) {
-                              alert(err.message);
-                            }
-                          }}
-                        >
-                          Reconcile IN
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="flag-btn"
-                        onClick={async () => {
-                          try {
-                            await apiResolveFlag(flag.id);
-                            setState(resolveFlag(state, flag.id));
-                          } catch (err) {
-                            alert(err.message);
-                          }
-                        }}
-                      >
-                        Dismiss / Resolve
-                      </button>
+              activeFlagsList.map((flag) => {
+                const decision = flagDecisionCopy(flag.type);
+                return (
+                  <div className="flag-row" key={flag.id}>
+                    <div className="flag-row-main">
+                      <div className="flag-row-title">
+                        <b className="flag-vin">{flag.vin}</b>
+                        <span className="flag-kind">{flagLabel(flag.type)}</span>
+                      </div>
+                      <p className="flag-message">
+                        {flag.createdAt && (
+                          <time dateTime={flag.createdAt}>
+                            {new Date(flag.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </time>
+                        )}
+                        {flag.createdAt ? " · " : ""}
+                        {flag.message}
+                      </p>
+                      <p className="flag-help">{decision.help}</p>
                     </div>
-                  )}
-                </div>
-              ))
+                    {setState && (
+                      <div className="flag-actions">
+                        {flag.type === "duplicate_yard_status" && (
+                          <button
+                            type="button"
+                            className="flag-btn primary-flag"
+                            title="Confirm vehicle is IN at the newly scanned yard and close this flag"
+                            onClick={async () => {
+                              try {
+                                await apiResolveFlag(flag.id);
+                                setState(resolveFlag(state, flag.id));
+                                setToastMessage(`Confirmed IN at new yard for ${flag.vin}.`);
+                                setTimeout(() => setToastMessage(""), 3500);
+                              } catch (err) {
+                                alert(err.message);
+                              }
+                            }}
+                          >
+                            Confirm IN at new yard
+                          </button>
+                        )}
+                        {flag.type === "unverified_in" && (
+                          <button
+                            type="button"
+                            className="flag-btn secondary-flag"
+                            title="Create the missing IN record and close this flag"
+                            onClick={async () => {
+                              try {
+                                await adminOverrideVehicle(flag.vin, "in", "Admin reconciled missing IN record");
+                                await apiResolveFlag(flag.id);
+                                setState(resolveFlag(state, flag.id));
+                                setToastMessage(`Reconciled missing IN for ${flag.vin}.`);
+                                setTimeout(() => setToastMessage(""), 3500);
+                              } catch (err) {
+                                alert(err.message);
+                              }
+                            }}
+                          >
+                            Reconcile missing IN
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="flag-btn"
+                          title="Close this flag without changing vehicle status"
+                          onClick={async () => {
+                            try {
+                              await apiResolveFlag(flag.id);
+                              setState(resolveFlag(state, flag.id));
+                              setToastMessage(`Flag closed for ${flag.vin}.`);
+                              setTimeout(() => setToastMessage(""), 3500);
+                            } catch (err) {
+                              alert(err.message);
+                            }
+                          }}
+                        >
+                          {decision.resolveLabel}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </section>
         )}
@@ -464,10 +536,10 @@ export function AdminHome({ stats, state, setState }) {
         {activeTab === "damaged" && (
           <section className="panel stack flag-tab-panel">
             <div className="tab-summary">
-              <span className="eyebrow">Vehicle Damage Log</span>
-              <strong>{activeDamagedCount} active damaged car flag{activeDamagedCount === 1 ? "" : "s"} ({damagedVehiclesList.length} total recorded)</strong>
+              <strong>{activeDamagedCount} open damage case{activeDamagedCount === 1 ? "" : "s"}</strong>
+              <span className="tab-summary-hint">{damagedVehiclesList.length} total recorded · tap a row for remarks and photo</span>
               <span className={activeDamagedCount > 0 ? "pill bad" : "pill ok"}>
-                {activeDamagedCount > 0 ? "Action Required" : "No Active Damage Flags"}
+                {activeDamagedCount > 0 ? "Review needed" : "No open damage"}
               </span>
             </div>
 
@@ -492,14 +564,14 @@ export function AdminHome({ stats, state, setState }) {
                       const isExpanded = expandedDamagedRows.has(item.id);
                       return (
                         <React.Fragment key={item.id}>
-                          <tr 
+                          <tr
                             className={`damaged-row ${isExpanded ? "expanded-active" : ""} ${item.resolved ? "resolved" : "active"}`}
                             onClick={() => toggleDamagedRow(item.id)}
                           >
                             <td><strong className="damaged-vin">{item.vin}</strong></td>
                             <td><span className="damaged-model">{item.model}</span></td>
-                            <td>{item.yardName} {item.yardCode && `(${item.yardCode})`}</td>
-                            <td><span className={`scan-badge ${item.scanType}`}>{item.scanType.toUpperCase()} SCAN</span></td>
+                            <td className="damaged-yard-cell">{item.yardName}{item.yardCode ? ` (${item.yardCode})` : ""}</td>
+                            <td><span className={`scan-badge ${item.scanType}`}>{item.scanType.toUpperCase()}</span></td>
                             <td>
                               <span className="damaged-time">
                                 {new Date(item.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
@@ -507,7 +579,7 @@ export function AdminHome({ stats, state, setState }) {
                             </td>
                             <td>
                               <span className={item.resolved ? "pill ok" : "pill bad"}>
-                                {item.resolved ? "Resolved" : "Flagged"}
+                                {item.resolved ? "Resolved" : "Open"}
                               </span>
                             </td>
                             <td className="expand-cell">
@@ -516,7 +588,7 @@ export function AdminHome({ stats, state, setState }) {
                               </span>
                             </td>
                           </tr>
-                          
+
                           {isExpanded && (
                             <tr className="expanded-row">
                               <td colSpan="7">
@@ -524,34 +596,37 @@ export function AdminHome({ stats, state, setState }) {
                                   <div className="damaged-remark-box">
                                     <span className="material-symbols-outlined remark-icon">report_problem</span>
                                     <div>
-                                      <small className="remark-label">Damage Remarks</small>
+                                      <small className="remark-label">Damage remarks</small>
                                       <p className="remark-text">{item.damageRemark}</p>
                                     </div>
                                   </div>
 
                                   <div className="damaged-photo-section">
-                                    <small className="photo-label">Damage Evidence Photo</small>
+                                    <small className="photo-label">Evidence photo</small>
                                     {item.damageImage ? (
                                       <div className="photo-actions">
                                         <div
                                           className="damaged-photo-preview clickable"
-                                          onClick={() => setSelectedPhotoModal({
-                                            vin: item.vin,
-                                            model: item.model,
-                                            yardName: item.yardName,
-                                            src: item.damageImage,
-                                            remark: item.damageRemark,
-                                          })}
-                                          title="Click to expand photo"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedPhotoModal({
+                                              vin: item.vin,
+                                              model: item.model,
+                                              yardName: item.yardName,
+                                              src: item.damageImage,
+                                              remark: item.damageRemark,
+                                            });
+                                          }}
+                                          title="View full photo"
                                         >
-                                          <img src={item.damageImage} alt="Damage evidence" />
+                                          <img src={item.damageImage} alt={`Damage evidence for ${item.vin}`} />
                                           <div className="photo-overlay">
                                             <span className="material-symbols-outlined">zoom_in</span>
-                                            <span>View Full Photo</span>
+                                            <span>View full photo</span>
                                           </div>
                                         </div>
                                         <a href={item.damageImage} download={`damage-${item.vin}.jpg`} className="download-btn" onClick={(e) => e.stopPropagation()}>
-                                          <span className="material-symbols-outlined">download</span> Download Evidence
+                                          <span className="material-symbols-outlined">download</span> Download
                                         </a>
                                       </div>
                                     ) : (
@@ -572,14 +647,14 @@ export function AdminHome({ stats, state, setState }) {
                                           try {
                                             await apiResolveFlag(item.flagId);
                                             setState(resolveFlag(state, item.flagId));
-                                            setToastMessage(`Damage flag resolved for VIN ${item.vin}`);
+                                            setToastMessage(`Damage flag closed for ${item.vin}`);
                                             setTimeout(() => setToastMessage(""), 3500);
                                           } catch (err) {
                                             alert(err.message);
                                           }
                                         }}
                                       >
-                                        Resolve Damage Flag
+                                        Mark damage handled
                                       </button>
                                     </div>
                                   )}
@@ -600,15 +675,14 @@ export function AdminHome({ stats, state, setState }) {
         {activeTab === "transit" && (
           <section className="panel stack flag-tab-panel">
             <div className="tab-summary">
-              <span className="eyebrow">Incoming Vehicles</span>
-              <strong>{transitCount} vehicle{transitCount === 1 ? "" : "s"} currently in transit from TKM</strong>
-              <span className={transitCount > 0 ? "pill info" : "pill ok"} style={transitCount > 0 ? { background: 'var(--brand)', color: 'white' } : {}}>
-                {transitCount > 0 ? "Pending Arrival" : "No Transit Vehicles"}
+              <strong>{transitCount} vehicle{transitCount === 1 ? "" : "s"} in transit from TKM</strong>
+              <span className={transitCount > 0 ? "pill info transit-pill" : "pill ok"}>
+                {transitCount > 0 ? "Awaiting yard IN scan" : "None in transit"}
               </span>
             </div>
 
             {transitCount === 0 ? (
-              <p className="notice ok">There are no vehicles currently marked as in transit.</p>
+              <p className="notice ok">No vehicles currently marked in transit. Upload a TKM list below to add them.</p>
             ) : (
               <div className="table-wrapper">
                 <table className="damaged-table">
@@ -616,7 +690,7 @@ export function AdminHome({ stats, state, setState }) {
                     <tr>
                       <th>VIN</th>
                       <th>Model</th>
-                      <th>Destination Yard</th>
+                      <th>Destination</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -625,13 +699,14 @@ export function AdminHome({ stats, state, setState }) {
                       const destinationYard = yards.find(y => y.id === vehicle.currentYardId);
                       return (
                         <tr key={vehicle.vin}>
-                          <td style={{ fontFamily: "monospace" }}>{vehicle.vin}</td>
+                          <td className="damaged-vin">{vehicle.vin}</td>
                           <td>{vehicle.model}</td>
-                          <td>
-                            <span className="scan-badge in">{destinationYard?.code || "UKN"}</span> {destinationYard?.name || "Unknown Yard"}
+                          <td className="damaged-yard-cell">
+                            <span className="scan-badge in">{destinationYard?.code || "?"}</span>{" "}
+                            {destinationYard?.name || "Unknown yard"}
                           </td>
                           <td>
-                            <span className="pill info" style={{ background: 'var(--brand)', color: 'white' }}>In Transit</span>
+                            <span className="pill info transit-pill">In transit</span>
                           </td>
                         </tr>
                       );
@@ -640,11 +715,9 @@ export function AdminHome({ stats, state, setState }) {
                 </table>
               </div>
             )}
-            
-            <div style={{ marginTop: "2rem" }}>
-              <TransitUploadTab onUploadComplete={() => {
-                // Dashboard will automatically react if state refreshes, or user can refresh.
-              }} />
+
+            <div className="transit-upload-slot">
+              <TransitUploadTab onUploadComplete={() => {}} />
             </div>
           </section>
         )}
