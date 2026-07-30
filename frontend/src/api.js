@@ -62,13 +62,10 @@ function setCache(key, data) {
   localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
 }
 
+/** @deprecated Yards are hardcoded in stockyardLogic.js — do not use for login/config. */
 export async function getYards() {
-  const cached = getCached('cache:yards');
-  if (cached) return cached;
   const response = await apiFetch("/api/yards");
-  const data = response.data || response;
-  setCache('cache:yards', data);
-  return data;
+  return response.data || response;
 }
 
 export async function getBranches() {
