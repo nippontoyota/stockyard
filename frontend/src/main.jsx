@@ -627,6 +627,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const [damageRemark, setDamageRemark] = useState("");
   const [damageImage, setDamageImage] = useState("");
   const [driveType, setDriveType] = useState("");
+  const [manualScanType, setManualScanType] = useState("in"); // ponytail: manual toggle always wins; QR still uses auto scanType
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [torchOn, setTorchOn] = useState(false);
@@ -926,8 +927,12 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
 
   async function submit(event) {
     event.preventDefault();
+    // Manual entry: toggle wins. QR popover: keep auto scanType (+ live check).
+    const fromQr = Boolean(scanSuccess);
+    let effectiveType = fromQr ? scanType : manualScanType;
+
     if (!vin.trim()) return setOverlayResult({ type: "error", message: "Enter or scan a VIN." });
-    if (scanType === "out" && !outRemark) return setOverlayResult({ type: "error", message: "Select an OUT reason." });
+    if (effectiveType === "out" && !outRemark) return setOverlayResult({ type: "error", message: "Select an OUT reason." });
     if (outRemark === "stockyard_transfer" && !transferDestinationYardId) return setOverlayResult({ type: "error", message: "Select destination yard for transfer." });
     if (outRemark === "stockyard_transfer" && !transferRequestedBy.trim()) return setOverlayResult({ type: "error", message: "Enter the name of person who requested the transfer." });
     if (damaged) {
@@ -938,28 +943,25 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       return setOverlayResult({ type: "error", message: "This vehicle has an active flag. You must attach a photo to proceed." });
     }
 
-    // Item 2: Live status check before submit (if online)
-    let liveScanType = scanType;
-    if (online && pendingVin.length === 17) {
+    if (fromQr && online && pendingVin.length === 17) {
       try {
         const liveStatus = await getVehicleStatus(pendingVin);
         if (liveStatus && liveStatus.current_status) {
           const liveIsIn = liveStatus.current_status === 'in' && (liveStatus.current_yard_id === yard.id || liveStatus.current_yard_id === yard.code);
-          liveScanType = liveIsIn ? 'out' : 'in';
+          effectiveType = liveIsIn ? 'out' : 'in';
         }
       } catch {
-        // Offline or not found — use local state
+        // Offline or not found — use local/auto type
       }
     }
 
-    // Item 5: Confirmation dialog for OUT scans
-    if (liveScanType === "out" && !confirmOutData) {
-      setConfirmOutData({ vin: pendingVin, scanType: liveScanType, outRemark, model: decodedVin?.model || "Unknown" });
+    if (effectiveType === "out" && !confirmOutData) {
+      setConfirmOutData({ vin: pendingVin, scanType: effectiveType, outRemark, model: decodedVin?.model || "Unknown" });
       return;
     }
 
     setConfirmOutData(null);
-    await doSubmit(liveScanType);
+    await doSubmit(effectiveType);
   }
 
   function finishSubmit(newState, type, msg, flags) {
@@ -974,6 +976,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     setDamaged(false);
     setDamageRemark("");
     setDamageImage("");
+    setManualScanType("in");
     setScanSuccess(null);
     scanLockedRef.current = false;
     onRefresh();
@@ -1167,13 +1170,42 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
           <input ref={fileInputRef} type="file" accept="image/*" onChange={uploadQr} style={{ display: "none" }} />
           <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()}><span className="material-symbols-outlined">upload_file</span> Upload QR</button>
         </div>
-        {!scanSuccess && <label htmlFor="vin">Manual VIN entry</label>}
+        {!scanSuccess && (
+          <>
+            <label htmlFor="vin">Manual VIN entry</label>
+            <div className="segmented" role="tablist" aria-label="Manual submit type">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={manualScanType === "in"}
+                className={manualScanType === "in" ? "active" : ""}
+                onClick={() => {
+                  setManualScanType("in");
+                  setOutRemark("");
+                  setTransferDestinationYardId("");
+                  setTransferRequestedBy("");
+                }}
+              >
+                IN
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={manualScanType === "out"}
+                className={manualScanType === "out" ? "active" : ""}
+                onClick={() => setManualScanType("out")}
+              >
+                OUT
+              </button>
+            </div>
+          </>
+        )}
         <div className={scanSuccess ? "vin-submit-panel scanned" : "inline-form"}>
           <input id="vin" value={vin} onChange={(event) => {
             setVin(event.target.value.toUpperCase());
             setScanSuccess(null);
           }} placeholder="Enter VIN" aria-live={scanSuccess ? "polite" : undefined} />
-          {!scanSuccess && <button className="primary">Submit {scanType.toUpperCase()}</button>}
+          {!scanSuccess && <button className="primary">Submit {manualScanType.toUpperCase()}</button>}
           {scanSuccess && (
             <button type="button" className="scan-next-button" onClick={() => {
               setVin("");
@@ -1194,7 +1226,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
         </div>
         {!scanSuccess && (
           <div className="stack">
-            {scanType === "out" && (
+            {manualScanType === "out" && (
               <>
                 <label htmlFor="remark">OUT Reason</label>
                 <select id="remark" value={outRemark} onChange={(event) => {
