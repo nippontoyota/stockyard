@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { yards, normalizeVin, isValidVin, detectModel } from "../stockyardLogic.js";
 import { uploadTransitListApi } from "../api.js";
@@ -10,7 +10,6 @@ export function TransitUploadTab({ onUploadComplete }) {
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
-  // Fuzzy match yard by name or code
   function findYard(value) {
     if (!value) return null;
     const search = String(value).toLowerCase().trim();
@@ -30,44 +29,48 @@ export function TransitUploadTab({ onUploadComplete }) {
     setLoading(true);
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = (ev) => {
       try {
-        const data = new Uint8Array(e.target.result);
+        const data = new Uint8Array(ev.target.result);
         const workbook = XLSX.read(data, { type: "array" });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        // Extract raw JSON (array of arrays)
         const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-        
+
         if (rows.length < 2) throw new Error("File is empty or missing headers.");
 
-        const headers = rows[0].map(h => String(h).toLowerCase().trim());
-        const vinCol = headers.findIndex(h => h.includes("vin"));
-        const modelCol = headers.findIndex(h => h.includes("model"));
-        const yardCol = headers.findIndex(h => h.includes("yard") || h.includes("destination") || h.includes("location"));
+        const headers = rows[0].map((h) => String(h).toLowerCase().trim());
+        const vinCol = headers.findIndex((h) => h.includes("vin"));
+        const modelCol = headers.findIndex((h) => h.includes("model"));
+        const yardCol = headers.findIndex((h) => h.includes("yard") || h.includes("destination") || h.includes("location"));
 
-        if (vinCol === -1) throw new Error("Could not find a 'VIN' column.");
-        
+        if (vinCol === -1) throw new Error("Could not find a VIN column.");
+
         const extracted = [];
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i];
           if (!row || !row[vinCol]) continue;
-          
+
           const rawVin = String(row[vinCol]);
           const normalizedVin = normalizeVin(rawVin);
           if (!normalizedVin || !isValidVin(normalizedVin)) continue;
 
           const rawYard = yardCol !== -1 ? row[yardCol] : null;
-          const matchedYard = findYard(rawYard) || yards[0]; // fallback to first yard if not found
-          
+          const matchedYard = findYard(rawYard);
           const rawModel = modelCol !== -1 ? row[modelCol] : detectModel(normalizedVin);
 
           extracted.push({
             vin: normalizedVin,
             model: rawModel || detectModel(normalizedVin),
-            yard_id: matchedYard.id,
-            yardCode: matchedYard.code,
-            yardName: matchedYard.name
+            yard_id: matchedYard?.id || null,
+            yardCode: matchedYard?.code || "",
+            yardName: matchedYard?.name || "",
+            rawYard: rawYard ? String(rawYard) : "",
+            unmatched: !matchedYard,
           });
+        }
+
+        if (extracted.length === 0) {
+          throw new Error("No valid VINs found in this file.");
         }
 
         setParsedData(extracted);
@@ -80,18 +83,46 @@ export function TransitUploadTab({ onUploadComplete }) {
     reader.readAsArrayBuffer(droppedFile);
   }
 
+  const unmatchedCount = parsedData.filter((v) => v.unmatched).length;
+  const readyCount = parsedData.length - unmatchedCount;
+
+  function updateRowYard(vin, yardId) {
+    const yard = yards.find((y) => y.id === yardId);
+    setParsedData((prev) =>
+      prev.map((row) =>
+        row.vin === vin
+          ? {
+              ...row,
+              yard_id: yard?.id || null,
+              yardCode: yard?.code || "",
+              yardName: yard?.name || "",
+              unmatched: !yard,
+            }
+          : row
+      )
+    );
+  }
+
   async function handleConfirm() {
-    if (parsedData.length === 0) return;
+    if (readyCount === 0) return;
+    if (unmatchedCount > 0) {
+      const go = window.confirm(
+        `${unmatchedCount} row${unmatchedCount === 1 ? "" : "s"} still have no yard.\n\nUpload the ${readyCount} matched vehicle${readyCount === 1 ? "" : "s"} and skip the rest?`
+      );
+      if (!go) return;
+    }
+
+    const payload = parsedData.filter((v) => v.yard_id).map(({ vin, model, yard_id }) => ({ vin, model, yard_id }));
     setLoading(true);
     setError(null);
     try {
-      const response = await uploadTransitListApi(parsedData);
-      setSuccessMsg(response.message || "Transit list uploaded successfully.");
+      const response = await uploadTransitListApi(payload);
+      setSuccessMsg(response.message || `Uploaded ${payload.length} vehicles as in transit.`);
       setParsedData([]);
       setFile(null);
       if (onUploadComplete) onUploadComplete();
     } catch (err) {
-      setError("Failed to upload: " + err.message);
+      setError("Upload failed: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -99,9 +130,9 @@ export function TransitUploadTab({ onUploadComplete }) {
 
   return (
     <section className="panel stack transit-upload-panel">
-      <h2>Upload Transit List</h2>
-      <p className="field-hint" style={{ marginBottom: "1rem" }}>
-        Upload an Excel file (.xlsx) from TKM containing <strong>VIN</strong>, <strong>Model</strong>, and <strong>Destination</strong> columns.
+      <h2>Upload transit list</h2>
+      <p className="field-hint">
+        Excel from TKM with <strong>VIN</strong>, optional <strong>Model</strong>, and <strong>Destination / Yard</strong> columns.
       </p>
 
       {!parsedData.length && (
@@ -109,70 +140,91 @@ export function TransitUploadTab({ onUploadComplete }) {
           className="upload-dropzone"
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleFileDrop}
-          style={{
-            border: "2px dashed var(--border)",
-            borderRadius: "12px",
-            padding: "3rem",
-            textAlign: "center",
-            cursor: "pointer",
-            background: "var(--surface)",
-            transition: "all 0.2s ease"
-          }}
           onClick={() => document.getElementById("transit-file").click()}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") document.getElementById("transit-file").click();
+          }}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: "3rem", color: "var(--text-dim)", marginBottom: "1rem" }}>upload_file</span>
-          <br />
-          <strong>Drag & drop your Excel file here</strong>
-          <p className="field-hint">or click to browse</p>
+          <span className="material-symbols-outlined upload-dropzone-icon">upload_file</span>
+          <strong>{loading ? "Reading file…" : "Drop Excel here or click to browse"}</strong>
+          <p className="field-hint">{file ? file.name : ".xlsx / .xls"}</p>
           <input
             id="transit-file"
             type="file"
             accept=".xlsx,.xls"
             onChange={handleFileDrop}
-            style={{ display: "none" }}
+            hidden
           />
         </div>
       )}
 
       {error && (
         <div className="notice warn">
-          <strong>Error:</strong> {error}
+          <strong>Could not import:</strong> {error}
         </div>
       )}
 
       {successMsg && (
         <div className="notice ok">
-          <strong>Success:</strong> {successMsg}
+          <strong>Done:</strong> {successMsg}
         </div>
       )}
 
       {parsedData.length > 0 && (
         <div className="transit-preview stack">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <h3>Preview: {parsedData.length} Vehicles Detected</h3>
-            <button className="ghost" onClick={() => setParsedData([])} disabled={loading}>
+          <div className="transit-preview-header">
+            <div>
+              <h3>{parsedData.length} vehicles found</h3>
+              <p className="field-hint">
+                {readyCount} ready
+                {unmatchedCount > 0 ? ` · ${unmatchedCount} need a yard` : ""}
+              </p>
+            </div>
+            <button type="button" className="ghost" onClick={() => { setParsedData([]); setFile(null); }} disabled={loading}>
               Cancel
             </button>
           </div>
-          
-          <div className="table-wrapper" style={{ maxHeight: "400px", overflowY: "auto", border: "1px solid var(--border)", borderRadius: "8px" }}>
+
+          {unmatchedCount > 0 && (
+            <div className="notice warn">
+              Rows highlighted below have no matched yard. Pick a destination before uploading, or they will be skipped.
+            </div>
+          )}
+
+          <div className="table-wrapper transit-preview-table">
             <table className="damaged-table">
-              <thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
+              <thead>
                 <tr>
                   <th>#</th>
                   <th>VIN</th>
                   <th>Model</th>
-                  <th>Destination Yard</th>
+                  <th>Destination yard</th>
                 </tr>
               </thead>
               <tbody>
                 {parsedData.map((v, i) => (
-                  <tr key={v.vin}>
-                    <td style={{ color: "var(--text-dim)" }}>{i + 1}</td>
-                    <td style={{ fontFamily: "monospace" }}>{v.vin}</td>
+                  <tr key={v.vin} className={v.unmatched ? "row-unmatched" : ""}>
+                    <td className="muted-cell">{i + 1}</td>
+                    <td className="damaged-vin">{v.vin}</td>
                     <td>{v.model}</td>
                     <td>
-                      <span className="scan-badge in">{v.yardCode}</span> {v.yardName}
+                      <select
+                        className={`yard-pick ${v.unmatched ? "yard-pick-warn" : ""}`}
+                        value={v.yard_id || ""}
+                        onChange={(e) => updateRowYard(v.vin, e.target.value)}
+                        aria-label={`Destination yard for ${v.vin}`}
+                      >
+                        <option value="">
+                          {v.rawYard ? `Unmatched: ${v.rawYard}` : "Select yard…"}
+                        </option>
+                        {yards.map((y) => (
+                          <option key={y.id} value={y.id}>
+                            {y.code} · {y.name}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                   </tr>
                 ))}
@@ -180,8 +232,13 @@ export function TransitUploadTab({ onUploadComplete }) {
             </table>
           </div>
 
-          <button className="primary" onClick={handleConfirm} disabled={loading} style={{ alignSelf: "flex-end", marginTop: "1rem" }}>
-            {loading ? "Uploading..." : "Confirm Transit List"}
+          <button
+            type="button"
+            className="primary"
+            onClick={handleConfirm}
+            disabled={loading || readyCount === 0}
+          >
+            {loading ? "Uploading…" : `Confirm ${readyCount} in transit`}
             <span className="material-symbols-outlined">cloud_upload</span>
           </button>
         </div>

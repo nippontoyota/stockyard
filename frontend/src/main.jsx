@@ -45,11 +45,11 @@ import { usePwaInstall } from "./usePwaInstall.js";
 function flagLabel(type) {
   return {
     damage_reported: "Damage Reported",
-    gps_outside_yard: "GPS Radius Violation",
-    unverified_in: "Unverified OUT",
+    gps_outside_yard: "GPS Outside Yard",
+    unverified_in: "OUT Without IN",
     yard_capacity_exceeded: "Capacity Exceeded",
-    duplicate_yard_status: "Duplicate Status",
-    invalid_vin: "Invalid VIN Format",
+    duplicate_yard_status: "Duplicate Yard IN",
+    invalid_vin: "Invalid VIN",
     dwell_exceeded: "Dwell Time Exceeded",
     manual_admin_override: "Admin Override",
   }[type] || String(type || "Flag").replace(/_/g, " ");
@@ -1589,11 +1589,12 @@ function AdminView({ state, setState }) {
 
     setLoading(true);
     try {
-      await adminOverrideVehicle(vin, status, reason, status === "in" ? yardId : null);
-      setState(updateVehicleAdmin(state, { vin, yardId, status, reason }));
+      const targetVin = vin;
+      await adminOverrideVehicle(targetVin, status, reason, status === "in" ? yardId : null);
+      setState(updateVehicleAdmin(state, { vin: targetVin, yardId, status, reason }));
       setVin("");
       setReason("");
-      setFormSuccess(status === "out" ? `Forced OUT for ${vin}.` : `Set IN at ${selectedYard?.code || yardId} for ${vin}.`);
+      setFormSuccess(status === "out" ? `Forced OUT for ${targetVin}.` : `Set IN at ${selectedYard?.code || yardId} for ${targetVin}.`);
     } catch (err) {
       setFormError(err.message || "Override failed.");
     } finally {

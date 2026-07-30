@@ -31,7 +31,9 @@
   color: var(--bm-on-surface);
   /* padding: 16px; */
   /* Remove container padding since AdminDashboard already pads it */
-  min-height: 100vh;
+  min-height: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .bm-header {

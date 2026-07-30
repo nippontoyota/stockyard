@@ -81,17 +81,15 @@ export function BranchesTab() {
 
   return (
     <div className="bm-container">
-      {/* Header Section */}
       <div className="bm-header">
-        <h2>Branch Management</h2>
-        <p>Group physical yards into logical branches for requisitions.</p>
+        <h2>Branches</h2>
+        <p>Group yards into branches used for requisitions and delivery login.</p>
       </div>
       
       {error && <div className="notice bad" style={{marginBottom: 16}}>{error}</div>}
 
-      {/* Add Branch Form */}
       <form onSubmit={handleCreate} className="bm-add-form">
-        <label htmlFor="new-branch">NEW BRANCH NAME</label>
+        <label htmlFor="new-branch">New branch name</label>
         <div className="input-group">
           <input 
             id="new-branch"
@@ -101,7 +99,7 @@ export function BranchesTab() {
             required 
           />
           <button type="submit">
-            Add
+            Add branch
           </button>
         </div>
       </form>
@@ -130,10 +128,10 @@ export function BranchesTab() {
                     {!b.active && <span className="inactive-pill" style={{marginTop: 4}}>Inactive</span>}
                   </div>
                   <div className="bm-card-actions">
-                    <button type="button" className="bm-icon-btn" onClick={() => { setEditingId(b.id); setEditName(b.name); }} title="Edit">
+                    <button type="button" className="bm-icon-btn" onClick={() => { setEditingId(b.id); setEditName(b.name); }} title="Rename branch" aria-label="Rename branch">
                       <span className="material-symbols-outlined">edit</span>
                     </button>
-                    <button type="button" className="bm-icon-btn danger" onClick={() => handleToggleActive(b.id, b.active)} title={b.active ? "Archive" : "Unarchive"}>
+                    <button type="button" className="bm-icon-btn" onClick={() => handleToggleActive(b.id, b.active)} title={b.active ? "Archive branch" : "Restore branch"} aria-label={b.active ? "Archive branch" : "Restore branch"}>
                       <span className="material-symbols-outlined">{b.active ? "archive" : "unarchive"}</span>
                     </button>
                   </div>

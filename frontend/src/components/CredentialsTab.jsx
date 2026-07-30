@@ -142,17 +142,15 @@ export function CredentialsTab() {
     <section className="credentials-workspace stack">
       <div className="tab-summary">
         <div>
-          <span className="eyebrow">Access & Credentials Management</span>
-          <strong style={{ fontSize: "1.2rem", display: "block", marginTop: "4px" }}>
-            Stockyard & Admin Login Passwords
-          </strong>
+          <strong>Login passwords</strong>
+          <span className="tab-summary-hint">Yard staff sign in with yard code + password. Show a password only when sharing it.</span>
         </div>
         <button
           type="button"
           className="action-icon-btn"
           onClick={loadCredentials}
-          title="Refresh Credentials List"
-          aria-label="Refresh Credentials"
+          title="Refresh credentials"
+          aria-label="Refresh credentials"
         >
           <span className="material-symbols-outlined">refresh</span>
         </button>
@@ -160,7 +158,6 @@ export function CredentialsTab() {
 
       {toastMessage && <div className="notice ok">{toastMessage}</div>}
 
-      {/* Control / Filter Bar */}
       <div className="modal-controls credentials-controls">
           <div className="search-row modal-search">
             <span className="material-symbols-outlined">search</span>
@@ -168,10 +165,11 @@ export function CredentialsTab() {
               className="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search stockyard by code (e.g. CO01A) or name..."
+              placeholder="Search yard code or name…"
+              aria-label="Search credentials"
             />
           </div>
-        <div className="segmented">
+        <div className="segmented" role="tablist" aria-label="Filter by role">
           <button
             type="button"
             className={roleFilter === "all" ? "active" : ""}
@@ -196,7 +194,6 @@ export function CredentialsTab() {
         </div>
       </div>
 
-      {/* Admin Account Card Spotlight */}
       {adminAccount && (roleFilter === "all" || roleFilter === "admin") && !searchQuery && (
         <div className="admin-cred-spotlight">
           <div className="cred-spotlight-header">
@@ -204,26 +201,27 @@ export function CredentialsTab() {
               <span className="material-symbols-outlined">shield_person</span>
             </div>
             <div>
-              <span className="eyebrow">Executive Access</span>
-              <h3>System Administrator Account</h3>
-              <small className="cred-email">Admin Console</small>
+              <h3>Admin account</h3>
+              <small className="cred-email">{adminAccount.username}</small>
             </div>
           </div>
 
           <div className="cred-field-box">
-            <label className="cred-label">Admin Password</label>
+            <label className="cred-label">Password</label>
             <div className="cred-password-row">
               <input
                 type={visiblePasswords[adminAccount.username] ? "text" : "password"}
                 value={adminAccount.password}
                 readOnly
                 className="cred-password-input"
+                aria-label="Admin password"
               />
               <button
                 type="button"
                 className="icon-btn-inline"
                 onClick={() => togglePasswordVisibility(adminAccount.username)}
-                title={visiblePasswords[adminAccount.username] ? "Hide Password" : "Show Password"}
+                title={visiblePasswords[adminAccount.username] ? "Hide password" : "Show password"}
+                aria-label={visiblePasswords[adminAccount.username] ? "Hide password" : "Show password"}
               >
                 <span className="material-symbols-outlined">
                   {visiblePasswords[adminAccount.username] ? "visibility_off" : "visibility"}
@@ -234,25 +232,24 @@ export function CredentialsTab() {
                 className="primary cred-edit-btn"
                 onClick={() => openEditModal(adminAccount)}
               >
-                Change Admin Password
+                Change password
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Stockyard Account Grid */}
       <div className="tab-summary">
-        <span className="eyebrow">Stockyard Worker Credentials</span>
-        <span>Showing {yardAccounts.length} yard account{yardAccounts.length === 1 ? "" : "s"}</span>
+        <strong>Yard accounts</strong>
+        <span className="tab-summary-hint">Showing {yardAccounts.length} account{yardAccounts.length === 1 ? "" : "s"}</span>
       </div>
 
       {loading ? (
-        <div className="notice info">Loading credential accounts...</div>
+        <div className="notice info">Loading accounts…</div>
       ) : yardAccounts.length === 0 ? (
         <div className="no-results modal-no-results">
           <span className="material-symbols-outlined">key_off</span>
-          <p>No accounts match your search filter.</p>
+          <p>No accounts match this search.</p>
         </div>
       ) : (
         <div className="cred-card-grid">
@@ -269,13 +266,17 @@ export function CredentialsTab() {
                     </div>
                   </div>
                   <span className={`pill ${account.isDefault ? "neutral" : "ok"}`}>
-                    {account.isDefault ? "Default Password" : "Custom Password"}
+                    {account.isDefault ? "Default" : "Custom"}
                   </span>
                 </div>
 
                 <div className="cred-card-body">
                   <div className="cred-meta">
-                    <span className="cred-meta-label">Password:</span>
+                    <span className="cred-meta-label">Username</span>
+                    <span className="cred-meta-val cred-username">{account.username}</span>
+                  </div>
+                  <div className="cred-meta">
+                    <span className="cred-meta-label">Password</span>
                     <div className="cred-password-wrapper">
                       <span className="cred-password-text">
                         {isVisible ? account.password : "••••••••••••"}
@@ -284,7 +285,8 @@ export function CredentialsTab() {
                         type="button"
                         className="icon-btn-tiny"
                         onClick={() => togglePasswordVisibility(account.username)}
-                        title={isVisible ? "Hide Password" : "Show Password"}
+                        title={isVisible ? "Hide password" : "Show password"}
+                        aria-label={isVisible ? "Hide password" : "Show password"}
                       >
                         <span className="material-symbols-outlined">
                           {isVisible ? "visibility_off" : "visibility"}
@@ -301,7 +303,7 @@ export function CredentialsTab() {
                     onClick={() => openEditModal(account)}
                   >
                     <span className="material-symbols-outlined">key</span>
-                    <span>Edit Password</span>
+                    <span>Change password</span>
                   </button>
                 </div>
               </div>

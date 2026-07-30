@@ -18,26 +18,28 @@ export function AllVehiclesTab({ state }) {
   const filteredVehicles = allVehicles.filter((v) => {
     const derivedStatus = getDerivedStatus(v);
     const matchesStatus = statusFilter === "all" || derivedStatus.label === statusFilter;
-    
+
     const decoded = decodeVinDetails(v.vin);
     const displayModel = v.model && v.model !== "Unknown" && v.model !== "Toyota Vehicle" ? v.model : decoded.model;
     const searchString = `${v.vin} ${displayModel} ${v.variant || ""} ${v.colour || ""} ${derivedStatus.label}`.toLowerCase();
     const matchesSearch = searchString.includes(searchQuery.toLowerCase());
-    
+
     return matchesStatus && matchesSearch;
   });
 
   const getYardName = (yardId) => {
-    if (!yardId) return "-";
-    const yardObj = yards.find(y => y.id === yardId || y.code === yardId);
-    return yardObj ? yardObj.name : yardId;
+    if (!yardId) return "—";
+    const yardObj = yards.find((y) => y.id === yardId || y.code === yardId);
+    return yardObj ? `${yardObj.code} · ${yardObj.name}` : yardId;
   };
 
   return (
     <div className="tab-pane">
-      <div className="tab-header">
-        <h2>All Vehicles Tracking</h2>
-        <p className="tab-desc">Real-time status of all vehicles across all yards and transit operations.</p>
+      <div className="tab-summary">
+        <strong>All vehicles</strong>
+        <span className="tab-summary-hint">
+          {filteredVehicles.length} shown · {allVehicles.length} total across yards and transit
+        </span>
       </div>
 
       <div className="controls-row">
@@ -45,16 +47,17 @@ export function AllVehiclesTab({ state }) {
           <span className="material-symbols-outlined">search</span>
           <input
             type="text"
-            placeholder="Search by VIN or Model..."
+            placeholder="Search VIN or model…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search vehicles"
           />
         </div>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="all">All Statuses</option>
-          <option value="IN-TRANSIT">In-Transit</option>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status">
+          <option value="all">All statuses</option>
+          <option value="IN-TRANSIT">In transit</option>
           <option value="IN">In</option>
-          <option value="BRANCH TRANSFER">Branch Transfer</option>
+          <option value="BRANCH TRANSFER">Branch transfer</option>
           <option value="OUT">Out</option>
         </select>
       </div>
@@ -67,15 +70,17 @@ export function AllVehiclesTab({ state }) {
               <th>Model</th>
               <th>Key No</th>
               <th>Status</th>
-              <th>Current/Last Yard</th>
-              <th>Last Updated</th>
+              <th>Yard</th>
+              <th>Updated</th>
             </tr>
           </thead>
           <tbody>
             {filteredVehicles.length === 0 ? (
               <tr>
                 <td colSpan="6" className="empty-state-cell">
-                  No vehicles found.
+                  {allVehicles.length === 0
+                    ? "No vehicles in the system yet."
+                    : "No vehicles match this search or filter."}
                 </td>
               </tr>
             ) : (
@@ -85,14 +90,23 @@ export function AllVehiclesTab({ state }) {
                   <tr key={v.vin}>
                     <td className="mono">{v.vin}</td>
                     <td>{v.model}</td>
-                    <td className="mono">{v.keyNo || "-"}</td>
+                    <td className="mono">{v.keyNo || "—"}</td>
                     <td>
                       <span className={`status-badge ${derivedStatus.badgeClass}`}>
                         {derivedStatus.label}
                       </span>
                     </td>
-                    <td>{getYardName(v.currentYardId)}</td>
-                    <td>{new Date(v.lastChangedAt).toLocaleString()}</td>
+                    <td className="yard-cell">{getYardName(v.currentYardId)}</td>
+                    <td className="time-cell">
+                      {v.lastChangedAt
+                        ? new Date(v.lastChangedAt).toLocaleString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "—"}
+                    </td>
                   </tr>
                 );
               })
