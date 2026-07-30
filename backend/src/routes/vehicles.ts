@@ -269,6 +269,11 @@ router.patch('/deliver', async (req, res, next) => {
           target: vehicleStatus.vehicle_id,
           set: { current_status: 'out', last_changed_at: new Date(), override_reason: 'delivered' },
         });
+
+      await db
+        .update(flags)
+        .set({ resolved: true, resolved_by: req.user!.id, resolved_at: new Date() })
+        .where(and(eq(flags.vehicle_id, vehicle.id), eq(flags.resolved, false)));
       updated++;
     }
 
