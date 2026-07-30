@@ -64,6 +64,20 @@ export function AllVehiclesTab({ state, setState }) {
     setSuccess("");
   }, [editingVin, editingVehicle]);
 
+  useEffect(() => {
+    if (!editingVin) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") closeEditor();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [editingVin]);
+
   const filteredVehicles = allVehicles.filter((v) => {
     const derivedStatus = getDerivedStatus(v);
     const matchesStatus = statusFilter === "all" || derivedStatus.label === statusFilter;
@@ -165,18 +179,24 @@ export function AllVehiclesTab({ state, setState }) {
       </div>
 
       {editingVin && form && (
-        <form className="vehicle-edit-panel" onSubmit={handleSave}>
-          <div className="vehicle-edit-panel-header">
-            <div>
-              <p className="vehicle-edit-kicker">Editing vehicle</p>
-              <h3 className="vehicle-edit-vin">{editingVin}</h3>
-            </div>
-            <button type="button" className="close-modal-btn" onClick={closeEditor} aria-label="Close editor">
-              <span className="material-symbols-outlined">close</span>
-            </button>
-          </div>
+        <div className="modal-overlay" onClick={closeEditor} aria-modal="true" role="dialog" aria-labelledby="vehicle-edit-title">
+          <form
+            className="modal-content vehicle-edit-modal-card"
+            onSubmit={handleSave}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="vehicle-edit-panel-header">
+              <div>
+                <p className="vehicle-edit-kicker">Editing vehicle</p>
+                <h3 id="vehicle-edit-title" className="vehicle-edit-vin">{editingVin}</h3>
+              </div>
+              <button type="button" className="close-modal-btn" onClick={closeEditor} aria-label="Close editor">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </header>
 
-          <div className="vehicle-edit-grid">
+            <div className="vehicle-edit-modal-body">
+              <div className="vehicle-edit-grid">
             <label className="vehicle-edit-field">
               <span>Model</span>
               <input
@@ -260,20 +280,22 @@ export function AllVehiclesTab({ state, setState }) {
               />
               <span>VIN marked valid</span>
             </label>
-          </div>
+              </div>
 
-          {error && <p className="notice bad">{error}</p>}
-          {success && <p className="notice ok">{success}</p>}
+              {error && <p className="notice bad">{error}</p>}
+              {success && <p className="notice ok">{success}</p>}
+            </div>
 
-          <div className="vehicle-edit-actions">
-            <button type="button" className="cred-modal-cancel" onClick={closeEditor}>
-              Cancel
-            </button>
-            <button type="submit" className="primary" disabled={saving || !form.model.trim()}>
-              {saving ? "Saving…" : "Save vehicle"}
-            </button>
-          </div>
-        </form>
+            <footer className="vehicle-edit-actions">
+              <button type="button" className="cred-modal-cancel" onClick={closeEditor}>
+                Cancel
+              </button>
+              <button type="submit" className="primary" disabled={saving || !form.model.trim()}>
+                {saving ? "Saving…" : "Save vehicle"}
+              </button>
+            </footer>
+          </form>
+        </div>
       )}
 
       <div className="table-wrapper">
