@@ -27,7 +27,7 @@ import {
 } from "./AnalyticsCharts.jsx";
 import {
   bulkSync, getVehicles, getAdminDashboard, getFlags, getScans, resolveFlag as apiResolveFlag, adminOverrideVehicle, loginApi,
-  getNotifications, getRequisitions, markAllNotificationsRead, markNotificationRead, getAdminBranches, getYards, getBranches,
+  getNotifications, getRequisitions, markAllNotificationsRead, markNotificationRead, getAdminBranches, getBranches,
   getVehicleStatus, deliverVehicles
 } from "./api.js";
 import "./styles.css";
@@ -119,12 +119,15 @@ export default function App() {
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
 
   useEffect(() => {
-    Promise.all([getYards(), getBranches()]).then(([newYards, newBranches]) => {
-      setConfig(newYards, newBranches);
+    // Yards are hardcoded in stockyardLogic — do not fetch (filtered API + cache
+    // was causing login to show only the previously selected yard after logout).
+    localStorage.removeItem("cache:yards");
+    getBranches().then((newBranches) => {
+      setConfig(null, newBranches);
       setConfigLoaded(true);
     }).catch(e => {
       console.error("Failed to load config", e);
-      setConfigLoaded(true); // continue anyway with defaults
+      setConfigLoaded(true); // continue anyway with hardcoded yards
     });
   }, []);
 
@@ -637,8 +640,6 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const [gpsData, setGpsData] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [message, setMessage] = useState(null);
-  // Item 6: Manual scan type override
-  const [manualScanType, setManualScanType] = useState(null);
   // Item 5: OUT confirmation
   const [confirmOutData, setConfirmOutData] = useState(null);
   const videoRef = useRef(null);
@@ -649,8 +650,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const yard = yards.find((item) => item.id === session.yardId) || yards[0];
   const pendingVin = normalizeVin(vin);
   const isCarInCurrentYard = state.vehicles[pendingVin]?.currentStatus === "in" && (state.vehicles[pendingVin]?.currentYardId === yard.id || state.vehicles[pendingVin]?.currentYardId === yard.code);
-  const autoScanType = isCarInCurrentYard ? "out" : "in";
-  const scanType = manualScanType || autoScanType;
+  const scanType = isCarInCurrentYard ? "out" : "in";
   const activeFlag = state.flags?.find((f) => f.vin === pendingVin && !f.resolved);
   const isFlagged = Boolean(activeFlag);
   // Item 7: Decoded VIN info for verification
@@ -949,7 +949,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
         const liveStatus = await getVehicleStatus(pendingVin);
         if (liveStatus && liveStatus.current_status) {
           const liveIsIn = liveStatus.current_status === 'in' && (liveStatus.current_yard_id === yard.id || liveStatus.current_yard_id === yard.code);
-          liveScanType = manualScanType || (liveIsIn ? 'out' : 'in');
+          liveScanType = liveIsIn ? 'out' : 'in';
         }
       } catch {
         // Offline or not found — use local state
@@ -1012,10 +1012,6 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
             <p>{yard.name}</p>
             {lastSyncedAt && <small className="last-synced" style={{color: 'var(--text-dim)', fontSize: '0.75rem'}}>Last synced: {Math.round((Date.now() - lastSyncedAt.getTime()) / 60000)}m ago</small>}
           </div>
-        </div>
-        <div className="scan-type-toggle" style={{display: 'flex', gap: '8px', marginBottom: '8px'}}>
-          <button type="button" className={`ghost ${scanType === 'in' ? 'active primary' : ''}`} onClick={() => { setManualScanType('in'); setScanSuccess(null); }} style={{flex: 1}}>IN {manualScanType==='in'?'(Manual)':'(Auto)'}</button>
-          <button type="button" className={`ghost ${scanType === 'out' ? 'active primary' : ''}`} onClick={() => { setManualScanType('out'); setScanSuccess(null); }} style={{flex: 1}}>OUT {manualScanType==='out'?'(Manual)':'(Auto)'}</button>
         </div>
         <div className="camera">
           <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => {
