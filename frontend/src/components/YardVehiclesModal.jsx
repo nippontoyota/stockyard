@@ -1,7 +1,59 @@
 import React, { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
 import { decodeVinDetails, flagLabel, createScan, applyScan, yardsByRegion, findYardById, findApprovedTransferReq } from "../stockyardLogic.js";
 import { bulkSync } from "../api.js";
 import { VehicleTimeline } from "./VehicleTimeline.jsx";
+
+function driveLabel(value) {
+  if (!value) return "";
+  return String(value).replace(/_/g, " ");
+}
+
+function exportYardVehiclesExcel(yard, vehicles, flags = []) {
+  const rows = vehicles.map((vehicle) => {
+    const decoded = decodeVinDetails(vehicle.vin);
+    const model =
+      vehicle.model && vehicle.model !== "Unknown" && vehicle.model !== "Toyota Vehicle"
+        ? vehicle.model
+        : decoded.model || "";
+    const variant =
+      vehicle.variant && vehicle.variant !== "Standard" ? vehicle.variant : decoded.variant || "";
+    const colour =
+      vehicle.colour && vehicle.colour !== "Not set" ? vehicle.colour : decoded.colour || "";
+    const openFlag = flags.find((f) => f.vin === vehicle.vin && !f.resolved);
+
+    return {
+      VIN: vehicle.vin,
+      Model: model,
+      Variant: variant,
+      Colour: colour,
+      "Drive Type": driveLabel(vehicle.driveType),
+      "Key No": vehicle.keyNo || "",
+      Status: (vehicle.currentStatus || "").toUpperCase(),
+      "Yard Code": yard.code,
+      "Yard Name": yard.name,
+      Region: yard.city || "",
+      "VIN Valid": vehicle.vinValid === false ? "No" : "Yes",
+      "Open Flag": openFlag ? flagLabel(openFlag.type) : "",
+      "Last Updated": vehicle.lastChangedAt
+        ? new Date(vehicle.lastChangedAt).toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "",
+    };
+  });
+
+  const sheet = XLSX.utils.json_to_sheet(rows.length ? rows : [{ VIN: "", Model: "", Status: "" }]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Vehicles");
+  const safeCode = String(yard.code || "yard").replace(/[^\w.-]+/g, "_");
+  const dateStamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(workbook, `${safeCode}_vehicles_${dateStamp}.xlsx`);
+}
 
 function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDone }) {
   const [outRemark, setOutRemark] = useState("");
@@ -427,8 +479,22 @@ export function YardVehiclesModal({ yard, state, setState, onClose }) {
         )}
 
         <footer className="modal-footer">
-          <span className="modal-footer-note">Scroll to view all cars</span>
-          <button className="primary modal-done-btn" onClick={onClose}>Done</button>
+          <span className="modal-footer-note">
+            {yardVehicles.length} vehicle{yardVehicles.length === 1 ? "" : "s"} at this yard
+          </span>
+          <div className="modal-footer-actions">
+            <button
+              type="button"
+              className="yard-export-btn"
+              disabled={yardVehicles.length === 0}
+              onClick={() => exportYardVehiclesExcel(yard, yardVehicles, state?.flags || [])}
+              title={yardVehicles.length === 0 ? "No vehicles to export" : "Download Excel of all vehicles in this yard"}
+            >
+              <span className="material-symbols-outlined">download</span>
+              <span>Download Excel</span>
+            </button>
+            <button type="button" className="primary modal-done-btn" onClick={onClose}>Done</button>
+          </div>
         </footer>
       </div>
     </div>
