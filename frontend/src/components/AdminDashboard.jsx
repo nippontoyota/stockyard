@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   ExecutiveKpiCards,
@@ -12,7 +12,7 @@ import { YardVehiclesModal } from "./YardVehiclesModal.jsx";
 import { CredentialsTab } from "./CredentialsTab.jsx";
 import { TransitUploadTab } from "./TransitUploadTab.jsx";
 import { AllVehiclesTab } from "./AllVehiclesTab.jsx";
-import { flagLabel, resolveFlag, yards, detectModel } from "../stockyardLogic.js";
+import { flagLabel, resolveFlag, yards, detectModel, YARD_REGIONS } from "../stockyardLogic.js";
 import { resolveFlag as apiResolveFlag, adminOverrideVehicle } from "../api.js";
 import { useWebPush } from "../hooks/useWebPush.js";
 
@@ -96,6 +96,7 @@ export function AdminHome({ stats, state, setState }) {
   const [selectedYardModal, setSelectedYardModal] = useState(null);
   const [selectedPhotoModal, setSelectedPhotoModal] = useState(null);
   const [expandedDamagedRows, setExpandedDamagedRows] = useState(new Set());
+  const [yardSearch, setYardSearch] = useState("");
 
   const toggleDamagedRow = (id) => {
     setExpandedDamagedRows(prev => {
@@ -114,6 +115,27 @@ export function AdminHome({ stats, state, setState }) {
     if (riskFilter === "heavy") return yard.risk === "critical" || yard.risk === "heavy";
     return true;
   });
+
+  const searchFilteredYards = useMemo(() => {
+    const q = yardSearch.trim().toLowerCase();
+    if (!q) return filteredYards;
+    return filteredYards.filter(
+      (yard) =>
+        yard.name.toLowerCase().includes(q) ||
+        yard.code.toLowerCase().includes(q) ||
+        yard.id.toLowerCase().includes(q) ||
+        (yard.city || "").toLowerCase().includes(q)
+    );
+  }, [filteredYards, yardSearch]);
+
+  const yardsGroupedByRegion = useMemo(
+    () =>
+      YARD_REGIONS.map((region) => ({
+        region,
+        yards: searchFilteredYards.filter((yard) => yard.city === region),
+      })).filter((group) => group.yards.length > 0),
+    [searchFilteredYards]
+  );
 
   const handleDownload = () => {
     exportAnalyticsReport(stats);
@@ -394,41 +416,86 @@ export function AdminHome({ stats, state, setState }) {
         {activeTab === "yards" && (
           <>
             <div className="tab-summary">
-              <strong>{filteredYards.length} stockyard{filteredYards.length === 1 ? "" : "s"}</strong>
-              <span className="tab-summary-hint">Tap a yard to see its vehicles</span>
+              <strong>
+                {searchFilteredYards.length} stockyard{searchFilteredYards.length === 1 ? "" : "s"}
+              </strong>
+              <span className="tab-summary-hint">
+                {yardSearch
+                  ? `${searchFilteredYards.length} match${searchFilteredYards.length === 1 ? "" : "es"} · tap a yard to see its vehicles`
+                  : `${stats.yards.length} yards across ${YARD_REGIONS.length} regions · tap a yard to see its vehicles`}
+              </span>
             </div>
-            <section className="yard-box-grid">
-              {filteredYards.map((yard) => {
-                const empty = Math.max(0, yard.capacity - yard.count);
-                return (
-                  <article
-                    className={`yard-box clickable ${yard.risk === "critical" ? "risk-critical" : yard.risk === "heavy" ? "risk-heavy" : ""}`}
-                    key={yard.id}
-                    onClick={() => setSelectedYardModal(yard)}
-                    title={`View vehicles at ${yard.name}`}
+
+            <div className="analytics-yards-toolbar">
+              <div className="yard-search-wrap">
+                <span className="material-symbols-outlined yard-search-icon" aria-hidden="true">search</span>
+                <input
+                  id="analyticsYardSearch"
+                  type="search"
+                  className="yard-search-input"
+                  value={yardSearch}
+                  onChange={(e) => setYardSearch(e.target.value)}
+                  placeholder="Search by name, code, or region…"
+                  autoComplete="off"
+                  aria-label="Search yards"
+                />
+                {yardSearch && (
+                  <button
+                    type="button"
+                    className="yard-search-clear"
+                    onClick={() => setYardSearch("")}
+                    aria-label="Clear yard search"
                   >
-                    <div>
-                      <span className="eyebrow">{yard.code}</span>
-                      <h2>{yard.name}</h2>
-                    </div>
-                    <div className="yard-count">{yard.count}</div>
-                    <div className="yard-box-metrics">
-                      <span><b>{yard.count}</b>Utilised</span>
-                      <span><b>{empty}</b>Empty</span>
-                      <span><b>{yard.capacity}</b>Capacity</span>
-                    </div>
-                    <div className="progress-wrapper">
-                      <progress max="100" value={Math.min(100, yard.utilization)} />
-                      <span className="progress-lbl">{yard.utilization}%</span>
-                    </div>
-                    <div className="yard-box-tap-hint">
-                      <span className="material-symbols-outlined">directions_car</span>
-                      <span>View vehicles</span>
-                    </div>
-                  </article>
-                );
-              })}
-            </section>
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {yardsGroupedByRegion.length === 0 ? (
+              <div className="yard-picker-empty">
+                <span className="material-symbols-outlined">location_off</span>
+                <p>No yards match &ldquo;{yardSearch}&rdquo;</p>
+              </div>
+            ) : (
+              yardsGroupedByRegion.map(({ region, yards: regionYards }) => (
+                <section key={region} className="analytics-yards-region">
+                  <div className="analytics-yards-region-label">{region}</div>
+                  <div className="yard-box-grid">
+                    {regionYards.map((yard) => {
+                      const empty = Math.max(0, yard.capacity - yard.count);
+                      return (
+                        <article
+                          className={`yard-box clickable ${yard.risk === "critical" ? "risk-critical" : yard.risk === "heavy" ? "risk-heavy" : ""}`}
+                          key={yard.id}
+                          onClick={() => setSelectedYardModal(yard)}
+                          title={`View vehicles at ${yard.name}`}
+                        >
+                          <div>
+                            <span className="eyebrow">{yard.code}</span>
+                            <h2>{yard.name}</h2>
+                          </div>
+                          <div className="yard-count">{yard.count}</div>
+                          <div className="yard-box-metrics">
+                            <span><b>{yard.count}</b>Utilised</span>
+                            <span><b>{empty}</b>Empty</span>
+                            <span><b>{yard.capacity}</b>Capacity</span>
+                          </div>
+                          <div className="progress-wrapper">
+                            <progress max="100" value={Math.min(100, yard.utilization)} />
+                            <span className="progress-lbl">{yard.utilization}%</span>
+                          </div>
+                          <div className="yard-box-tap-hint">
+                            <span className="material-symbols-outlined">directions_car</span>
+                            <span>View vehicles</span>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))
+            )}
           </>
         )}
 
