@@ -18,7 +18,6 @@ export function VehicleTimeline({ scans = [], vin, onForceClose }) {
 
   return (
     <div className="vehicle-timeline">
-      <h3 className="timeline-header">Vehicle History — {vin}</h3>
       <div className="timeline-track">
         {sorted.map((scan, i) => {
           const time = new Date(scan.scannedAt || scan.scanned_at);
