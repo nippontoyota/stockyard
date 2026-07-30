@@ -284,6 +284,15 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
       resolved_at: new Date(),
     });
 
+    // Auto-resolve any active operational flags since the admin has manually corrected the state
+    await db.update(flags)
+      .set({
+        resolved: true,
+        resolved_by: req.user!.id,
+        resolved_at: new Date(),
+      })
+      .where(and(eq(flags.vehicle_id, vehicle.id), eq(flags.resolved, false)));
+
     res.json({ vin: req.params.vin.toUpperCase(), status: body.status, reason: body.reason });
   } catch (err) {
     next(err);
