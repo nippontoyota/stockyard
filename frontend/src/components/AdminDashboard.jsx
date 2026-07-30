@@ -365,70 +365,107 @@ export function AdminHome({ stats, state, setState }) {
     }
   }
 
+  const healthyYards = stats.yards.filter((yard) => yard.risk === "normal").length;
+
   return (
-    <section className="admin-console">
-      <header className="admin-console-header">
-        <div>
-          <h1>Admin</h1>
-          <p>Fix issues, manage stock, and configure access — one place.</p>
+    <section className="dashboard-workspace admin-console">
+      <aside className="dashboard-rail" aria-label="Admin sections">
+        <div className="rail-brand">
+          <span className="material-symbols-outlined">admin_panel_settings</span>
+          <strong>Admin</strong>
         </div>
-      </header>
-
-      <StatusStrip
-        stats={stats}
-        openFlags={activeFlagsList.length}
-        damageCount={damageFlags.length + damagedExtras.length}
-        transitCount={transitCount}
-        onJump={setSection}
-      />
-
-      <nav className="admin-section-nav" role="tablist" aria-label="Admin sections">
-        {SECTIONS.map((s) => {
-          let badge = 0;
-          if (s.id === "attention") badge = activeFlagsList.length;
-          if (s.id === "vehicles") badge = transitCount;
-          return (
-            <button
-              key={s.id}
-              type="button"
-              role="tab"
-              aria-selected={section === s.id}
-              className={section === s.id ? "active" : ""}
-              onClick={() => setSection(s.id)}
-            >
-              <span className="material-symbols-outlined">{s.icon}</span>
-              <span>{s.label}</span>
-              {badge > 0 && <span className="admin-section-badge">{badge}</span>}
-            </button>
-          );
-        })}
-      </nav>
-
-      {toastMessage && <div className="notice ok">{toastMessage}</div>}
-
-      {section === "attention" && (
-        <div className="admin-section stack">
-          <div className="admin-section-intro">
-            <strong>Things that need a decision</strong>
-            <span>Resolve exceptions and damage here. Everything else stays in Vehicles or Yards.</span>
-          </div>
-
-          <div className="admin-filter-chips" role="group" aria-label="Issue type">
-            {[
-              { id: "all", label: `All (${activeFlagsList.length})` },
-              { id: "exceptions", label: `Exceptions (${activeFlagsList.length - damageFlags.length})` },
-              { id: "damage", label: `Damage (${damageFlags.length})` },
-            ].map((chip) => (
+        <div className="rail-menu" role="tablist" aria-label="Admin sections">
+          {SECTIONS.map((s) => {
+            let badge = 0;
+            if (s.id === "attention") badge = activeFlagsList.length;
+            if (s.id === "vehicles") badge = transitCount;
+            return (
               <button
-                key={chip.id}
+                key={s.id}
                 type="button"
-                className={issueFilter === chip.id ? "active" : ""}
-                onClick={() => setIssueFilter(chip.id)}
+                role="tab"
+                aria-selected={section === s.id}
+                className={section === s.id ? "active" : ""}
+                onClick={() => setSection(s.id)}
               >
-                {chip.label}
+                <span className="material-symbols-outlined">{s.icon}</span>
+                <span>{s.label}</span>
+                {badge > 0 && <span className="rail-badge">{badge}</span>}
               </button>
-            ))}
+            );
+          })}
+        </div>
+        <div className="rail-note">
+          <b>{healthyYards}/{stats.yards.length}</b>
+          <span>yards healthy</span>
+        </div>
+      </aside>
+
+      <div className="stack analytical-dashboard admin-console-main">
+        <header className="admin-console-header">
+          <div className="dashboard-header-copy">
+            <h1>{SECTIONS.find((s) => s.id === section)?.label || "Admin"}</h1>
+            <p className="dashboard-subtitle">
+              {section === "attention" && "Resolve exceptions and damage reports"}
+              {section === "yards" && "Browse yards by region and open vehicle lists"}
+              {section === "vehicles" && "Find, edit, and clean up vehicle records"}
+              {section === "setup" && "Passwords, branches, and push alerts"}
+            </p>
           </div>
+          <div className="segmented dashboard-mobile-tabs admin-mobile-tabs" role="tablist" aria-label="Admin sections">
+            {SECTIONS.map((s) => {
+              let badge = 0;
+              if (s.id === "attention") badge = activeFlagsList.length;
+              if (s.id === "vehicles") badge = transitCount;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={section === s.id}
+                  className={section === s.id ? "active" : ""}
+                  onClick={() => setSection(s.id)}
+                >
+                  {s.label}{badge > 0 ? ` (${badge})` : ""}
+                </button>
+              );
+            })}
+          </div>
+        </header>
+
+        <StatusStrip
+          stats={stats}
+          openFlags={activeFlagsList.length}
+          damageCount={damageFlags.length + damagedExtras.length}
+          transitCount={transitCount}
+          onJump={setSection}
+        />
+
+        {toastMessage && <div className="notice ok">{toastMessage}</div>}
+
+        {section === "attention" && (
+          <div className="admin-section stack">
+            <div className="admin-section-intro">
+              <strong>Things that need a decision</strong>
+              <span>Resolve exceptions and damage here. Everything else stays in Vehicles or Yards.</span>
+            </div>
+
+            <div className="admin-filter-chips" role="group" aria-label="Issue type">
+              {[
+                { id: "all", label: `All (${activeFlagsList.length})` },
+                { id: "exceptions", label: `Exceptions (${activeFlagsList.length - damageFlags.length})` },
+                { id: "damage", label: `Damage (${damageFlags.length})` },
+              ].map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={issueFilter === chip.id ? "active" : ""}
+                  onClick={() => setIssueFilter(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
 
           {filteredFlags.length === 0 && damagedExtras.length === 0 ? (
             <p className="notice ok">Nothing open. Yards are clear of exceptions.</p>
@@ -759,6 +796,7 @@ export function AdminHome({ stats, state, setState }) {
           </div>
         </div>
       )}
+      </div>
 
       <YardVehiclesModal
         yard={selectedYardModal}
