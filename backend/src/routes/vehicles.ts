@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { eq, and, desc, ilike, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { vehicles, vehicleStatus, scans, yards } from '../db/schema.js';
+import { vehicles, vehicleStatus, scans, yards, flags } from '../db/schema.js';
 import { authenticate } from '../middleware/auth.js';
 
 import { detectModel } from '../lib/vin.js';
