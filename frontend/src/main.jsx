@@ -375,33 +375,35 @@ function Login({ onLogin }) {
     const cleanPassword = passwordInput.trim();
     const targetYard = yards.find((y) => y.id === yardId) || yards[0];
     const targetBranch = branches.find((b) => b.id === branchId);
-    const cleanUsername = role === "admin" ? "ADMIN123@nippon.com" : role === "delivery_incharge" ? (targetBranch ? `${targetBranch.id}@nippon.com` : "") : `${targetYard?.id || ""}@nippon.com`;
+    const cleanUsername =
+      role === "admin"
+        ? "admin"
+        : role === "delivery_incharge"
+          ? targetBranch?.id || ""
+          : targetYard?.id || "";
 
     // 1. Evaluate local credential validity (handles default & custom saved credentials)
     let isLocalValid = false;
     if (role === "admin") {
-      if (cleanPassword === "ADMIN123@nippon.com" || cleanPassword === "ADMIN123") {
+      if (cleanPassword === "ADMIN123") {
         isLocalValid = true;
       }
     } else if (role === "delivery_incharge") {
       if (cleanPassword === "delivery123") {
         isLocalValid = true;
       }
-    } else {
-      const validPasswords = [
-        targetYard?.code,
-        targetYard?.id,
-        `${targetYard?.code || ""}@nippon.com`,
-        `${targetYard?.id || ""}@nippon.com`,
-      ];
-      if (validPasswords.some((p) => p.toLowerCase() === cleanPassword.toLowerCase())) {
-        isLocalValid = true;
-      }
+    } else if (targetYard?.code && cleanPassword.toLowerCase() === targetYard.code.toLowerCase()) {
+      isLocalValid = true;
     }
 
     try {
       const cachedCreds = JSON.parse(localStorage.getItem("nippon_credentials_cache") || "[]");
-      const matched = cachedCreds.find((c) => c.username === cleanUsername || (targetYard && (c.yardId === targetYard.id || c.yardId === targetYard.code)));
+      const matched = cachedCreds.find(
+        (c) =>
+          c.username === cleanUsername ||
+          (targetYard && c.yardId === targetYard.id) ||
+          (targetBranch && c.branchId === targetBranch.id)
+      );
       if (matched && matched.password === cleanPassword) {
         isLocalValid = true;
       }

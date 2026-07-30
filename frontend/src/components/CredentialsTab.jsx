@@ -1,9 +1,31 @@
 import React, { useState, useEffect } from "react";
-import { yards } from "../stockyardLogic.js";
-import { getCredentialsApi, updateCredentialApi } from "../api.js";
+import { yards, fallbackBranches } from "../stockyardLogic.js";
+import { getCredentialsApi, updateCredentialApi, getAdminBranches } from "../api.js";
+import {
+  ADMIN_DEFAULT_PASSWORD,
+  DELIVERY_DEFAULT_PASSWORD,
+  defaultPasswordForRole,
+  buildDefaultCredentials,
+} from "../credentials.js";
+
+function mergeWithDefaults(apiRows, defaults) {
+  const byUsername = new Map(apiRows.map((row) => [row.username, row]));
+  return defaults.map((fallback) => {
+    const found = byUsername.get(fallback.username);
+    if (!found) return fallback;
+    return {
+      ...fallback,
+      ...found,
+      yardName: found.yardName || fallback.yardName,
+      yardCode: found.yardCode || fallback.yardCode,
+      isDefault: found.password === defaultPasswordForRole(found.role, found.yardCode || fallback.yardCode),
+    };
+  });
+}
 
 export function CredentialsTab() {
   const [credentials, setCredentials] = useState([]);
+  const [branches, setBranches] = useState(fallbackBranches);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -17,70 +39,35 @@ export function CredentialsTab() {
     setLoading(true);
     const cachedRaw = localStorage.getItem("nippon_credentials_cache");
     const cachedCreds = cachedRaw ? JSON.parse(cachedRaw) : [];
+    const defaults = buildDefaultCredentials(yards, branches);
 
     try {
       const res = await getCredentialsApi();
-      if (res && res.credentials) {
-        setCredentials(res.credentials);
-        localStorage.setItem("nippon_credentials_cache", JSON.stringify(res.credentials));
+      if (res?.credentials?.length) {
+        const merged = mergeWithDefaults(res.credentials, defaults);
+        setCredentials(merged);
+        localStorage.setItem("nippon_credentials_cache", JSON.stringify(merged));
       } else {
-        // Fallback default list from static yards array
-        const defaultList = [
-          {
-            username: "ADMIN123@nippon.com",
-            password: "ADMIN123@nippon.com",
-            role: "admin",
-            yardId: null,
-            yardName: "System Administrator",
-            isDefault: true,
-          },
-          ...yards.map((y) => ({
-            username: `${y.id}@nippon.com`,
-            password: `${y.id}@nippon.com`,
-            role: "yard",
-            yardId: y.id,
-            yardName: y.name,
-            isDefault: true,
-          })),
-        ];
-        const mergedList = defaultList.map((d) => {
-          const found = cachedCreds.find((c) => c.username === d.username);
-          return found ? { ...d, password: found.password, isDefault: found.password === d.username } : d;
-        });
-        setCredentials(mergedList);
+        const merged = mergeWithDefaults(cachedCreds, defaults);
+        setCredentials(merged);
       }
-    } catch (err) {
-      // Offline / fallback fallback populate
-      const fallbackList = [
-        {
-          username: "ADMIN123@nippon.com",
-          password: "ADMIN123@nippon.com",
-          role: "admin",
-          yardId: null,
-          yardName: "System Administrator",
-          isDefault: true,
-        },
-        ...yards.map((y) => ({
-          username: `${y.id}@nippon.com`,
-          password: `${y.id}@nippon.com`,
-          role: "yard",
-          yardId: y.id,
-          yardName: y.name,
-          isDefault: true,
-        })),
-      ];
-      const mergedList = fallbackList.map((d) => {
-        const found = cachedCreds.find((c) => c.username === d.username);
-        return found ? { ...d, password: found.password, isDefault: found.password === d.username } : d;
-      });
-      setCredentials(mergedList);
+    } catch {
+      const merged = mergeWithDefaults(cachedCreds, defaults);
+      setCredentials(merged);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadCredentials();
+    getAdminBranches()
+      .then((res) => {
+        if (res?.length) setBranches(res);
+      })
+      .catch(() => {})
+      .finally(() => {
+        loadCredentials();
+      });
   }, []);
 
   const togglePasswordVisibility = (username) => {
@@ -105,7 +92,11 @@ export function CredentialsTab() {
       setCredentials((prev) => {
         const updated = prev.map((item) =>
           item.username === editingAccount.username
-            ? { ...item, password: updatedPassword, isDefault: updatedPassword === item.username }
+            ? {
+                ...item,
+                password: updatedPassword,
+                isDefault: updatedPassword === defaultPasswordForRole(item.role, item.yardCode),
+              }
             : item
         );
         localStorage.setItem("nippon_credentials_cache", JSON.stringify(updated));
@@ -116,10 +107,10 @@ export function CredentialsTab() {
     try {
       await updateCredentialApi(editingAccount.username, updatedPassword);
       applyLocalUpdate();
-      setToastMessage(`Password updated successfully!`);
-    } catch (err) {
+      setToastMessage("Password updated.");
+    } catch {
       applyLocalUpdate();
-      setToastMessage(`Password updated locally.`);
+      setToastMessage("Password saved locally. Sync when back online.");
     } finally {
       setEditingAccount(null);
       setNewPasswordInput("");
@@ -130,27 +121,46 @@ export function CredentialsTab() {
 
   const filteredCredentials = credentials.filter((item) => {
     const matchesRole = roleFilter === "all" || item.role === roleFilter;
-    const searchString = `${item.username} ${item.yardName || ""} ${item.yardId || ""}`.toLowerCase();
+    const searchString = `${item.yardCode || ""} ${item.yardName || ""} ${item.yardId || ""} ${item.branchId || ""}`.toLowerCase();
     const matchesSearch = searchString.includes(searchQuery.toLowerCase());
     return matchesRole && matchesSearch;
   });
 
   const adminAccount = credentials.find((c) => c.role === "admin");
-  const yardAccounts = filteredCredentials.filter((c) => c.role !== "admin");
+  const yardAccounts = filteredCredentials.filter((c) => c.role === "yard");
+  const deliveryAccounts = filteredCredentials.filter((c) => c.role === "delivery_incharge");
+
+  const defaultHint =
+    editingAccount?.role === "admin"
+      ? `Default is ${ADMIN_DEFAULT_PASSWORD}.`
+      : editingAccount?.role === "delivery_incharge"
+        ? `Default is ${DELIVERY_DEFAULT_PASSWORD} for all delivery logins.`
+        : editingAccount?.yardCode
+          ? `Default is the yard code (${editingAccount.yardCode}).`
+          : "Keep it short so yard staff can type it on a phone.";
+
+  const placeholder =
+    editingAccount?.role === "admin"
+      ? "e.g. ADMIN123"
+      : editingAccount?.role === "delivery_incharge"
+        ? "e.g. delivery123"
+        : `e.g. ${editingAccount?.yardCode || "CO01A"}`;
 
   return (
     <section className="credentials-workspace stack">
       <div className="tab-summary credentials-summary">
         <div className="credentials-summary-copy">
           <strong>Login passwords</strong>
-          <span className="tab-summary-hint">Yard staff sign in with yard code + password. Show a password only when sharing it.</span>
+          <span className="tab-summary-hint">
+            Staff pick their role and location on the sign-in screen, then enter the password shown here.
+          </span>
         </div>
         <button
           type="button"
           className="action-icon-btn"
           onClick={loadCredentials}
-          title="Refresh credentials"
-          aria-label="Refresh credentials"
+          title="Refresh passwords"
+          aria-label="Refresh passwords"
         >
           <span className="material-symbols-outlined">refresh</span>
         </button>
@@ -166,7 +176,7 @@ export function CredentialsTab() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search yard code or name…"
-            aria-label="Search credentials"
+            aria-label="Search passwords"
           />
         </div>
         <div className="segmented" role="tablist" aria-label="Filter by role">
@@ -186,10 +196,17 @@ export function CredentialsTab() {
           </button>
           <button
             type="button"
+            className={roleFilter === "delivery_incharge" ? "active" : ""}
+            onClick={() => setRoleFilter("delivery_incharge")}
+          >
+            Delivery ({credentials.filter((c) => c.role === "delivery_incharge").length})
+          </button>
+          <button
+            type="button"
             className={roleFilter === "admin" ? "active" : ""}
             onClick={() => setRoleFilter("admin")}
           >
-            Admin ({credentials.filter((c) => c.role === "admin").length})
+            Admin
           </button>
         </div>
       </div>
@@ -201,8 +218,8 @@ export function CredentialsTab() {
               <span className="material-symbols-outlined">shield_person</span>
             </div>
             <div>
-              <h3>Admin account</h3>
-              <small className="cred-email">{adminAccount.username}</small>
+              <h3>Admin login</h3>
+              <small className="cred-login-hint">Sign-in screen → Admin role → password below</small>
             </div>
           </div>
 
@@ -235,91 +252,156 @@ export function CredentialsTab() {
                 Change password
               </button>
             </div>
+            <small className="field-hint">Default: {ADMIN_DEFAULT_PASSWORD}</small>
           </div>
         </div>
       )}
 
-      <div className="tab-summary">
-        <strong>Yard accounts</strong>
-        <span className="tab-summary-hint">Showing {yardAccounts.length} account{yardAccounts.length === 1 ? "" : "s"}</span>
-      </div>
+      {(roleFilter === "all" || roleFilter === "delivery_incharge") && !searchQuery && deliveryAccounts.length > 0 && (
+        <>
+          <div className="tab-summary">
+            <strong>Delivery logins</strong>
+            <span className="tab-summary-hint">
+              Each branch has its own sign-in location. Default password is {DELIVERY_DEFAULT_PASSWORD} unless changed.
+            </span>
+          </div>
+          <div className="cred-card-grid">
+            {deliveryAccounts.map((account) => {
+              const isVisible = visiblePasswords[account.username];
+              return (
+                <div key={account.username} className="cred-card">
+                  <div className="cred-card-top">
+                    <div className="cred-card-title">
+                      <span className="material-symbols-outlined cred-card-icon">local_shipping</span>
+                      <div>
+                        <strong>{account.yardName}</strong>
+                        <small className="cred-yard-code">Delivery branch</small>
+                      </div>
+                    </div>
+                    <span className={`pill ${account.isDefault ? "neutral" : "ok"}`}>
+                      {account.isDefault ? "Default" : "Custom"}
+                    </span>
+                  </div>
 
-      {loading ? (
-        <div className="notice info">Loading accounts…</div>
-      ) : yardAccounts.length === 0 ? (
-        <div className="no-results modal-no-results">
-          <span className="material-symbols-outlined">key_off</span>
-          <p>No accounts match this search.</p>
-        </div>
-      ) : (
-        <div className="cred-card-grid">
-          {yardAccounts.map((account) => {
-            const isVisible = visiblePasswords[account.username];
-            return (
-              <div key={account.username} className="cred-card">
-                <div className="cred-card-top">
-                  <div className="cred-card-title">
-                    <span className="material-symbols-outlined cred-card-icon">warehouse</span>
-                    <div>
-                      <strong>{account.yardName}</strong>
-                      <small className="cred-yard-code">{account.yardId || "Yard"}</small>
+                  <div className="cred-card-body">
+                    <div className="cred-meta">
+                      <span className="cred-meta-label">Sign-in password</span>
+                      <div className="cred-password-wrapper">
+                        <span className="cred-password-text">
+                          {isVisible ? account.password : "••••••••••••"}
+                        </span>
+                        <button
+                          type="button"
+                          className="icon-btn-tiny"
+                          onClick={() => togglePasswordVisibility(account.username)}
+                          title={isVisible ? "Hide password" : "Show password"}
+                          aria-label={isVisible ? "Hide password" : "Show password"}
+                        >
+                          <span className="material-symbols-outlined">
+                            {isVisible ? "visibility_off" : "visibility"}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <span className={`pill ${account.isDefault ? "neutral" : "ok"}`}>
-                    {account.isDefault ? "Default" : "Custom"}
-                  </span>
-                </div>
 
-                <div className="cred-card-body">
-                  <div className="cred-meta">
-                    <span className="cred-meta-label">Username</span>
-                    <span className="cred-meta-val cred-username">{account.username}</span>
+                  <div className="cred-card-footer">
+                    <button type="button" className="cred-card-btn" onClick={() => openEditModal(account)}>
+                      <span className="material-symbols-outlined">key</span>
+                      <span>Change password</span>
+                    </button>
                   </div>
-                  <div className="cred-meta">
-                    <span className="cred-meta-label">Password</span>
-                    <div className="cred-password-wrapper">
-                      <span className="cred-password-text">
-                        {isVisible ? account.password : "••••••••••••"}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {(roleFilter === "all" || roleFilter === "yard") && (
+        <>
+          <div className="tab-summary">
+            <strong>Yard logins</strong>
+            <span className="tab-summary-hint">
+              Showing {yardAccounts.length} yard{yardAccounts.length === 1 ? "" : "s"}. Default password matches the yard code (e.g. CO01A).
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="notice info">Loading accounts…</div>
+          ) : yardAccounts.length === 0 ? (
+            <div className="no-results modal-no-results">
+              <span className="material-symbols-outlined">key_off</span>
+              <p>No yard accounts match this search.</p>
+            </div>
+          ) : (
+            <div className="cred-card-grid">
+              {yardAccounts.map((account) => {
+                const isVisible = visiblePasswords[account.username];
+                return (
+                  <div key={account.username} className="cred-card">
+                    <div className="cred-card-top">
+                      <div className="cred-card-title">
+                        <span className="material-symbols-outlined cred-card-icon">warehouse</span>
+                        <div>
+                          <strong>{account.yardName}</strong>
+                          <small className="cred-yard-code">{account.yardCode || account.yardId}</small>
+                        </div>
+                      </div>
+                      <span className={`pill ${account.isDefault ? "neutral" : "ok"}`}>
+                        {account.isDefault ? "Default" : "Custom"}
                       </span>
-                      <button
-                        type="button"
-                        className="icon-btn-tiny"
-                        onClick={() => togglePasswordVisibility(account.username)}
-                        title={isVisible ? "Hide password" : "Show password"}
-                        aria-label={isVisible ? "Hide password" : "Show password"}
-                      >
-                        <span className="material-symbols-outlined">
-                          {isVisible ? "visibility_off" : "visibility"}
-                        </span>
+                    </div>
+
+                    <div className="cred-card-body">
+                      <div className="cred-meta">
+                        <span className="cred-meta-label">Sign-in password</span>
+                        <div className="cred-password-wrapper">
+                          <span className="cred-password-text">
+                            {isVisible ? account.password : "••••••••••••"}
+                          </span>
+                          <button
+                            type="button"
+                            className="icon-btn-tiny"
+                            onClick={() => togglePasswordVisibility(account.username)}
+                            title={isVisible ? "Hide password" : "Show password"}
+                            aria-label={isVisible ? "Hide password" : "Show password"}
+                          >
+                            <span className="material-symbols-outlined">
+                              {isVisible ? "visibility_off" : "visibility"}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="cred-card-footer">
+                      <button type="button" className="cred-card-btn" onClick={() => openEditModal(account)}>
+                        <span className="material-symbols-outlined">key</span>
+                        <span>Change password</span>
                       </button>
                     </div>
                   </div>
-                </div>
-
-                <div className="cred-card-footer">
-                  <button
-                    type="button"
-                    className="cred-card-btn"
-                    onClick={() => openEditModal(account)}
-                  >
-                    <span className="material-symbols-outlined">key</span>
-                    <span>Change password</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Edit Password Modal */}
       {editingAccount && (
         <div className="modal-overlay" onClick={() => setEditingAccount(null)} aria-modal="true" role="dialog">
           <div className="modal-content cred-modal-card" onClick={(e) => e.stopPropagation()}>
             <header className="modal-header">
               <div>
-                <span className="eyebrow">{editingAccount.role === "admin" ? "ADMIN ACCOUNT" : editingAccount.yardId}</span>
-                <h2>Edit Account Password</h2>
+                <span className="eyebrow">
+                  {editingAccount.role === "admin"
+                    ? "ADMIN"
+                    : editingAccount.role === "delivery_incharge"
+                      ? "DELIVERY"
+                      : editingAccount.yardCode || "YARD"}
+                </span>
+                <h2>Change password</h2>
               </div>
               <button
                 className="close-modal-btn"
@@ -332,45 +414,41 @@ export function CredentialsTab() {
 
             <form onSubmit={handleUpdatePassword} className="modal-body stack">
               <div className="field-group">
-                <label className="field-label">Stockyard Account / Role</label>
+                <label className="field-label">Account</label>
                 <input
                   className="input-disabled"
-                  value={editingAccount.yardName ? `${editingAccount.yardId || "Yard"} · ${editingAccount.yardName}` : "System Administrator"}
+                  value={
+                    editingAccount.role === "admin"
+                      ? "Admin console"
+                      : editingAccount.role === "delivery_incharge"
+                        ? `Delivery · ${editingAccount.yardName}`
+                        : `${editingAccount.yardCode || editingAccount.yardId} · ${editingAccount.yardName}`
+                  }
                   readOnly
                   disabled
                 />
               </div>
 
               <div className="field-group">
-                <label className="field-label">New Password</label>
+                <label className="field-label">New password</label>
                 <input
                   type="text"
                   className="search modal-input"
                   value={newPasswordInput}
                   onChange={(e) => setNewPasswordInput(e.target.value)}
-                  placeholder="Enter new password (e.g. CO01A@nippon.com)"
+                  placeholder={placeholder}
                   required
                   autoFocus
                 />
-                <small className="field-hint">
-                  Password format for worker stockyard accounts should be simple and easy for workers to enter on mobile.
-                </small>
+                <small className="field-hint">{defaultHint}</small>
               </div>
 
               <div className="modal-footer" style={{ padding: 0, marginTop: "1rem" }}>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => setEditingAccount(null)}
-                >
+                <button type="button" className="secondary" onClick={() => setEditingAccount(null)}>
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="primary"
-                  disabled={isSubmitting || !newPasswordInput.trim()}
-                >
-                  {isSubmitting ? "Updating..." : "Save New Password"}
+                <button type="submit" className="primary" disabled={isSubmitting || !newPasswordInput.trim()}>
+                  {isSubmitting ? "Saving…" : "Save password"}
                 </button>
               </div>
             </form>
