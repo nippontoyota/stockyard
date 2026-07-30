@@ -410,11 +410,11 @@ export function removeDeliveredVehicles(state, vins) {
 export function flagLabel(type) {
   return {
     damage_reported: "Damage Reported",
-    gps_outside_yard: "GPS Radius Violation",
-    unverified_in: "Unverified OUT",
+    gps_outside_yard: "GPS Outside Yard",
+    unverified_in: "OUT Without IN",
     yard_capacity_exceeded: "Capacity Exceeded",
-    duplicate_yard_status: "Duplicate Status",
-    invalid_vin: "Invalid VIN Format",
+    duplicate_yard_status: "Duplicate Yard IN",
+    invalid_vin: "Invalid VIN",
     manual_admin_override: "Admin Override",
     dwell_exceeded: "Dwell Time Exceeded",
   }[type] || String(type || "Flag").replace(/_/g, " ");
