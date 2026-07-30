@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as XLSX from "xlsx";
 import {
@@ -8,11 +8,8 @@ import {
   createScan,
   dashboard,
   decodeVinDetails,
-  parseDeliveredVins,
   normalizeVin,
-  removeDeliveredVehicles,
   resolveFlag,
-  updateVehicleAdmin,
   yards,
   fallbackBranches,
   setConfig,
@@ -29,16 +26,15 @@ import {
   DwellByModelChart,
 } from "./AnalyticsCharts.jsx";
 import {
-  bulkSync, getVehicles, getAdminDashboard, getFlags, getScans, resolveFlag as apiResolveFlag, adminOverrideVehicle, loginApi,
+  bulkSync, getVehicles, getAdminDashboard, getFlags, getScans, resolveFlag as apiResolveFlag, loginApi,
   getNotifications, getRequisitions, markAllNotificationsRead, markNotificationRead, getAdminBranches, getBranches,
-  getVehicleStatus, deliverVehicles
+  getVehicleStatus
 } from "./api.js";
 import "./styles.css";
 
 // Import new components
 import { RequisitionsTab } from "./components/RequisitionsTab.jsx";
 import { NotificationBell } from "./components/NotificationBell.jsx";
-import { BranchesTab } from "./components/BranchesTab.jsx";
 import { useSocket } from "./useSocket.js";
 import { ScanOverlay } from "./components/ScanOverlay.jsx";
 import { GpsStatus } from "./components/GpsStatus.jsx";
@@ -61,10 +57,7 @@ function flagLabel(type) {
 
 function getRoutePath(viewName, role) {
   if (role === "admin") {
-    if (viewName === "dashboard") return "/dashboard";
     if (viewName === "stock") return "/stock";
-    if (viewName === "admin" || viewName === "delivered") return "/admin";
-    if (viewName === "branches") return "/admin-branches";
     return "/dashboard";
   }
   if (role === "delivery_incharge") {
@@ -83,10 +76,8 @@ function getRoutePath(viewName, role) {
 function getViewFromPath(pathname, role) {
   const path = (pathname || "").toLowerCase();
   if (role === "admin") {
-    if (path === "/admin" || path === "/delivered") return "admin";
     if (path === "/stock") return "stock";
-    if (path === "/admin-branches") return "branches";
-    if (path === "/dashboard" || path === "/dash") return "dashboard";
+    // Legacy /admin and /admin-branches URLs land on the unified Admin console
     return "dashboard";
   }
   if (role === "delivery_incharge") {
@@ -121,7 +112,7 @@ export default function App() {
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
 
   useEffect(() => {
-    // Yards are hardcoded in stockyardLogic — do not fetch (filtered API + cache
+    // Yards are hardcoded in stockyardLogic â€” do not fetch (filtered API + cache
     // was causing login to show only the previously selected yard after logout).
     localStorage.removeItem("cache:yards");
     getBranches().then((newBranches) => {
@@ -253,7 +244,7 @@ export default function App() {
     };
   }, [fetchServerData]);
 
-  // §1.1 — Socket.io event-driven updates
+  // Â§1.1 â€” Socket.io event-driven updates
   useSocket(fetchServerData);
 
   useEffect(() => {
@@ -322,20 +313,28 @@ export default function App() {
       <main className="content">
         {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} onRefresh={fetchServerData} lastSyncedAt={lastSyncedAt} />}
         {view === "stock" && <StockView state={state} session={session} />}
-        {view === "dashboard" && (isAdmin ? <AdminHome stats={stats} state={state} setState={setState} /> : <DashboardView state={state} stats={stats} session={session} setState={setState} />)}
-        {view === "admin" && isAdmin && <AdminView state={state} setState={setState} />}
+        {view === "dashboard" && (
+          isAdmin
+            ? <AdminHome stats={stats} state={state} setState={setState} />
+            : <DashboardView state={state} stats={stats} session={session} setState={setState} />
+        )}
         {view === "requisitions" && <RequisitionsTab state={state} session={session} onRefresh={fetchServerData} />}
-        {view === "branches" && isAdmin && <BranchesTab session={session} />}
       </main>
       <nav className={`bottom-nav ${isAdmin ? "bottom-nav-admin" : ""}`}>
         {session.role === "stockyard" && <NavButton icon="barcode_scanner" label="Scan" active={view === "scan"} onClick={() => navigateTo("scan")} />}
         <NavButton icon="inventory_2" label="Stock" active={view === "stock"} onClick={() => navigateTo("stock")} />
-        <NavButton icon="dashboard" label={isAdmin ? "Analytics" : "Dash"} active={view === "dashboard"} onClick={() => navigateTo("dashboard")} />
+        {!isAdmin && <NavButton icon="dashboard" label="Dash" active={view === "dashboard"} onClick={() => navigateTo("dashboard")} />}
         {(session.role === "stockyard" || session.role === "delivery_incharge") && (
           <NavButton icon="swap_horiz" label="Requests" badge={pendingReqCount} active={view === "requisitions"} onClick={() => navigateTo("requisitions")} />
         )}
-        {isAdmin && <NavButton icon="account_tree" label="Branches" active={view === "branches"} onClick={() => navigateTo("branches")} />}
-        {isAdmin && <NavButton icon="admin_panel_settings" label="Tools" active={view === "admin"} onClick={() => navigateTo("admin")} />}
+        {isAdmin && (
+          <NavButton
+            icon="admin_panel_settings"
+            label="Admin"
+            active={view === "dashboard"}
+            onClick={() => navigateTo("dashboard")}
+          />
+        )}
       </nav>
     </div>
   );
@@ -475,7 +474,7 @@ function Login({ onLogin }) {
         <div className="login-visual" aria-hidden="true">
           <div className="yard-strip">
             <span>Authorised access only</span>
-            <b>{yards.length} yards · {YARD_REGIONS.length} regions</b>
+            <b>{yards.length} yards Â· {YARD_REGIONS.length} regions</b>
           </div>
         </div>
         <div className="login-form-panel">
@@ -518,7 +517,7 @@ function Login({ onLogin }) {
                   <select id="yardSelect" value={yardId} onChange={handleYardChange} required>
                     {regionYards.map((yard) => (
                       <option key={yard.id} value={yard.id}>
-                        {yard.code} · {yard.name}
+                        {yard.code} Â· {yard.name}
                       </option>
                     ))}
                   </select>
@@ -607,35 +606,8 @@ function NavButton({ icon, label, active, badge, onClick }) {
   );
 }
 
-function exportAnalyticsReport(stats) {
-  const yardSheet = XLSX.utils.json_to_sheet(
-    stats.yards.map((y) => ({
-      Code: y.code,
-      Name: y.name,
-      Capacity: y.capacity,
-      Occupied: y.count,
-      Utilization: `${y.utilization}%`,
-      Risk: y.risk.toUpperCase(),
-    }))
-  );
-
-  const modelSheet = XLSX.utils.json_to_sheet(
-    stats.models.map((m) => ({
-      Model: m.model,
-      Units: m.count,
-      Percentage: `${m.pct}%`,
-    }))
-  );
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, yardSheet, "Yard Capacity");
-  XLSX.utils.book_append_sheet(workbook, modelSheet, "Model Distribution");
-  XLSX.writeFile(workbook, `Stockyard_Analytics_${new Date().toISOString().slice(0, 10)}.xlsx`);
-}
-
 import { YardVehiclesModal } from "./components/YardVehiclesModal.jsx";
 import { AdminHome } from "./components/AdminDashboard.jsx";
-import { CredentialsTab } from "./components/CredentialsTab.jsx";
 
 function compressImage(file, maxDimension = 1000, quality = 0.8) {
   return new Promise((resolve) => {
@@ -753,7 +725,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     }
     try {
       const compressed = await compressImage(file, 1000, 0.8);
-      // Check compressed size — base64 is ~33% larger than binary
+      // Check compressed size â€” base64 is ~33% larger than binary
       if (compressed.length > 3 * 1024 * 1024) {
         setOverlayResult({ type: "error", message: "Compressed photo still too large (max 3MB). Use a lower-resolution camera setting." });
         return;
@@ -979,7 +951,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       await bulkSync([scan]);
       finishSubmit(result.state, resultType, result.message, newFlags.map(f => flagLabel(f.type)));
     } catch (err) {
-      // Item 9: Offline or failed → enqueue to IndexedDB
+      // Item 9: Offline or failed â†’ enqueue to IndexedDB
       await enqueueScan(scan);
       setPendingCount(c => c + 1);
       finishSubmit(result.state, resultType, result.message + " (Saved offline)", newFlags.map(f => flagLabel(f.type)));
@@ -1012,7 +984,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
           effectiveType = liveIsIn ? 'out' : 'in';
         }
       } catch {
-        // Offline or not found — use local/auto type
+        // Offline or not found â€” use local/auto type
       }
     }
 
@@ -1115,7 +1087,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
               <div>
                 <b>VIN {scanSuccess} scanned.</b>
                 {decodedVin && <div style={{fontSize: '0.85rem', color: 'var(--text-dim)', margin: '4px 0'}}>
-                  {decodedVin.model} {decodedVin.engine ? `(${decodedVin.engine})` : ''} · {decodedVin.plant || 'Unknown Plant'}
+                  {decodedVin.model} {decodedVin.engine ? `(${decodedVin.engine})` : ''} Â· {decodedVin.plant || 'Unknown Plant'}
                 </div>}
                 <small>Ready for vehicle {scanType.toUpperCase()}.</small>
               </div>
@@ -1146,7 +1118,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                       return (
                         <optgroup key={region} label={region}>
                           {options.map((y) => (
-                            <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
+                            <option key={y.id} value={y.id}>{y.code} Â· {y.name}</option>
                           ))}
                         </optgroup>
                       );
@@ -1320,7 +1292,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                         return (
                           <optgroup key={region} label={region}>
                             {options.map((y) => (
-                              <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
+                              <option key={y.id} value={y.id}>{y.code} Â· {y.name}</option>
                             ))}
                           </optgroup>
                         );
@@ -1509,7 +1481,7 @@ function StockView({ state, session }) {
                 {yardsByRegion().map(({ region, yards: regionYards }) => (
                   <optgroup key={region} label={region}>
                     {regionYards.map((yard) => (
-                      <option key={yard.id} value={yard.id}>{yard.code} · {yard.name}</option>
+                      <option key={yard.id} value={yard.id}>{yard.code} Â· {yard.name}</option>
                     ))}
                   </optgroup>
                 ))}
@@ -1562,7 +1534,7 @@ function VehicleCard({ vehicle, flags }) {
         <div>
           <strong>{vehicle.vin}</strong>
           <span>{vehicle.model}</span>
-          <small>{vehicle.variant || "Standard"} · {vehicle.colour || "Not set"}{vehicle.keyNo ? ` · Key No: ${vehicle.keyNo}` : ""}</small>
+          <small>{vehicle.variant || "Standard"} Â· {vehicle.colour || "Not set"}{vehicle.keyNo ? ` Â· Key No: ${vehicle.keyNo}` : ""}</small>
         </div>
       </div>
       <div className="vehicle-yard">
@@ -1639,7 +1611,7 @@ function DashboardView({ state, stats, session, setState }) {
                 <span>
                   <b>{flag.vin}</b>
                   <small>
-                    {flag.createdAt && <span className="flag-time">{new Date(flag.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}{" · "}
+                    {flag.createdAt && <span className="flag-time">{new Date(flag.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}{" Â· "}
                     <strong className="flag-kind">{flagLabel(flag.type)}</strong> {flag.message}
                   </small>
                 </span>
@@ -1672,249 +1644,6 @@ function Progress({ yard }) {
       <div><b>{yard.name}</b><span>{yard.count}/{yard.capacity}</span></div>
       <progress max="100" value={Math.min(100, yard.utilization)} />
     </div>
-  );
-}
-
-function AdminView({ state, setState }) {
-  const [activeTab, setActiveTab] = useState("credentials");
-  const [vin, setVin] = useState("");
-  const [yardId, setYardId] = useState(yards[0]?.id || "");
-  const [status, setStatus] = useState("out");
-  const [reason, setReason] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [formError, setFormError] = useState("");
-  const [formSuccess, setFormSuccess] = useState("");
-
-  const selectedYard = yards.find((y) => y.id === yardId);
-  const consequence =
-    status === "out"
-      ? `Marks ${vin || "this VIN"} as OUT and clears its current yard.`
-      : `Marks ${vin || "this VIN"} as IN at ${selectedYard ? `${selectedYard.code} · ${selectedYard.name}` : "the selected yard"}.`;
-
-  async function submit(event) {
-    event.preventDefault();
-    setFormError("");
-    setFormSuccess("");
-    const confirmed = window.confirm(
-      status === "out"
-        ? `Force close OUT for ${vin}?\n\n${consequence}\n\nThis is logged as a manual admin override.`
-        : `Reassign ${vin} as IN?\n\n${consequence}\n\nThis is logged as a manual admin override.`
-    );
-    if (!confirmed) return;
-
-    setLoading(true);
-    try {
-      const targetVin = vin;
-      await adminOverrideVehicle(targetVin, status, reason, status === "in" ? yardId : null);
-      setState(updateVehicleAdmin(state, { vin: targetVin, yardId, status, reason }));
-      setVin("");
-      setReason("");
-      setFormSuccess(status === "out" ? `Forced OUT for ${targetVin}.` : `Set IN at ${selectedYard?.code || yardId} for ${targetVin}.`);
-    } catch (err) {
-      setFormError(err.message || "Override failed.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="stack admin-view-container">
-      <div className="dashboard-header admin-tools-header">
-        <div className="dashboard-header-copy">
-          <h1>Admin Tools</h1>
-          <p className="dashboard-subtitle">Passwords, manual status fixes, and delivered VIN cleanup</p>
-        </div>
-        <div className="segmented admin-tools-tabs" role="tablist" aria-label="Admin tools">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "credentials"}
-            className={activeTab === "credentials" ? "active" : ""}
-            onClick={() => setActiveTab("credentials")}
-          >
-            Passwords
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "corrections"}
-            className={activeTab === "corrections" ? "active" : ""}
-            onClick={() => setActiveTab("corrections")}
-          >
-            Corrections
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "delivered"}
-            className={activeTab === "delivered" ? "active" : ""}
-            onClick={() => setActiveTab("delivered")}
-          >
-            Delivered
-          </button>
-        </div>
-      </div>
-
-      {activeTab === "credentials" && <CredentialsTab />}
-
-      {activeTab === "corrections" && (
-        <section className="panel stack">
-          <h2>Manual vehicle correction</h2>
-          <p className="field-hint">
-            Use only when a physical scan failed. Every change is audited with your note.
-          </p>
-          <form className="stack" onSubmit={submit}>
-            <label htmlFor="override-vin">VIN</label>
-            <input
-              id="override-vin"
-              required
-              value={vin}
-              onChange={(event) => setVin(event.target.value.toUpperCase())}
-              placeholder="17-character VIN"
-              autoComplete="off"
-              spellCheck={false}
-            />
-
-            <label htmlFor="override-status">What should happen?</label>
-            <select id="override-status" value={status} onChange={(event) => setStatus(event.target.value)}>
-              <option value="out">Force close — mark vehicle OUT</option>
-              <option value="in">Reassign — mark vehicle IN at a yard</option>
-            </select>
-
-            {status === "in" && (
-              <>
-                <label htmlFor="override-yard">Destination yard</label>
-                <select id="override-yard" value={yardId} onChange={(event) => setYardId(event.target.value)} required>
-                  {yardsByRegion().map(({ region, yards: regionYards }) => (
-                    <optgroup key={region} label={region}>
-                      {regionYards.map((yard) => (
-                        <option value={yard.id} key={yard.id}>{yard.code} · {yard.name}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </>
-            )}
-
-            <label htmlFor="override-reason">Why are you changing this?</label>
-            <textarea
-              id="override-reason"
-              required
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              placeholder="e.g. Vehicle left without OUT scan — confirmed with yard supervisor"
-              rows={3}
-            />
-
-            <div className="notice info correction-consequence" role="status">
-              <strong>Result:</strong> {consequence}
-            </div>
-
-            {formError && <p className="notice bad">{formError}</p>}
-            {formSuccess && <p className="notice ok">{formSuccess}</p>}
-
-            <button className="primary" disabled={loading || !vin.trim() || !reason.trim()}>
-              <span>{loading ? "Applying…" : status === "out" ? "Force close OUT" : "Reassign as IN"}</span>
-              <span className="material-symbols-outlined">build</span>
-            </button>
-          </form>
-        </section>
-      )}
-
-      {activeTab === "delivered" && (
-        <DeliveredUpload state={state} setState={setState} />
-      )}
-    </div>
-  );
-}
-
-function DeliveredUpload({ state, setState }) {
-  const [text, setText] = useState("");
-  const [message, setMessage] = useState("");
-  const [messageTone, setMessageTone] = useState("ok");
-  const [loading, setLoading] = useState(false);
-  const vins = useMemo(() => parseDeliveredVins(text), [text]);
-  const liveMatches = vins.filter((vin) => state.vehicles[vin]);
-  const unmatched = vins.length - liveMatches.length;
-
-  function upload(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (file.name.toLowerCase().endsWith(".xlsx")) {
-        const workbook = XLSX.read(reader.result, { type: "array" });
-        setText(workbook.SheetNames.map((name) => XLSX.utils.sheet_to_csv(workbook.Sheets[name])).join("\n"));
-        return;
-      }
-      setText(String(reader.result || ""));
-    };
-    if (file.name.toLowerCase().endsWith(".xlsx")) reader.readAsArrayBuffer(file);
-    else reader.readAsText(file);
-  }
-
-  async function submit(event) {
-    event.preventDefault();
-    if (!liveMatches.length) {
-      setMessageTone("warn");
-      setMessage("No matching live vehicles found. Nothing will be removed.");
-      return;
-    }
-    const confirmed = window.confirm(
-      `Remove ${liveMatches.length} live vehicle${liveMatches.length === 1 ? "" : "s"} from stock?\n\n` +
-      `${unmatched > 0 ? `${unmatched} VIN${unmatched === 1 ? "" : "s"} in the list are not in live stock and will be ignored.\n\n` : ""}` +
-      "This cannot be undone from this screen."
-    );
-    if (!confirmed) return;
-
-    setLoading(true);
-    try {
-      await deliverVehicles(liveMatches);
-      setState(removeDeliveredVehicles(state, vins));
-      setMessageTone("ok");
-      setMessage(`Removed ${liveMatches.length} delivered vehicle${liveMatches.length === 1 ? "" : "s"} from live stock.`);
-      setText("");
-    } catch (err) {
-      setMessageTone("bad");
-      setMessage(`Could not sync: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <section className="panel stack">
-      <h2>Remove delivered vehicles</h2>
-      <p className="field-hint">
-        Paste or upload VINs that have already been delivered to customers. Matching vehicles are removed from live stock.
-      </p>
-      <form className="stack" onSubmit={submit}>
-        <label htmlFor="delivered-file">Excel / CSV file (optional)</label>
-        <input id="delivered-file" type="file" accept=".xlsx,.csv,.txt" onChange={upload} />
-        <label htmlFor="delivered-vins">VIN list</label>
-        <textarea
-          id="delivered-vins"
-          rows="8"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          placeholder="Paste VINs, one per line or from an Excel column"
-        />
-        <div className="delivered-counts">
-          <span><b>{vins.length}</b> VINs parsed</span>
-          <span><b>{liveMatches.length}</b> in live stock</span>
-          {unmatched > 0 && <span className="delivered-unmatched"><b>{unmatched}</b> not in stock</span>}
-        </div>
-        {liveMatches.length > 0 && (
-          <div className="notice warn" role="status">
-            Confirming will permanently remove {liveMatches.length} vehicle{liveMatches.length === 1 ? "" : "s"} from live stock.
-          </div>
-        )}
-        <button className="primary" disabled={!vins.length || loading || liveMatches.length === 0}>
-          {loading ? "Removing…" : `Remove ${liveMatches.length || ""} from live stock`.replace(/\s+/g, " ").trim()}
-        </button>
-      </form>
-      {message && <p className={`notice ${messageTone}`}>{message}</p>}
-    </section>
   );
 }
 
