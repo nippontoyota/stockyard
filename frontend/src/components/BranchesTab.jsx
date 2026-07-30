@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getAdminBranches, createAdminBranch, updateAdminBranch, assignBranchYards } from "../api.js";
-import { yards } from "../stockyardLogic.js";
+import { yardsByRegion } from "../stockyardLogic.js";
 import "../corporate-modern.css";
 
 export function BranchesTab() {
@@ -182,18 +182,23 @@ export function BranchesTab() {
             
             <form onSubmit={handleSaveYards} style={{display: 'flex', flexDirection: 'column', overflow: 'hidden'}}>
               <div className="bm-modal-body">
-                {yards.map(y => (
-                  <label key={y.id} className="bm-yard-checkbox">
-                    <input 
-                      type="checkbox" 
-                      checked={selectedYards.includes(y.id)} 
-                      onChange={(e) => {
-                        if (e.target.checked) setSelectedYards([...selectedYards, y.id]);
-                        else setSelectedYards(selectedYards.filter(id => id !== y.id));
-                      }}
-                    />
-                    <span>{y.name} ({y.code})</span>
-                  </label>
+                {yardsByRegion().map(({ region, yards: regionYards }) => (
+                  <div key={region} className="bm-yard-region">
+                    <p className="bm-yard-region-label">{region}</p>
+                    {regionYards.map((y) => (
+                      <label key={y.id} className="bm-yard-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={selectedYards.includes(y.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedYards([...selectedYards, y.id]);
+                            else setSelectedYards(selectedYards.filter((id) => id !== y.id));
+                          }}
+                        />
+                        <span>{y.code} · {y.name}</span>
+                      </label>
+                    ))}
+                  </div>
                 ))}
               </div>
               <div className="bm-modal-footer">

@@ -9,11 +9,20 @@ import { detectModel } from '../lib/vin.js';
 const router = Router();
 router.use(authenticate);
 
+let vehicleExtraColumnsReady = false;
+async function ensureVehicleExtraColumns() {
+  if (vehicleExtraColumnsReady) return;
+  await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS variant text`);
+  await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS colour text`);
+  vehicleExtraColumnsReady = true;
+}
+
 // ─── GET / ───────────────────────────────────────────────────────────
 // Paginated vehicle list. Stockyard users auto-filtered to their yard.
 
 router.get('/', async (req, res, next) => {
   try {
+    await ensureVehicleExtraColumns();
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(10000, Math.max(1, Number(req.query.limit) || 50));
     const offset = (page - 1) * limit;
@@ -40,6 +49,8 @@ router.get('/', async (req, res, next) => {
         id: vehicles.id,
         vin: vehicles.vin,
         model: vehicles.model,
+        variant: vehicles.variant,
+        colour: vehicles.colour,
         drive_type: vehicles.drive_type,
         vin_valid: vehicles.vin_valid,
         current_status: vehicleStatus.current_status,
@@ -76,6 +87,8 @@ router.get('/:vin', async (req, res, next) => {
         id: vehicles.id,
         vin: vehicles.vin,
         model: vehicles.model,
+        variant: vehicles.variant,
+        colour: vehicles.colour,
         drive_type: vehicles.drive_type,
         vin_valid: vehicles.vin_valid,
         created_at: vehicles.created_at,

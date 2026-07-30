@@ -113,16 +113,6 @@ async function checkGps(yardId: string, lat: number | undefined, lon: number | u
   }
 }
 
-async function checkCapacity(yardId: string, vehicleId: string, scanId: string, txOrDb: any = db) {
-  const [yard] = await txOrDb.select({ capacity: yards.capacity }).from(yards).where(eq(yards.id, yardId));
-  if (!yard) return;
-
-  const [{ value: currentCount }] = await txOrDb.select({ value: count() }).from(vehicleStatus).where(and(eq(vehicleStatus.current_yard_id, yardId), eq(vehicleStatus.current_status, 'in')));
-  if (Number(currentCount) > yard.capacity) {
-    await createFlag(vehicleId, scanId, 'yard_capacity_exceeded', `Yard at ${currentCount}/${yard.capacity} vehicles`, undefined, txOrDb);
-  }
-}
-
 // ─── Core Logic ──────────────────────────────────────────────────────
 
 async function processScanIn(body: ScanIn, yardId: string) {
@@ -182,7 +172,6 @@ async function processScanIn(body: ScanIn, yardId: string) {
     }
     
     await checkGps(yardId, body.latitude ?? undefined, body.longitude ?? undefined, vehicleId, scan.id, tx);
-    await checkCapacity(yardId, vehicleId, scan.id, tx);
 
     return { scan_id: scan.id, status: 'accepted' as const, flags: flagsList };
   });

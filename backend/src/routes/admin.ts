@@ -299,6 +299,126 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
   }
 });
 
+// ─── PATCH /vehicles/:vin ────────────────────────────────────────────
+// Full vehicle field edit (admin)
+
+const editVehicleBody = z.object({
+  model: z.string().trim().min(1).max(120).optional(),
+  variant: z.string().trim().max(120).optional().nullable(),
+  colour: z.string().trim().max(80).optional().nullable(),
+  drive_type: z.enum(['neo_drive', 'hybrid', 'petrol', 'diesel', '']).optional().nullable(),
+  key_no: z.string().trim().max(40).optional().nullable(),
+  status: z.enum(['in', 'out', 'transit']).optional(),
+  yard_id: z.string().optional().nullable(),
+  vin_valid: z.boolean().optional(),
+});
+
+let vehicleExtraColumnsReady = false;
+async function ensureVehicleExtraColumns() {
+  if (vehicleExtraColumnsReady) return;
+  await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS variant text`);
+  await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS colour text`);
+  vehicleExtraColumnsReady = true;
+}
+
+router.patch('/vehicles/:vin', async (req, res, next) => {
+  try {
+    await ensureVehicleExtraColumns();
+    const body = editVehicleBody.parse(req.body);
+    const vin = req.params.vin.toUpperCase();
+
+    const [vehicle] = await db
+      .select({ id: vehicles.id })
+      .from(vehicles)
+      .where(eq(vehicles.vin, vin));
+
+    if (!vehicle) {
+      res.status(404).json({ error: 'Vehicle not found' });
+      return;
+    }
+
+    const vehiclePatch: Record<string, unknown> = { updated_at: new Date() };
+    if (body.model !== undefined) vehiclePatch.model = body.model;
+    if (body.variant !== undefined) vehiclePatch.variant = body.variant || null;
+    if (body.colour !== undefined) vehiclePatch.colour = body.colour || null;
+    if (body.drive_type !== undefined) vehiclePatch.drive_type = body.drive_type || null;
+    if (body.vin_valid !== undefined) vehiclePatch.vin_valid = body.vin_valid;
+
+    if (Object.keys(vehiclePatch).length > 1) {
+      await db.update(vehicles).set(vehiclePatch).where(eq(vehicles.id, vehicle.id));
+    }
+
+    const [existingStatus] = await db
+      .select()
+      .from(vehicleStatus)
+      .where(eq(vehicleStatus.vehicle_id, vehicle.id));
+
+    const nextStatus = body.status ?? existingStatus?.current_status ?? 'out';
+    let nextYardId =
+      body.yard_id !== undefined ? body.yard_id || null : existingStatus?.current_yard_id ?? null;
+    if (nextStatus === 'out' && body.yard_id === undefined) {
+      nextYardId = existingStatus?.current_yard_id ?? null;
+    }
+    if (nextStatus === 'in' && !nextYardId) {
+      res.status(400).json({ error: 'Select a yard when status is IN.' });
+      return;
+    }
+
+    const statusPatch: Record<string, unknown> = {
+      current_status: nextStatus,
+      current_yard_id: nextYardId,
+      last_changed_at: new Date(),
+      override_reason: 'Admin vehicle edit',
+    };
+    if (body.key_no !== undefined) statusPatch.key_no = body.key_no || null;
+
+    await db
+      .insert(vehicleStatus)
+      .values({
+        vehicle_id: vehicle.id,
+        current_status: nextStatus,
+        current_yard_id: nextYardId,
+        last_changed_at: new Date(),
+        key_no: body.key_no ?? existingStatus?.key_no ?? null,
+        override_reason: 'Admin vehicle edit',
+      })
+      .onConflictDoUpdate({
+        target: vehicleStatus.vehicle_id,
+        set: statusPatch,
+      });
+
+    await db.insert(flags).values({
+      vehicle_id: vehicle.id,
+      flag_type: 'manual_admin_override',
+      message: 'Admin updated vehicle details',
+      resolved: true,
+      resolved_by: req.user!.id,
+      resolved_at: new Date(),
+    });
+
+    const [updated] = await db
+      .select({
+        vin: vehicles.vin,
+        model: vehicles.model,
+        variant: vehicles.variant,
+        colour: vehicles.colour,
+        drive_type: vehicles.drive_type,
+        vin_valid: vehicles.vin_valid,
+        current_status: vehicleStatus.current_status,
+        current_yard_id: vehicleStatus.current_yard_id,
+        key_no: vehicleStatus.key_no,
+        last_changed_at: vehicleStatus.last_changed_at,
+      })
+      .from(vehicles)
+      .leftJoin(vehicleStatus, eq(vehicles.id, vehicleStatus.vehicle_id))
+      .where(eq(vehicles.id, vehicle.id));
+
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── POST /import/vehicles ──────────────────────────────────────────
 
 const importBody = z.object({

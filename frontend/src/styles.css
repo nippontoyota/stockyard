@@ -121,6 +121,26 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .segmented .active { background: #000; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 .login .segmented { background: #f1f1f1; border: 1px solid rgba(88, 89, 91, .18); }
 .login .segmented .active { background: #000; color: #fff; }
+.login-location-fields {
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(88, 89, 91, 0.18);
+  border-radius: 10px;
+  background: #f8f9ff;
+}
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.login-yard-hint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+  text-transform: none;
+  font-weight: 500;
+}
 .segmented .out { background: #475569; }
 .scan-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .scan-card, .panel { padding: 16px; }
@@ -2055,6 +2075,112 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .badge-out { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
 .badge-transfer { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 .badge-unknown { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+
+/* Admin vehicle edit */
+.vehicle-edit-workspace { gap: 14px; display: flex; flex-direction: column; }
+.vehicle-edit-panel {
+  border: 1px solid #d7dee3;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+.vehicle-edit-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.vehicle-edit-kicker {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #EB0A1E;
+}
+.vehicle-edit-vin {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #002046;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+}
+.vehicle-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+.vehicle-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: none;
+}
+.vehicle-edit-field-wide { grid-column: 1 / -1; }
+.vehicle-edit-field input,
+.vehicle-edit-field select {
+  min-height: 44px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  padding: 10px 12px;
+  font-weight: 500;
+}
+.vehicle-edit-field input:focus,
+.vehicle-edit-field select:focus {
+  outline: none;
+  border-color: #EB0A1E;
+  box-shadow: 0 0 0 3px rgba(235, 10, 30, 0.12);
+}
+.vehicle-edit-check {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  text-transform: none;
+  min-height: 44px;
+}
+.vehicle-edit-check input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+}
+.vehicle-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+.vehicle-edit-actions .primary {
+  min-height: 44px;
+  padding: 0 18px;
+}
+.vehicle-row-clickable { cursor: pointer; }
+.vehicle-row-clickable:hover { background: #f8fafc; }
+.vehicle-row-active { background: #fff1f2; }
+.vehicle-row-active:hover { background: #ffe4e6; }
+.vehicle-edit-table tbody tr:focus-visible {
+  outline: 2px solid #EB0A1E;
+  outline-offset: -2px;
+}
+@media (max-width: 720px) {
+  .vehicle-edit-grid { grid-template-columns: 1fr; }
+  .vehicle-edit-field-wide { grid-column: auto; }
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    §3.2 — Scan Overlay
