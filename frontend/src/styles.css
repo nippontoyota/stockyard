@@ -46,7 +46,15 @@ h1 { text-transform: uppercase; letter-spacing: 0; color: #000; }
   flex: 1 1 0; min-width: 0; border: 0; background: transparent; color: #44474e;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 6px 2px; border-radius: 8px; font-size: 11px; text-align: center;
+  position: relative;
 }
+.bottom-nav .nav-badge {
+  position: absolute; top: 2px; right: calc(50% - 22px);
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: #EB0A1E; color: #fff; font-size: 10px; font-weight: 700;
+  line-height: 16px; text-align: center;
+}
+.bottom-nav .active .nav-badge { background: #fff; color: #EB0A1E; }
 .bottom-nav button small {
   display: block; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; margin-top: 2px;
 }
@@ -72,16 +80,14 @@ h1 { text-transform: uppercase; letter-spacing: 0; color: #000; }
   box-shadow: 0 24px 70px rgba(0, 0, 0, .16);
 }
 .login-visual {
-  position: relative; min-height: 620px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between;
+  position: relative; min-height: 620px; padding: 22px; display: flex; flex-direction: column; justify-content: flex-end;
   color: #fff; background: linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.72)), url("/parking.jpeg") center / cover;
 }
 .login-visual:before {
   content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(235, 10, 30, .82) 0 24%, transparent 24% 100%);
 }
-.login-visual-top, .yard-strip { position: relative; z-index: 1; }
-.login-visual-top { display: flex; align-items: center; gap: 10px; font-weight: 700; }
-.toyota-dot { width: 34px; height: 34px; border-radius: 999px; background: #EB0A1E; border: 4px solid #fff; box-shadow: 0 8px 18px rgba(0,0,0,.3); }
 .yard-strip {
+  position: relative; z-index: 1;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 14px 16px; background: rgba(0, 0, 0, .72); border: 1px solid rgba(255,255,255,.2); border-radius: 8px;
 }

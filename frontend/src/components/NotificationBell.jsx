@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { markNotificationRead, markAllNotificationsRead } from "../api.js";
 
-export function NotificationBell({ notifications = [] }) {
+export function NotificationBell({ notifications = [], onNavigate }) {
   const [open, setOpen] = useState(false);
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
   const panelRef = useRef(null);
 
   useEffect(() => {
@@ -20,7 +20,6 @@ export function NotificationBell({ notifications = [] }) {
   async function handleMarkRead(id) {
     try {
       await markNotificationRead(id);
-      // Optimistic update handled by polling
     } catch (err) {
       console.error(err);
     }
@@ -35,15 +34,23 @@ export function NotificationBell({ notifications = [] }) {
     }
   }
 
+  async function handleItemClick(n) {
+    if (!n.read) await handleMarkRead(n.id);
+    if (n.type?.startsWith("requisition") && onNavigate) {
+      onNavigate("requisitions");
+      setOpen(false);
+    }
+  }
+
   return (
     <div className="dropdown-container" ref={panelRef}>
-      <button 
-        className="icon-btn relative" 
+      <button
+        className="icon-btn relative"
         onClick={() => setOpen(!open)}
         aria-label="Notifications"
       >
         <span className="material-symbols-outlined">notifications</span>
-        {unreadCount > 0 && <span className="badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+        {unreadCount > 0 && <span className="badge">{unreadCount > 9 ? "9+" : unreadCount}</span>}
       </button>
 
       {open && (
@@ -59,8 +66,12 @@ export function NotificationBell({ notifications = [] }) {
               <div className="p-md text-center muted">No new notifications</div>
             ) : (
               <ul className="notif-list">
-                {notifications.map(n => (
-                  <li key={n.id} className={`notif-item ${!n.read ? 'unread' : ''}`} onClick={() => !n.read && handleMarkRead(n.id)}>
+                {notifications.map((n) => (
+                  <li
+                    key={n.id}
+                    className={`notif-item ${!n.read ? "unread" : ""}`}
+                    onClick={() => handleItemClick(n)}
+                  >
                     <div className="notif-text">
                       <p>{n.message}</p>
                       <small className="muted">{new Date(n.created_at).toLocaleString()}</small>

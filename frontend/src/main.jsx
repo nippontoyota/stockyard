@@ -15,7 +15,8 @@ import {
   updateVehicleAdmin,
   yards,
   fallbackBranches,
-  setConfig
+  setConfig,
+  findApprovedTransferReq,
 } from "./stockyardLogic.js";
 import {
   ExecutiveKpiCards,
@@ -301,6 +302,7 @@ export default function App() {
 
   const isAdmin = session.role === "admin";
   const stats = dashboard(state, isAdmin ? null : session.yardId);
+  const pendingReqCount = (state.requisitions?.incoming || []).filter((r) => r.status === "pending").length;
 
   return (
     <div className="app-shell">
@@ -308,6 +310,7 @@ export default function App() {
         session={session}
         online={online}
         notifications={state.notifications}
+        onNavigate={navigateTo}
         onLogout={() => {
           setSession(null);
           window.history.replaceState(null, "", "/");
@@ -318,14 +321,16 @@ export default function App() {
         {view === "stock" && <StockView state={state} session={session} />}
         {view === "dashboard" && (isAdmin ? <AdminHome stats={stats} state={state} setState={setState} /> : <DashboardView state={state} stats={stats} session={session} setState={setState} />)}
         {view === "admin" && isAdmin && <AdminView state={state} setState={setState} />}
-        {view === "requisitions" && <RequisitionsTab state={state} session={session} />}
+        {view === "requisitions" && <RequisitionsTab state={state} session={session} onRefresh={fetchServerData} />}
         {view === "branches" && isAdmin && <BranchesTab session={session} />}
       </main>
       <nav className={`bottom-nav ${isAdmin ? "bottom-nav-admin" : ""}`}>
         {session.role === "stockyard" && <NavButton icon="barcode_scanner" label="Scan" active={view === "scan"} onClick={() => navigateTo("scan")} />}
         <NavButton icon="inventory_2" label="Stock" active={view === "stock"} onClick={() => navigateTo("stock")} />
         <NavButton icon="dashboard" label={isAdmin ? "Analytics" : "Dash"} active={view === "dashboard"} onClick={() => navigateTo("dashboard")} />
-        {(session.role === "stockyard" || session.role === "delivery_incharge") && <NavButton icon="swap_horiz" label="Requests" active={view === "requisitions"} onClick={() => navigateTo("requisitions")} />}
+        {(session.role === "stockyard" || session.role === "delivery_incharge") && (
+          <NavButton icon="swap_horiz" label="Requests" badge={pendingReqCount} active={view === "requisitions"} onClick={() => navigateTo("requisitions")} />
+        )}
         {isAdmin && <NavButton icon="account_tree" label="Branches" active={view === "branches"} onClick={() => navigateTo("branches")} />}
         {isAdmin && <NavButton icon="admin_panel_settings" label="Tools" active={view === "admin"} onClick={() => navigateTo("admin")} />}
       </nav>
@@ -446,10 +451,6 @@ function Login({ onLogin }) {
     <main className="login">
       <section className="login-panel">
         <div className="login-visual" aria-hidden="true">
-          <div className="login-visual-top">
-            <span className="toyota-dot"></span>
-            <strong>Stockyard Gate Security</strong>
-          </div>
           <div className="yard-strip">
             <span>Authorised access only</span>
             <b>{yards.length} active yards</b>
@@ -527,7 +528,7 @@ function Login({ onLogin }) {
   );
 }
 
-function Header({ session, online, notifications, onLogout }) {
+function Header({ session, online, notifications, onNavigate, onLogout }) {
   const { isInstallable, promptInstall } = usePwaInstall();
 
   return (
@@ -544,7 +545,7 @@ function Header({ session, online, notifications, onLogout }) {
             <span className="material-symbols-outlined">install_mobile</span> Install App
           </button>
         )}
-        {session.role !== "admin" && <NotificationBell notifications={notifications || []} />}
+        {session.role !== "admin" && <NotificationBell notifications={notifications || []} onNavigate={onNavigate} />}
         <span className={online ? "pill ok" : "pill warn"}>{online ? "Online" : "Offline"}</span>
         <button className="icon-btn" onClick={onLogout} aria-label="Log out"><span className="material-symbols-outlined">logout</span></button>
       </div>
@@ -552,8 +553,14 @@ function Header({ session, online, notifications, onLogout }) {
   );
 }
 
-function NavButton({ icon, label, active, onClick }) {
-  return <button className={active ? "active" : ""} onClick={onClick}><span className="material-symbols-outlined">{icon}</span><small>{label}</small></button>;
+function NavButton({ icon, label, active, badge, onClick }) {
+  return (
+    <button className={active ? "active" : ""} onClick={onClick}>
+      <span className="material-symbols-outlined">{icon}</span>
+      {badge > 0 && <span className="nav-badge">{badge > 9 ? "9+" : badge}</span>}
+      <small>{label}</small>
+    </button>
+  );
 }
 
 function exportAnalyticsReport(stats) {
@@ -652,6 +659,16 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const isFlagged = Boolean(activeFlag);
   // Item 7: Decoded VIN info for verification
   const decodedVin = useMemo(() => pendingVin.length >= 5 ? decodeVinDetails(pendingVin) : null, [pendingVin]);
+
+  useEffect(() => {
+    if (!pendingVin || scanType !== "out") return;
+    const req = findApprovedTransferReq(state.requisitions, pendingVin);
+    if (!req) return;
+    setOutRemark("stockyard_transfer");
+    setTransferRequestedBy(req.requested_by || "");
+    const destYard = req.requesting_branch?.yards?.[0]?.id;
+    if (destYard) setTransferDestinationYardId(destYard);
+  }, [pendingVin, scanType, state.requisitions]);
 
   // F12 indoor GPS fallback
   useEffect(() => {

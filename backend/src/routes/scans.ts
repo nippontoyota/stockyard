@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { eq, and, count, desc } from 'drizzle-orm';
+import { eq, and, count, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { scans, vehicles, vehicleStatus, devices, flags, yards, requisitions, notifications } from '../db/schema.js';
 import { isValidVin, detectModel, resolveVehicleMetadata } from '../lib/vin.js';
 import { haversineMeters } from '../lib/geo.js';
 import { authenticate } from '../middleware/auth.js';
-import { emitScanEvent, emitFlagEvent } from '../lib/socket.js';
+import { emitScanEvent, emitFlagEvent, emitRequisitionEvent } from '../lib/socket.js';
 import { uploadBase64Image } from '../lib/supabase.js';
 import { notifyRoleAtBranch } from '../lib/webPush.js';
 
@@ -244,13 +244,26 @@ async function processScanOut(body: ScanOut, yardId: string) {
           type: 'requisition_fulfilled',
           related_req_id: reqRecord.id,
         });
-        // Push notification is external I/O, safe to call inside tx (fire-and-forget)
         notifyRoleAtBranch('delivery_incharge', reqRecord.requesting_branch_id, {
           title: 'Requisition Fulfilled',
           body: 'Vehicle transfer initiated for requisition.',
-          url: '/admin',
+          url: '/requisitions',
         }).catch(() => {});
       }
+    } else {
+      await tx
+        .update(requisitions)
+        .set({
+          status: 'rejected',
+          rejected_at: scanTime,
+          rejection_reason: 'Vehicle scanned out for another reason',
+        })
+        .where(
+          and(
+            eq(requisitions.vehicle_id, vehicleId),
+            inArray(requisitions.status, ['pending', 'approved'])
+          )
+        );
     }
 
     return { scan_id: scan.id, status: 'accepted' as const, flags: flagsList };
@@ -285,6 +298,7 @@ router.post('/out', async (req, res, next) => {
     const result = await processScanOut(parsed, yardId);
     if (result.status === 'accepted') {
       emitScanEvent({ type: 'out', vin: parsed.vin, model: null, yardId, timestamp: parsed.scanned_at, status: 'accepted', flagType: result.flags?.[0] });
+      emitRequisitionEvent();
     }
     res.status(result.status === 'already_processed' ? 200 : 201).json(result);
   } catch (err) { next(err); }

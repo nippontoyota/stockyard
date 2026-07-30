@@ -10,14 +10,16 @@ jobs:
         with:
           node-version: 22
 
-      - name: Backend — install & build
+      - name: Backend — install, build & test
         run: |
           cd backend
           npm ci
           npm run build
+          npm test
 
-      - name: Frontend — install & build
+      - name: Frontend — install, build & test
         run: |
           cd frontend
           npm ci
           npm run build
+          npm test

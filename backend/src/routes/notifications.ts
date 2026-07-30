@@ -3,6 +3,7 @@ import { db } from '../db/client.js';
 import { notifications } from '../db/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { authenticate } from '../middleware/auth.js';
+import { resolveBranchId } from '../lib/branch.js';
 
 const router = Router();
 router.use(authenticate);
@@ -10,8 +11,8 @@ router.use(authenticate);
 router.get('/', async (req, res, next) => {
   try {
     const role = req.user!.role as "stockyard" | "delivery_incharge" | "admin";
-    const branchId = req.user?.branch_id;
-    if (!branchId || role === 'admin') return res.json([]); // admin doesn't get these notifications
+    const branchId = await resolveBranchId(req.user!);
+    if (!branchId || role === 'admin') return res.json([]);
 
     const notifs = await db
       .select()
@@ -34,7 +35,7 @@ router.get('/', async (req, res, next) => {
 router.post('/:id/read', async (req, res, next) => {
   try {
     const role = req.user!.role as "stockyard" | "delivery_incharge" | "admin";
-    const branchId = req.user?.branch_id;
+    const branchId = await resolveBranchId(req.user!);
     if (!branchId || role === 'admin') return res.status(403).json({ error: 'Forbidden' });
 
     await db
@@ -57,7 +58,7 @@ router.post('/:id/read', async (req, res, next) => {
 router.post('/read-all', async (req, res, next) => {
   try {
     const role = req.user!.role as "stockyard" | "delivery_incharge" | "admin";
-    const branchId = req.user?.branch_id;
+    const branchId = await resolveBranchId(req.user!);
     if (!branchId || role === 'admin') return res.status(403).json({ error: 'Forbidden' });
 
     await db
