@@ -367,6 +367,80 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   line-height: 1.35;
   max-width: 65ch;
 }
+.analytics-yards-toolbar {
+  padding: 14px;
+  background: #fff;
+  border: 1px solid rgba(88, 89, 91, 0.16);
+  border-radius: 8px;
+}
+.analytics-yards-region + .analytics-yards-region {
+  margin-top: 18px;
+}
+.analytics-yards-region-label {
+  margin: 0 0 10px;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #EB0A1E;
+}
+.yard-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.yard-search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 20px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+.yard-search-input {
+  padding-left: 40px !important;
+  padding-right: 40px !important;
+}
+.yard-search-clear {
+  position: absolute;
+  right: 6px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+.yard-search-clear:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #0b1c30;
+}
+.yard-search-clear .material-symbols-outlined {
+  font-size: 18px;
+}
+.yard-picker-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 16px;
+  color: #94a3b8;
+  text-align: center;
+  background: #fff;
+  border: 1px solid rgba(88, 89, 91, 0.16);
+  border-radius: 8px;
+}
+.yard-picker-empty .material-symbols-outlined {
+  font-size: 32px;
+}
+.yard-picker-empty p {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
 .yard-box { min-height: 210px; padding: 14px; display: grid; gap: 12px; align-content: space-between; }
 .yard-box h2 { margin: 0; min-height: 48px; color: #000; font-size: 18px; line-height: 1.25; }
 .yard-count {
