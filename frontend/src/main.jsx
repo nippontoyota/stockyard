@@ -338,7 +338,7 @@ function Login({ onLogin }) {
   const [role, setRole] = useState("stockyard");
   const [yardId, setYardId] = useState(yards[0]?.id || "");
   const [branches, setBranches] = useState(fallbackBranches);
-  const [branchId, setBranchId] = useState(fallbackBranches[0].id);
+  const [branchId, setBranchId] = useState(fallbackBranches[0]?.id || "");
   const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -371,7 +371,7 @@ function Login({ onLogin }) {
     const cleanPassword = passwordInput.trim();
     const targetYard = yards.find((y) => y.id === yardId) || yards[0];
     const targetBranch = branches.find((b) => b.id === branchId);
-    const cleanUsername = role === "admin" ? "ADMIN123@nippon.com" : role === "delivery_incharge" ? (targetBranch ? `${targetBranch.id}@nippon.com` : "") : `${targetYard.id}@nippon.com`;
+    const cleanUsername = role === "admin" ? "ADMIN123@nippon.com" : role === "delivery_incharge" ? (targetBranch ? `${targetBranch.id}@nippon.com` : "") : `${targetYard?.id || ""}@nippon.com`;
 
     // 1. Evaluate local credential validity (handles default & custom saved credentials)
     let isLocalValid = false;
@@ -385,10 +385,10 @@ function Login({ onLogin }) {
       }
     } else {
       const validPasswords = [
-        targetYard.code,
-        targetYard.id,
-        `${targetYard.code}@nippon.com`,
-        `${targetYard.id}@nippon.com`,
+        targetYard?.code,
+        targetYard?.id,
+        `${targetYard?.code || ""}@nippon.com`,
+        `${targetYard?.id || ""}@nippon.com`,
       ];
       if (validPasswords.some((p) => p.toLowerCase() === cleanPassword.toLowerCase())) {
         isLocalValid = true;
@@ -397,7 +397,7 @@ function Login({ onLogin }) {
 
     try {
       const cachedCreds = JSON.parse(localStorage.getItem("nippon_credentials_cache") || "[]");
-      const matched = cachedCreds.find((c) => c.username === cleanUsername || c.yardId === targetYard.id || c.yardId === targetYard.code);
+      const matched = cachedCreds.find((c) => c.username === cleanUsername || (targetYard && (c.yardId === targetYard.id || c.yardId === targetYard.code)));
       if (matched && matched.password === cleanPassword) {
         isLocalValid = true;
       }
@@ -1571,7 +1571,7 @@ function Progress({ yard }) {
 function AdminView({ state, setState }) {
   const [activeTab, setActiveTab] = useState("credentials");
   const [vin, setVin] = useState("");
-  const [yardId, setYardId] = useState(yards[0].id);
+  const [yardId, setYardId] = useState(yards[0]?.id || "");
   const [status, setStatus] = useState("out");
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
