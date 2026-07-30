@@ -59,8 +59,7 @@ function getRoutePath(viewName, role) {
   if (role === "admin") {
     if (viewName === "dashboard") return "/dashboard";
     if (viewName === "stock") return "/stock";
-    if (viewName === "delivered") return "/delivered";
-    if (viewName === "admin") return "/admin";
+    if (viewName === "admin" || viewName === "delivered") return "/admin";
     if (viewName === "branches") return "/admin-branches";
     return "/dashboard";
   }
@@ -80,8 +79,7 @@ function getRoutePath(viewName, role) {
 function getViewFromPath(pathname, role) {
   const path = (pathname || "").toLowerCase();
   if (role === "admin") {
-    if (path === "/admin") return "admin";
-    if (path === "/delivered") return "delivered";
+    if (path === "/admin" || path === "/delivered") return "admin";
     if (path === "/stock") return "stock";
     if (path === "/admin-branches") return "branches";
     if (path === "/dashboard" || path === "/dash") return "dashboard";
@@ -319,19 +317,17 @@ export default function App() {
         {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} onRefresh={fetchServerData} lastSyncedAt={lastSyncedAt} />}
         {view === "stock" && <StockView state={state} session={session} />}
         {view === "dashboard" && (isAdmin ? <AdminHome stats={stats} state={state} setState={setState} /> : <DashboardView state={state} stats={stats} session={session} setState={setState} />)}
-        {view === "delivered" && isAdmin && <DeliveredUpload state={state} setState={setState} />}
         {view === "admin" && isAdmin && <AdminView state={state} setState={setState} />}
         {view === "requisitions" && <RequisitionsTab state={state} session={session} />}
         {view === "branches" && isAdmin && <BranchesTab session={session} />}
       </main>
-      <nav className="bottom-nav">
+      <nav className={`bottom-nav ${isAdmin ? "bottom-nav-admin" : ""}`}>
         {session.role === "stockyard" && <NavButton icon="barcode_scanner" label="Scan" active={view === "scan"} onClick={() => navigateTo("scan")} />}
-        <NavButton icon="inventory_2" label="Stock" active={view === "stock"} onClick={() => navigateTo("stock")} />
-        <NavButton icon="dashboard" label="Dash" active={view === "dashboard"} onClick={() => navigateTo("dashboard")} />
+        <NavButton icon="inventory_2" label="Stock" active={view === "stock"} onClick={() => navigateTo("stock")} />}
+        <NavButton icon="dashboard" label={isAdmin ? "Analytics" : "Dash"} active={view === "dashboard"} onClick={() => navigateTo("dashboard")} />
         {(session.role === "stockyard" || session.role === "delivery_incharge") && <NavButton icon="swap_horiz" label="Requests" active={view === "requisitions"} onClick={() => navigateTo("requisitions")} />}
         {isAdmin && <NavButton icon="account_tree" label="Branches" active={view === "branches"} onClick={() => navigateTo("branches")} />}
-        {isAdmin && <NavButton icon="upload_file" label="Delivered" active={view === "delivered"} onClick={() => navigateTo("delivered")} />}
-        {isAdmin && <NavButton icon="admin_panel_settings" label="Admin" active={view === "admin"} onClick={() => navigateTo("admin")} />}
+        {isAdmin && <NavButton icon="admin_panel_settings" label="Tools" active={view === "admin"} onClick={() => navigateTo("admin")} />}
       </nav>
     </div>
   );
@@ -1571,18 +1567,35 @@ function AdminView({ state, setState }) {
   const [status, setStatus] = useState("out");
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState("");
+
+  const selectedYard = yards.find((y) => y.id === yardId);
+  const consequence =
+    status === "out"
+      ? `Marks ${vin || "this VIN"} as OUT and clears its current yard.`
+      : `Marks ${vin || "this VIN"} as IN at ${selectedYard ? `${selectedYard.code} · ${selectedYard.name}` : "the selected yard"}.`;
 
   async function submit(event) {
     event.preventDefault();
+    setFormError("");
+    setFormSuccess("");
+    const confirmed = window.confirm(
+      status === "out"
+        ? `Force close OUT for ${vin}?\n\n${consequence}\n\nThis is logged as a manual admin override.`
+        : `Reassign ${vin} as IN?\n\n${consequence}\n\nThis is logged as a manual admin override.`
+    );
+    if (!confirmed) return;
+
     setLoading(true);
     try {
       await adminOverrideVehicle(vin, status, reason, status === "in" ? yardId : null);
       setState(updateVehicleAdmin(state, { vin, yardId, status, reason }));
       setVin("");
       setReason("");
-      alert("Manual vehicle correction applied successfully.");
+      setFormSuccess(status === "out" ? `Forced OUT for ${vin}.` : `Set IN at ${selectedYard?.code || yardId} for ${vin}.`);
     } catch (err) {
-      alert("Failed to override: " + err.message);
+      setFormError(err.message || "Override failed.");
     } finally {
       setLoading(false);
     }
@@ -1590,25 +1603,38 @@ function AdminView({ state, setState }) {
 
   return (
     <div className="stack admin-view-container">
-      <div className="dashboard-header" style={{ marginBottom: "1rem" }}>
-        <div>
-          <span className="eyebrow">System Administration</span>
-          <h1>Admin Control & Password Console</h1>
+      <div className="dashboard-header admin-tools-header">
+        <div className="dashboard-header-copy">
+          <h1>Admin Tools</h1>
+          <p className="dashboard-subtitle">Passwords, manual status fixes, and delivered VIN cleanup</p>
         </div>
-        <div className="segmented">
+        <div className="segmented admin-tools-tabs" role="tablist" aria-label="Admin tools">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "credentials"}
             className={activeTab === "credentials" ? "active" : ""}
             onClick={() => setActiveTab("credentials")}
           >
-            Manage Passwords
+            Passwords
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "corrections"}
             className={activeTab === "corrections" ? "active" : ""}
             onClick={() => setActiveTab("corrections")}
           >
-            Manual Corrections
+            Corrections
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "delivered"}
+            className={activeTab === "delivered" ? "active" : ""}
+            onClick={() => setActiveTab("delivered")}
+          >
+            Delivered
           </button>
         </div>
       </div>
@@ -1617,50 +1643,64 @@ function AdminView({ state, setState }) {
 
       {activeTab === "corrections" && (
         <section className="panel stack">
-          <h2>Admin Manual Vehicle Correction</h2>
-          <p className="field-hint" style={{ marginBottom: "1rem" }}>
-            Force status overrides or reassign vehicle stockyard locations manually.
+          <h2>Manual vehicle correction</h2>
+          <p className="field-hint">
+            Use only when a physical scan failed. Every change is audited with your note.
           </p>
           <form className="stack" onSubmit={submit}>
-            <label htmlFor="override-vin">Target Vehicle VIN</label>
+            <label htmlFor="override-vin">VIN</label>
             <input
               id="override-vin"
               required
               value={vin}
               onChange={(event) => setVin(event.target.value.toUpperCase())}
-              placeholder="17-Digit Vehicle Identification Number"
+              placeholder="17-character VIN"
+              autoComplete="off"
+              spellCheck={false}
             />
 
-            <label htmlFor="override-status">Action / Target Status</label>
+            <label htmlFor="override-status">What should happen?</label>
             <select id="override-status" value={status} onChange={(event) => setStatus(event.target.value)}>
-              <option value="out">Force close OUT</option>
-              <option value="in">Reassign IN yard location</option>
+              <option value="out">Force close — mark vehicle OUT</option>
+              <option value="in">Reassign — mark vehicle IN at a yard</option>
             </select>
 
             {status === "in" && (
               <>
-                <label htmlFor="override-yard">Select Destination Stockyard</label>
-                <select id="override-yard" value={yardId} onChange={(event) => setYardId(event.target.value)}>
+                <label htmlFor="override-yard">Destination yard</label>
+                <select id="override-yard" value={yardId} onChange={(event) => setYardId(event.target.value)} required>
                   {yards.map((yard) => <option value={yard.id} key={yard.id}>{yard.code} · {yard.name}</option>)}
                 </select>
               </>
             )}
 
-            <label htmlFor="override-reason">Correction Justification Note</label>
+            <label htmlFor="override-reason">Why are you changing this?</label>
             <textarea
               id="override-reason"
               required
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Enter official audit note for this manual state correction..."
+              placeholder="e.g. Vehicle left without OUT scan — confirmed with yard supervisor"
+              rows={3}
             />
 
-            <button className="primary" disabled={loading}>
-              <span>{loading ? "Applying..." : "Apply Manual Correction"}</span>
+            <div className="notice info correction-consequence" role="status">
+              <strong>Result:</strong> {consequence}
+            </div>
+
+            {formError && <p className="notice bad">{formError}</p>}
+            {formSuccess && <p className="notice ok">{formSuccess}</p>}
+
+            <button className="primary" disabled={loading || !vin.trim() || !reason.trim()}>
+              <span>{loading ? "Applying…" : status === "out" ? "Force close OUT" : "Reassign as IN"}</span>
               <span className="material-symbols-outlined">build</span>
             </button>
           </form>
         </section>
+      )}
+
+      {activeTab === "delivered" && (
+        <DeliveredUpload state={state} setState={setState} />
       )}
     </div>
   );
@@ -1669,8 +1709,11 @@ function AdminView({ state, setState }) {
 function DeliveredUpload({ state, setState }) {
   const [text, setText] = useState("");
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState("ok");
+  const [loading, setLoading] = useState(false);
   const vins = useMemo(() => parseDeliveredVins(text), [text]);
   const liveMatches = vins.filter((vin) => state.vehicles[vin]);
+  const unmatched = vins.length - liveMatches.length;
 
   function upload(event) {
     const file = event.target.files?.[0];
@@ -1690,30 +1733,65 @@ function DeliveredUpload({ state, setState }) {
 
   async function submit(event) {
     event.preventDefault();
+    if (!liveMatches.length) {
+      setMessageTone("warn");
+      setMessage("No matching live vehicles found. Nothing will be removed.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Remove ${liveMatches.length} live vehicle${liveMatches.length === 1 ? "" : "s"} from stock?\n\n` +
+      `${unmatched > 0 ? `${unmatched} VIN${unmatched === 1 ? "" : "s"} in the list are not in live stock and will be ignored.\n\n` : ""}` +
+      "This cannot be undone from this screen."
+    );
+    if (!confirmed) return;
+
+    setLoading(true);
     try {
-      if (liveMatches.length > 0) {
-        await deliverVehicles(liveMatches);
-      }
+      await deliverVehicles(liveMatches);
       setState(removeDeliveredVehicles(state, vins));
-      setMessage(`${liveMatches.length} delivered vehicle${liveMatches.length === 1 ? "" : "s"} removed from live stock.`);
+      setMessageTone("ok");
+      setMessage(`Removed ${liveMatches.length} delivered vehicle${liveMatches.length === 1 ? "" : "s"} from live stock.`);
       setText("");
     } catch (err) {
-      setMessage(`Error syncing with server: ${err.message}`);
+      setMessageTone("bad");
+      setMessage(`Could not sync: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
     <section className="panel stack">
-      <h2>Delivered Vehicles</h2>
+      <h2>Remove delivered vehicles</h2>
+      <p className="field-hint">
+        Paste or upload VINs that have already been delivered to customers. Matching vehicles are removed from live stock.
+      </p>
       <form className="stack" onSubmit={submit}>
-        <label htmlFor="delivered-file">Upload Excel export</label>
+        <label htmlFor="delivered-file">Excel / CSV file (optional)</label>
         <input id="delivered-file" type="file" accept=".xlsx,.csv,.txt" onChange={upload} />
         <label htmlFor="delivered-vins">VIN list</label>
-        <textarea id="delivered-vins" rows="8" value={text} onChange={(event) => setText(event.target.value)} placeholder="Paste VIN column from Excel" />
-        <div className="split"><span>{vins.length} VINs found</span><b>{liveMatches.length} live matches</b></div>
-        <button className="primary" disabled={!vins.length}>Remove From Live Stock</button>
+        <textarea
+          id="delivered-vins"
+          rows="8"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          placeholder="Paste VINs, one per line or from an Excel column"
+        />
+        <div className="delivered-counts">
+          <span><b>{vins.length}</b> VINs parsed</span>
+          <span><b>{liveMatches.length}</b> in live stock</span>
+          {unmatched > 0 && <span className="delivered-unmatched"><b>{unmatched}</b> not in stock</span>}
+        </div>
+        {liveMatches.length > 0 && (
+          <div className="notice warn" role="status">
+            Confirming will permanently remove {liveMatches.length} vehicle{liveMatches.length === 1 ? "" : "s"} from live stock.
+          </div>
+        )}
+        <button className="primary" disabled={!vins.length || loading || liveMatches.length === 0}>
+          {loading ? "Removing…" : `Remove ${liveMatches.length || ""} from live stock`.replace(/\s+/g, " ").trim()}
+        </button>
       </form>
-      {message && <p className="notice ok">{message}</p>}
+      {message && <p className={`notice ${messageTone}`}>{message}</p>}
     </section>
   );
 }
