@@ -48,6 +48,7 @@ export const vehicles = pgTable('vehicles', {
   id: uuid('id').defaultRandom().primaryKey(),
   vin: text('vin').notNull().unique(),
   model: text('model'),
+  drive_type: text('drive_type'), // 'neo_drive' | 'hybrid' | 'petrol' | 'diesel'
   vin_valid: boolean('vin_valid').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -168,16 +169,6 @@ export const notifications = pgTable('notifications', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// ─── zones (F2) ─────────────────────────────────────────────────────
-export const zones = pgTable('zones', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  yard_id: text('yard_id').notNull().references(() => yards.id),
-  code: text('code').notNull(), // "A1", "B2"
-  label: text('label'),
-  max_capacity: integer('max_capacity').default(50).notNull(),
-  active: boolean('active').default(true).notNull(),
-});
-
 // ─── audit_logs (F9) ────────────────────────────────────────────────
 export const auditLogs = pgTable(
   'audit_logs',
@@ -256,9 +247,5 @@ export const requisitionsRelations = relations(requisitions, ({ one, many }) => 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   branch: one(branches, { fields: [notifications.branch_id], references: [branches.id] }),
   requisition: one(requisitions, { fields: [notifications.related_req_id], references: [requisitions.id] }),
-}));
-
-export const zonesRelations = relations(zones, ({ one }) => ({
-  yard: one(yards, { fields: [zones.yard_id], references: [yards.id] }),
 }));
 

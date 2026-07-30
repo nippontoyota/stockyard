@@ -53,7 +53,7 @@ export async function uploadBase64Image(base64Str: string): Promise<string | nul
 
     if (error) {
       console.error('Supabase upload error for base64:', error);
-      return base64Str; // return original if failed
+      return null; // ponytail: return null not base64 — callers flag the failure instead of storing bloat
     }
 
     const { data: publicUrlData } = supabase.storage
@@ -63,6 +63,6 @@ export async function uploadBase64Image(base64Str: string): Promise<string | nul
     return publicUrlData.publicUrl;
   } catch (err) {
     console.error('Base64 upload failed:', err);
-    return base64Str;
+    return null;
   }
 }
