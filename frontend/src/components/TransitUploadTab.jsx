@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import * as XLSX from "xlsx";
-import { yards, normalizeVin, isValidVin, detectModel } from "../stockyardLogic.js";
+import { yards, yardsByRegion, normalizeVin, isValidVin, detectModel } from "../stockyardLogic.js";
 import { uploadTransitListApi } from "../api.js";
 
 export function TransitUploadTab({ onUploadComplete }) {
@@ -13,9 +13,16 @@ export function TransitUploadTab({ onUploadComplete }) {
   function findYard(value) {
     if (!value) return null;
     const search = String(value).toLowerCase().trim();
-    return yards.find(
-      (y) => y.code.toLowerCase() === search || y.name.toLowerCase().includes(search)
-    );
+    const byId = yards.find((y) => y.id.toLowerCase() === search);
+    if (byId) return byId;
+    const byExactName = yards.find((y) => y.name.toLowerCase() === search);
+    if (byExactName) return byExactName;
+    const byPartialName = yards.find((y) => y.name.toLowerCase().includes(search));
+    if (byPartialName) return byPartialName;
+    // Codes are shared across sites — only accept when exactly one match
+    const byCode = yards.filter((y) => y.code.toLowerCase() === search);
+    if (byCode.length === 1) return byCode[0];
+    return null;
   }
 
   function handleFileDrop(e) {
@@ -219,10 +226,14 @@ export function TransitUploadTab({ onUploadComplete }) {
                         <option value="">
                           {v.rawYard ? `Unmatched: ${v.rawYard}` : "Select yard…"}
                         </option>
-                        {yards.map((y) => (
-                          <option key={y.id} value={y.id}>
-                            {y.code} · {y.name}
-                          </option>
+                        {yardsByRegion().map(({ region, yards: regionYards }) => (
+                          <optgroup key={region} label={region}>
+                            {regionYards.map((y) => (
+                              <option key={y.id} value={y.id}>
+                                {y.code} · {y.name}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
                     </td>

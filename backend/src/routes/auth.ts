@@ -69,7 +69,7 @@ async function seedDefaultCredentials() {
     const existing = await db.select().from(credentials);
     const existingUsernames = new Set(existing.map((row) => row.username));
 
-    const allYards = await db.select().from(yards);
+    const allYards = await db.select().from(yards).where(eq(yards.active, true));
     const allBranches = await db.select().from(branches);
 
     const defaultRows = [

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { applyScan, createInitialState, dashboard, decodeVinDetails, normalizeVin, parseDeliveredVins, removeDeliveredVehicles, setConfig, yards } from "./stockyardLogic.js";
+import { applyScan, createInitialState, dashboard, decodeVinDetails, normalizeVin, parseDeliveredVins, removeDeliveredVehicles, yards } from "./stockyardLogic.js";
 
 // Verify Toyota Hyryder VIN decoding (from user screenshot VIN MBJUYML1STE225473)
 const hyryderDecoded = decodeVinDetails("MBJUYML1STE225473");
@@ -13,10 +13,11 @@ globalThis.localStorage = {
   setItem(key, value) { this.data[key] = String(value); },
 };
 
-setConfig([
-  { id: "CO01B-1", code: "CO01B-1", name: "Test Yard B", capacity: 200 },
-  { id: "CO01A-1", code: "CO01A-1", name: "Test Yard A", capacity: 150 },
-], []);
+assert.ok(yards.some((y) => y.id === "CO01B-1"));
+assert.ok(yards.some((y) => y.id === "CO01A-1"));
+assert.ok(yards.some((y) => y.id === "KL01A-3")); // Thazhuthla
+assert.ok(yards.some((y) => y.code === "TI01C")); // Chavakkad
+assert.equal(yards.some((y) => y.code === "KL01B"), false);
 
 const baseScan = {
   id: "scan-1",
@@ -67,15 +68,15 @@ assert.equal(normalizeVin("https://yard.example/car?vin=JTMBA38V70D123456"), "JT
 const deliveredVins = parseDeliveredVins("VIN\nJTMBA38V70D123456\nnot-a-vin\nJTMBA38V70D123456");
 assert.deepEqual(deliveredVins, ["JTMBA38V70D123456"]);
 
-// Fix the dashboard test to use a populated state instead of empty state
+// Dashboard uses the full hardcoded yard list
 const stateWithVehicle = firstScanResult.state;
 const globalStats = dashboard(stateWithVehicle);
 assert.equal(globalStats.currentStock, 1);
-assert.equal(globalStats.yards.length, 2);
+assert.equal(globalStats.yards.length, yards.length);
 
 const yardStats = dashboard(stateWithVehicle, "CO01B-1");
 assert.equal(yardStats.currentStock, 1);
-assert.equal(yardStats.totalCapacity, 200);
+assert.equal(yardStats.totalCapacity, 50);
 assert.equal(yardStats.openFlags, 0);
 
 // IN scan with damage reported
