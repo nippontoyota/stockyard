@@ -129,7 +129,7 @@ Frontend respects cache and only revalidates after 30s. Users still see fresh da
 
 **Problem:** Render free tier spins down after 15 min of inactivity. First request after spin-down takes 30–60s (cold boot). This happens frequently for a yard app used intermittently throughout the day.
 
-**Solution:**
+**Solution:** (use whichever one is free, dosent require any of my input and works best)
 
 - **Short-term:** Set up a cron-job service (cron-job.org, UptimeRobot, or GitHub Actions scheduled workflow) that pings `GET /api/health` every 5 minutes.
 - **Medium-term:** Upgrade to Render's $7/mo plan → no spin-down. Cheaper than the productivity lost to 30s waits.
@@ -221,39 +221,6 @@ async function fetchWithRetry(url, options, retries = 3) {
   }
 }
 ```
-
-### 2.3 PWA Install Prompt
-
-**Problem:** `manifest.webmanifest` exists but the app doesn't prompt users to install. Yard phones need the app installed as a standalone PWA for full-screen, camera access, and offline support.
-
-**Solution:**
-
-```jsx
-// In App component
-const [deferredPrompt, setDeferredPrompt] = useState(null);
-
-useEffect(() => {
-  const handler = (e) => {
-    e.preventDefault();  // don't auto-prompt
-    setDeferredPrompt(e);
-  };
-  window.addEventListener('beforeinstallprompt', handler);
-  return () => window.removeEventListener('beforeinstallprompt', handler);
-}, []);
-
-// Show install button when available
-{deferredPrompt && (
-  <button onClick={async () => {
-    deferredPrompt.prompt();
-    const result = await deferredPrompt.userChoice;
-    if (result.outcome === 'accepted') setDeferredPrompt(null);
-  }}>
-    Install App
-  </button>
-)}
-```
-
----
 
 ## 3. Frontend Usability & UX
 

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/client.js';
-import { requisitions, notifications, vehicleStatus, vehicles, branches } from '../db/schema.js';
-import { eq, or, and, desc } from 'drizzle-orm';
+import { requisitions, notifications, vehicleStatus, vehicles, branches, branchYards } from '../db/schema.js';
+import { eq, or, and, desc, inArray } from 'drizzle-orm';
 import { authenticate } from '../middleware/auth.js';
 import { notifyRoleAtBranch } from '../lib/webPush.js';
 import { z } from 'zod';
@@ -71,14 +71,31 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: 'Cannot request from your own branch' });
     }
 
-    // Check vehicle status
+    // Check vehicle status - must be 'in' at a yard belonging to the source branch
+    const sourceBranchYards = await db
+      .select({ yard_id: branchYards.yard_id })
+      .from(branchYards)
+      .where(eq(branchYards.branch_id, source_branch_id));
+
+    const sourceYardIds = sourceBranchYards.map(r => r.yard_id);
+
+    if (sourceYardIds.length === 0) {
+      return res.status(400).json({ error: 'Source branch has no yards configured' });
+    }
+
     const [vStatus] = await db
       .select()
       .from(vehicleStatus)
-      .where(eq(vehicleStatus.vehicle_id, vehicle_id));
+      .where(
+        and(
+          eq(vehicleStatus.vehicle_id, vehicle_id),
+          eq(vehicleStatus.current_status, 'in'),
+          inArray(vehicleStatus.current_yard_id, sourceYardIds)
+        )
+      );
       
-    if (!vStatus || vStatus.current_status !== 'in') {
-      return res.status(400).json({ error: 'Vehicle is not available (not currently IN)' });
+    if (!vStatus) {
+      return res.status(400).json({ error: 'Vehicle is not available at the source branch' });
     }
 
     // Check existing pending requisitions

@@ -3,13 +3,14 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { branches, branchYards, vehicleStatus, vehicles } from '../db/schema.js';
 import { eq, inArray, and } from 'drizzle-orm';
-import { authenticate, requireRole, requireBranchAccess } from '../middleware/auth.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
 // Used by delivery_incharge to browse stock at a specific branch
 // Returns vehicles currently marked as 'in' at any yard belonging to the branch
-router.get('/:id/stock', authenticate, requireBranchAccess('id'), async (req, res, next) => {
+// Delivery incharge can view any branch's stock to request vehicles
+router.get('/:id/stock', authenticate, async (req, res, next) => {
   try {
     const branchId = req.params.id as string;
     

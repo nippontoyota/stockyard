@@ -21,7 +21,7 @@ export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, gps, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "" }) {
+export function createScan({ vin, type, yardId, gps, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "" }) {
   return {
     id: crypto.randomUUID(),
     clientScanId: createClientScanId(),
@@ -36,6 +36,7 @@ export function createScan({ vin, type, yardId, gps, outRemark = "", transferDes
     damaged,
     damageRemark,
     damageImage,
+    driveType,
     deviceId: localStorage.getItem("yardDeviceId") || "unknown-device",
     scannedAt: new Date().toISOString(),
   };
@@ -314,6 +315,8 @@ export function dashboard(state, yardId = null) {
   const overallUtilization = totalCapacity > 0 ? Math.round((inVehicles.length / totalCapacity) * 100) : 0;
   const highRiskYards = yardsData.filter((y) => y.utilization >= 85).length;
 
+  const dwellAlertFlags = openFlagItems.filter((f) => f.type === 'dwell_exceeded');
+
   return {
     currentStock: inVehicles.length,
     totalVehiclesTracked: visibleVehicles.length,
@@ -321,6 +324,7 @@ export function dashboard(state, yardId = null) {
     overallUtilization,
     highRiskYards,
     averageDwellDays: dwellDays.length ? Math.round(dwellDays.reduce((a, b) => a + b, 0) / dwellDays.length) : 0,
+    dwellAlertCount: dwellAlertFlags.length,
     openFlags: openFlagItems.length,
     models,
     yards: yardsData,
@@ -339,6 +343,7 @@ function formatFlagLabel(type) {
     duplicate_yard_status: "Duplicate Status",
     invalid_vin: "Invalid VIN Format",
     manual_admin_override: "Admin Override",
+    dwell_exceeded: "Dwell Time Exceeded",
   };
   return map[type] || type.replace(/_/g, " ");
 }
@@ -387,5 +392,6 @@ export function flagLabel(type) {
     duplicate_yard_status: "Duplicate Status",
     invalid_vin: "Invalid VIN Format",
     manual_admin_override: "Admin Override",
+    dwell_exceeded: "Dwell Time Exceeded",
   }[type] || String(type || "Flag").replace(/_/g, " ");
 }

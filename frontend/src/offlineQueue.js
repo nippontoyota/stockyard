@@ -73,7 +73,8 @@ export async function removeScan(clientScanId) {
 
 /**
  * Drain the queue with exponential backoff retry.
- * @param {Function} bulkSyncFn - async function that sends scans to server
+ * Item 9: Per-scan sync tracking — only remove scans confirmed synced by server.
+ * @param {Function} bulkSyncFn - async function that sends scans to server, returns { results: [...] }
  * @returns {{ synced: number, failed: number }}
  */
 export async function drainQueue(bulkSyncFn, maxRetries = 3) {
@@ -82,9 +83,25 @@ export async function drainQueue(bulkSyncFn, maxRetries = 3) {
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      await bulkSyncFn(pending);
-      await clearPendingScans();
-      return { synced: pending.length, failed: 0 };
+      const response = await bulkSyncFn(pending);
+      // Per-scan: remove only those that the server accepted or already processed
+      const results = response?.results || [];
+      let synced = 0;
+      let failed = 0;
+      for (const r of results) {
+        if (r.status === 'accepted' || r.status === 'already_processed' || r.status === 'rejected') {
+          await removeScan(r.client_scan_id);
+          synced++;
+        } else {
+          failed++;
+        }
+      }
+      // If server returned no results array, fall back to clearing all (legacy compat)
+      if (!results.length && pending.length) {
+        await clearPendingScans();
+        return { synced: pending.length, failed: 0 };
+      }
+      return { synced, failed };
     } catch (err) {
       if (attempt === maxRetries - 1) {
         console.error('[offline-queue] Failed after retries:', err);

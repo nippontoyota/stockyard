@@ -27,7 +27,8 @@ import {
 } from "./AnalyticsCharts.jsx";
 import {
   bulkSync, getVehicles, getAdminDashboard, getFlags, getScans, resolveFlag as apiResolveFlag, adminOverrideVehicle, loginApi,
-  getNotifications, getRequisitions, markAllNotificationsRead, markNotificationRead, getAdminBranches, getYards, getBranches
+  getNotifications, getRequisitions, markAllNotificationsRead, markNotificationRead, getAdminBranches, getYards, getBranches,
+  getVehicleStatus, deliverVehicles
 } from "./api.js";
 import "./styles.css";
 
@@ -115,6 +116,7 @@ export default function App() {
     return getViewFromPath(window.location.pathname, session.role);
   });
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
 
   useEffect(() => {
     Promise.all([getYards(), getBranches()]).then(([newYards, newBranches]) => {
@@ -223,6 +225,7 @@ export default function App() {
           requisitions: reqsData || { incoming: [], outgoing: [] },
         };
       });
+      setLastSyncedAt(new Date());
     } catch (err) {
       console.error("Failed to load backend data", err);
     }
@@ -310,7 +313,7 @@ export default function App() {
         }}
       />
       <main className="content">
-        {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} onRefresh={fetchServerData} />}
+        {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} onRefresh={fetchServerData} lastSyncedAt={lastSyncedAt} />}
         {view === "stock" && <StockView state={state} session={session} />}
         {view === "dashboard" && (isAdmin ? <AdminHome stats={stats} state={state} setState={setState} /> : <DashboardView state={state} stats={stats} session={session} setState={setState} />)}
         {view === "delivered" && isAdmin && <DeliveredUpload state={state} setState={setState} />}
@@ -615,7 +618,7 @@ function compressImage(file, maxDimension = 1000, quality = 0.8) {
   });
 }
 
-function ScanView({ state, setState, session, online, onRefresh }) {
+function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt }) {
   const [vin, setVin] = useState("");
   const [outRemark, setOutRemark] = useState("");
   const [transferDestinationYardId, setTransferDestinationYardId] = useState("");
@@ -634,6 +637,10 @@ function ScanView({ state, setState, session, online, onRefresh }) {
   const [gpsData, setGpsData] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [message, setMessage] = useState(null);
+  // Item 6: Manual scan type override
+  const [manualScanType, setManualScanType] = useState(null);
+  // Item 5: OUT confirmation
+  const [confirmOutData, setConfirmOutData] = useState(null);
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
   const damagePhotoInputRef = useRef(null);
@@ -642,9 +649,12 @@ function ScanView({ state, setState, session, online, onRefresh }) {
   const yard = yards.find((item) => item.id === session.yardId) || yards[0];
   const pendingVin = normalizeVin(vin);
   const isCarInCurrentYard = state.vehicles[pendingVin]?.currentStatus === "in" && (state.vehicles[pendingVin]?.currentYardId === yard.id || state.vehicles[pendingVin]?.currentYardId === yard.code);
-  const scanType = isCarInCurrentYard ? "out" : "in";
+  const autoScanType = isCarInCurrentYard ? "out" : "in";
+  const scanType = manualScanType || autoScanType;
   const activeFlag = state.flags?.find((f) => f.vin === pendingVin && !f.resolved);
   const isFlagged = Boolean(activeFlag);
+  // Item 7: Decoded VIN info for verification
+  const decodedVin = useMemo(() => pendingVin.length >= 5 ? decodeVinDetails(pendingVin) : null, [pendingVin]);
 
   // F12 indoor GPS fallback
   useEffect(() => {
@@ -678,8 +688,18 @@ function ScanView({ state, setState, session, online, onRefresh }) {
   async function handleDamagePhotoSelect(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+    // Item 10a: Client-side image size validation
+    if (file.size > 10 * 1024 * 1024) {
+      setOverlayResult({ type: "error", message: "Photo is too large (max 10MB). Try a smaller image." });
+      return;
+    }
     try {
       const compressed = await compressImage(file, 1000, 0.8);
+      // Check compressed size — base64 is ~33% larger than binary
+      if (compressed.length > 3 * 1024 * 1024) {
+        setOverlayResult({ type: "error", message: "Compressed photo still too large (max 3MB). Use a lower-resolution camera setting." });
+        return;
+      }
       setDamageImage(compressed);
       setOverlayResult(null);
     } catch {
@@ -883,6 +903,31 @@ function ScanView({ state, setState, session, online, onRefresh }) {
     }
   }
 
+  // Item 5: Actual submission logic (called after OUT confirmation or directly for IN)
+  async function doSubmit(confirmedScanType) {
+    const finalScanType = confirmedScanType || scanType;
+
+    const gps = gpsData || { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
+    const scan = createScan({ vin, type: finalScanType, yardId: yard.id, gps, outRemark, transferDestinationYardId, transferRequestedBy, keyNo, damaged, damageRemark, damageImage, driveType, online });
+    const result = applyScan(state, scan);
+
+    if (!result.accepted) return setOverlayResult({ type: "error", message: result.message });
+
+    const newFlags = result.state.flags.filter(f => f.vin === scan.vin && !f.resolved);
+    const resultType = newFlags.length ? "flagged" : "success";
+
+    try {
+      if (!online) throw new Error("Offline");
+      await bulkSync([scan]);
+      finishSubmit(result.state, resultType, result.message, newFlags.map(f => flagLabel(f.type)));
+    } catch (err) {
+      // Item 9: Offline or failed → enqueue to IndexedDB
+      await enqueueScan(scan);
+      setPendingCount(c => c + 1);
+      finishSubmit(result.state, resultType, result.message + " (Saved offline)", newFlags.map(f => flagLabel(f.type)));
+    }
+  }
+
   async function submit(event) {
     event.preventDefault();
     if (!vin.trim()) return setOverlayResult({ type: "error", message: "Enter or scan a VIN." });
@@ -897,25 +942,28 @@ function ScanView({ state, setState, session, online, onRefresh }) {
       return setOverlayResult({ type: "error", message: "This vehicle has an active flag. You must attach a photo to proceed." });
     }
 
-    const gps = gpsData || { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
-    const scan = createScan({ vin, type: scanType, yardId: yard.id, gps, outRemark, transferDestinationYardId, transferRequestedBy, keyNo, damaged, damageRemark, damageImage, driveType, online });
-    const result = applyScan(state, scan);
-
-    if (!result.accepted) return setOverlayResult({ type: "error", message: result.message });
-
-    const newFlags = result.state.flags.filter(f => f.vin === scan.vin && !f.resolved);
-    const resultType = newFlags.length ? "flagged" : "success";
-
-    try {
-      if (!online) throw new Error("Offline");
-      await bulkSync([scan]);
-      finishSubmit(result.state, resultType, result.message, newFlags.map(f => flagLabel(f.type)));
-    } catch (err) {
-      // Offline or failed, enqueue it
-      await enqueueScan(scan);
-      setPendingCount(c => c + 1);
-      finishSubmit(result.state, resultType, result.message + " (Saved offline)", newFlags.map(f => flagLabel(f.type)));
+    // Item 2: Live status check before submit (if online)
+    let liveScanType = scanType;
+    if (online && pendingVin.length === 17) {
+      try {
+        const liveStatus = await getVehicleStatus(pendingVin);
+        if (liveStatus && liveStatus.current_status) {
+          const liveIsIn = liveStatus.current_status === 'in' && (liveStatus.current_yard_id === yard.id || liveStatus.current_yard_id === yard.code);
+          liveScanType = manualScanType || (liveIsIn ? 'out' : 'in');
+        }
+      } catch {
+        // Offline or not found — use local state
+      }
     }
+
+    // Item 5: Confirmation dialog for OUT scans
+    if (liveScanType === "out" && !confirmOutData) {
+      setConfirmOutData({ vin: pendingVin, scanType: liveScanType, outRemark, model: decodedVin?.model || "Unknown" });
+      return;
+    }
+
+    setConfirmOutData(null);
+    await doSubmit(liveScanType);
   }
 
   function finishSubmit(newState, type, msg, flags) {
@@ -941,12 +989,33 @@ function ScanView({ state, setState, session, online, onRefresh }) {
       <GpsStatus onGpsReady={setGpsData} onGpsOverride={setGpsData} />
       {pendingCount > 0 && <div className="offline-badge">Offline Mode <span className="pending-count-badge">{pendingCount}</span></div>}
       <form className="scan-card stack" onSubmit={submit}>
+        {confirmOutData && (
+          <div className="scan-result-popover" style={{zIndex: 20}}>
+            <h2 style={{color: 'var(--accent)', marginTop: 0}}>Confirm OUT Scan</h2>
+            <p><strong>Model:</strong> {confirmOutData.model}</p>
+            <p><strong>VIN:</strong> {confirmOutData.vin}</p>
+            <p><strong>Reason:</strong> {confirmOutData.outRemark.replace('_', ' ')}</p>
+            <div className="split" style={{marginTop: '16px'}}>
+              <button type="button" className="ghost" onClick={() => setConfirmOutData(null)}>Cancel</button>
+              <button type="button" className="primary" onClick={() => {
+                const type = confirmOutData.scanType;
+                setConfirmOutData(null);
+                doSubmit(type);
+              }}>Confirm OUT</button>
+            </div>
+          </div>
+        )}
         <div className="scan-ticket">
           <span className={`scan-badge ${scanType}`}>{scanType.toUpperCase()}</span>
           <div>
             <h1>{yard.code}</h1>
             <p>{yard.name}</p>
+            {lastSyncedAt && <small className="last-synced" style={{color: 'var(--text-dim)', fontSize: '0.75rem'}}>Last synced: {Math.round((Date.now() - lastSyncedAt.getTime()) / 60000)}m ago</small>}
           </div>
+        </div>
+        <div className="scan-type-toggle" style={{display: 'flex', gap: '8px', marginBottom: '8px'}}>
+          <button type="button" className={`ghost ${scanType === 'in' ? 'active primary' : ''}`} onClick={() => { setManualScanType('in'); setScanSuccess(null); }} style={{flex: 1}}>IN {manualScanType==='in'?'(Manual)':'(Auto)'}</button>
+          <button type="button" className={`ghost ${scanType === 'out' ? 'active primary' : ''}`} onClick={() => { setManualScanType('out'); setScanSuccess(null); }} style={{flex: 1}}>OUT {manualScanType==='out'?'(Manual)':'(Auto)'}</button>
         </div>
         <div className="camera">
           <button className={`scan-box ${cameraOpen ? "live" : ""}`} type="button" onClick={() => {
@@ -989,6 +1058,9 @@ function ScanView({ state, setState, session, online, onRefresh }) {
               <span className="material-symbols-outlined">check_circle</span>
               <div>
                 <b>VIN {scanSuccess} scanned.</b>
+                {decodedVin && <div style={{fontSize: '0.85rem', color: 'var(--text-dim)', margin: '4px 0'}}>
+                  {decodedVin.model} {decodedVin.engine ? `(${decodedVin.engine})` : ''} · {decodedVin.plant || 'Unknown Plant'}
+                </div>}
                 <small>Ready for vehicle {scanType.toUpperCase()}.</small>
               </div>
               {scanType === "out" && (
@@ -1620,11 +1692,18 @@ function DeliveredUpload({ state, setState }) {
     else reader.readAsText(file);
   }
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
-    setState(removeDeliveredVehicles(state, vins));
-    setMessage(`${liveMatches.length} delivered vehicle${liveMatches.length === 1 ? "" : "s"} removed from live stock.`);
-    setText("");
+    try {
+      if (liveMatches.length > 0) {
+        await deliverVehicles(liveMatches);
+      }
+      setState(removeDeliveredVehicles(state, vins));
+      setMessage(`${liveMatches.length} delivered vehicle${liveMatches.length === 1 ? "" : "s"} removed from live stock.`);
+      setText("");
+    } catch (err) {
+      setMessage(`Error syncing with server: ${err.message}`);
+    }
   }
 
   return (

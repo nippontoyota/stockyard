@@ -40,6 +40,7 @@ router.get('/', async (req, res, next) => {
         id: vehicles.id,
         vin: vehicles.vin,
         model: vehicles.model,
+        drive_type: vehicles.drive_type,
         vin_valid: vehicles.vin_valid,
         current_status: vehicleStatus.current_status,
         current_yard_id: vehicleStatus.current_yard_id,
@@ -75,6 +76,7 @@ router.get('/:vin', async (req, res, next) => {
         id: vehicles.id,
         vin: vehicles.vin,
         model: vehicles.model,
+        drive_type: vehicles.drive_type,
         vin_valid: vehicles.vin_valid,
         created_at: vehicles.created_at,
         current_status: vehicleStatus.current_status,
@@ -234,6 +236,44 @@ router.post('/transit-list', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ─── PATCH /deliver ──────────────────────────────────────────────────
+// Item 3: Backend sync for delivered vehicles (was client-side only)
+
+router.patch('/deliver', async (req, res, next) => {
+  try {
+    if (req.user!.role !== 'admin') {
+      res.status(403).json({ error: 'Only admins can mark vehicles as delivered' });
+      return;
+    }
+
+    const { vins } = req.body;
+    if (!Array.isArray(vins) || vins.length === 0) {
+      res.status(400).json({ error: 'Provide a non-empty array of VINs' });
+      return;
+    }
+
+    let updated = 0;
+    let notFound = 0;
+
+    for (const vinRaw of vins) {
+      const vin = String(vinRaw).toUpperCase().trim();
+      const [vehicle] = await db.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.vin, vin));
+      if (!vehicle) { notFound++; continue; }
+
+      await db
+        .insert(vehicleStatus)
+        .values({ vehicle_id: vehicle.id, current_status: 'out', last_changed_at: new Date() })
+        .onConflictDoUpdate({
+          target: vehicleStatus.vehicle_id,
+          set: { current_status: 'out', last_changed_at: new Date(), override_reason: 'delivered' },
+        });
+      updated++;
+    }
+
+    res.json({ updated, notFound, total: vins.length });
+  } catch (err) { next(err); }
 });
 
 export default router;
