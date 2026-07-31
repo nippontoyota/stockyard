@@ -1,5 +1,6 @@
 import { Server as SocketServer } from 'socket.io';
 import type { Server as HttpServer } from 'http';
+import { notifyAdmins } from './webPush.js';
 
 let io: SocketServer | null = null;
 
@@ -9,7 +10,6 @@ export function initSocket(httpServer: HttpServer): SocketServer {
       origin: '*',
       methods: ['GET', 'POST'],
     },
-    // Match client: polling first, then upgrade — works through Render's load balancer.
     transports: ['polling', 'websocket'],
     pingTimeout: 60000,
     pingInterval: 25000,
@@ -25,12 +25,6 @@ export function initSocket(httpServer: HttpServer): SocketServer {
   return io;
 }
 
-export function getIO(): SocketServer {
-  if (!io) throw new Error('Socket.io not initialized — call initSocket first');
-  return io;
-}
-
-/** Emit a scan event to all connected clients */
 export function emitScanEvent(data: {
   type: 'in' | 'out';
   vin: string;
@@ -44,7 +38,6 @@ export function emitScanEvent(data: {
   if (io) io.emit('scan:new', data);
 }
 
-/** Emit a flag event */
 export function emitFlagEvent(data: {
   id: string;
   vehicleId: string;
@@ -53,15 +46,13 @@ export function emitFlagEvent(data: {
   message: string;
 }) {
   if (io) io.emit('flag:created', data);
-}
 
-/** Emit vehicle status change */
-export function emitVehicleStatusChange(data: {
-  vin: string;
-  status: string;
-  yardId: string | null;
-}) {
-  if (io) io.emit('vehicle:status-changed', data);
+  const filter = data.flagType === 'damage_reported' ? 'damage' : 'exceptions';
+  void notifyAdmins({
+    title: 'New flag needs attention',
+    body: `${data.vin}: ${data.message}`,
+    url: `/dashboard?section=attention&filter=${filter}`,
+  });
 }
 
 export function emitRequisitionEvent() {
