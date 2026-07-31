@@ -10,6 +10,7 @@ import {
   decodeVinDetails,
   normalizeVin,
   resolveFlag,
+  flagLabel,
   yards,
   fallbackBranches,
   setConfig,
@@ -26,8 +27,8 @@ import {
   DwellByModelChart,
 } from "./AnalyticsCharts.jsx";
 import {
-  bulkSync, getVehicles, getAdminDashboard, getFlags, getScans, resolveFlag as apiResolveFlag, loginApi,
-  getNotifications, getRequisitions, markAllNotificationsRead, markNotificationRead, getAdminBranches, getBranches,
+  bulkSync, getVehicles, getFlags, getScans, resolveFlag as apiResolveFlag, loginApi,
+  getNotifications, getRequisitions, getAdminBranches, getBranches,
   getVehicleStatus
 } from "./api.js";
 import "./styles.css";
@@ -39,21 +40,11 @@ import { useSocket } from "./useSocket.js";
 import { ScanOverlay } from "./components/ScanOverlay.jsx";
 import { GpsStatus } from "./components/GpsStatus.jsx";
 import { enqueueScan, getPendingCount, drainQueue } from "./offlineQueue.js";
+import { saveSnapshot, loadSnapshot, formatSnapshotAge, applySnapshotToState } from "./offlineSnapshot.js";
 import { usePwaInstall } from "./usePwaInstall.js";
 import { YARD_REGIONS } from "./yardData.js";
-
-function flagLabel(type) {
-  return {
-    damage_reported: "Damage Reported",
-    gps_outside_yard: "GPS Outside Yard",
-    unverified_in: "OUT Without IN",
-    yard_capacity_exceeded: "Capacity Exceeded",
-    duplicate_yard_status: "Duplicate Yard IN",
-    invalid_vin: "Invalid VIN",
-    dwell_exceeded: "Dwell Time Exceeded",
-    manual_admin_override: "Admin Override",
-  }[type] || String(type || "Flag").replace(/_/g, " ");
-}
+import { AdminHome } from "./components/AdminDashboard.jsx";
+import { YardVehiclesModal } from "./components/YardVehiclesModal.jsx";
 
 function getRoutePath(viewName, role) {
   if (role === "admin") {
@@ -93,35 +84,113 @@ function getViewFromPath(pathname, role) {
   return "scan";
 }
 
-export default function App() {
-  const [session, setSession] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("yardSession"));
-    } catch {
-      return null;
-    }
+function getStoredSession() {
+  try {
+    return JSON.parse(localStorage.getItem("yardSession") || "null");
+  } catch {
+    return null;
+  }
+}
+
+function mapServerResponse(vehiclesData, flagsData, scansData, notifsData, reqsData) {
+  const mappedVehicles = {};
+  vehiclesData.forEach((v) => {
+    const decoded = decodeVinDetails(v.vin);
+    mappedVehicles[v.vin] = {
+      vin: v.vin,
+      model: v.model && v.model !== "Unknown" && v.model !== "Toyota Vehicle" ? v.model : decoded.model,
+      variant: v.variant && v.variant !== "Standard" ? v.variant : decoded.variant,
+      colour: v.colour && v.colour !== "Not set" ? v.colour : decoded.colour,
+      driveType: v.drive_type,
+      vinValid: v.vin_valid,
+      currentStatus: v.current_status,
+      currentYardId: v.current_yard_id,
+      lastChangedAt: v.last_changed_at,
+      outRemark: v.out_remark,
+      keyNo: v.key_no || v.keyNo || "",
+    };
   });
 
-  const [state, setState] = useState(createInitialState);
+  const mappedFlags = flagsData.map((f) => ({
+    id: f.id,
+    vin: f.vin,
+    type: f.flag_type,
+    message: f.message,
+    createdAt: f.created_at,
+    resolved: f.resolved,
+    damageRemark: f.damage_remark,
+    damageImage: f.damage_image,
+    scanType: f.scan_type,
+    yardId: f.yard_id,
+  }));
+
+  const mappedScans = scansData.map((s) => ({
+    id: s.id,
+    clientScanId: s.clientScanId || s.id,
+    vin: s.vin,
+    vinRaw: s.vinRaw || s.vin,
+    type: s.type,
+    yardId: s.yardId,
+    scannedAt: s.scannedAt,
+    damaged: Boolean(s.damaged),
+    damageRemark: s.damageRemark || "",
+    damageImage: s.damageImage || "",
+    outRemark: s.outRemark || "",
+    transferDestinationYardId: s.transferDestinationYardId || "",
+    transferRequestedBy: s.transferRequestedBy || "",
+    keyNo: s.keyNo || s.key_no || "",
+    syncStatus: "synced",
+  }));
+
+  return {
+    vehicles: mappedVehicles,
+    flags: mappedFlags,
+    scans: mappedScans,
+    notifications: notifsData || [],
+    requisitions: reqsData || { incoming: [], outgoing: [] },
+  };
+}
+
+function hydrateFromSnapshot(session, setState, setLastSyncedAt, setStaleSnapshotAt) {
+  const snapshot = loadSnapshot(session);
+  if (!snapshot) return false;
+  setState((s) => applySnapshotToState(s, snapshot));
+  setLastSyncedAt(new Date(snapshot.syncedAt));
+  setStaleSnapshotAt(snapshot.syncedAt);
+  return true;
+}
+
+export default function App() {
+  const [session, setSession] = useState(getStoredSession);
+
+  const [state, setState] = useState(() => {
+    const base = createInitialState();
+    const snap = loadSnapshot(getStoredSession());
+    return snap ? applySnapshotToState(base, snap) : base;
+  });
   const [online, setOnline] = useState(() => navigator.onLine);
   const [view, setView] = useState(() => {
     if (!session) return "login";
     return getViewFromPath(window.location.pathname, session.role);
   });
-  const [configLoaded, setConfigLoaded] = useState(false);
-  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const [dataReady, setDataReady] = useState(() => {
+    const sess = getStoredSession();
+    if (!sess) return true;
+    return Boolean(loadSnapshot(sess));
+  });
+  const [lastSyncedAt, setLastSyncedAt] = useState(() => {
+    const snap = loadSnapshot(getStoredSession());
+    return snap ? new Date(snap.syncedAt) : null;
+  });
+  const [staleSnapshotAt, setStaleSnapshotAt] = useState(() => loadSnapshot(getStoredSession())?.syncedAt || null);
 
   useEffect(() => {
     // Yards are hardcoded in stockyardLogic â€” do not fetch (filtered API + cache
     // was causing login to show only the previously selected yard after logout).
     localStorage.removeItem("cache:yards");
-    getBranches().then((newBranches) => {
-      setConfig(null, newBranches);
-      setConfigLoaded(true);
-    }).catch(e => {
-      console.error("Failed to load config", e);
-      setConfigLoaded(true); // continue anyway with hardcoded yards
-    });
+    getBranches()
+      .then((newBranches) => setConfig(null, newBranches))
+      .catch((e) => console.error("Failed to load branches config", e));
   }, []);
 
   useEffect(() => {
@@ -151,9 +220,13 @@ export default function App() {
   }, [session]);
 
   const fetchServerData = useCallback(async () => {
-    if (!session || !online) return;
+    if (!session) return;
+    if (!online) {
+      setDataReady(true);
+      return;
+    }
     try {
-      const isDeliveryOrYard = session.role === 'delivery_incharge' || session.role === 'stockyard';
+      const isDeliveryOrYard = session.role === "delivery_incharge" || session.role === "stockyard";
       const [vehiclesData, flagsData, scansData, notifsData, reqsData] = await Promise.all([
         getVehicles().catch(() => []),
         getFlags().catch(() => []),
@@ -162,68 +235,17 @@ export default function App() {
         isDeliveryOrYard ? getRequisitions().catch(() => ({ incoming: [], outgoing: [] })) : Promise.resolve({ incoming: [], outgoing: [] }),
       ]);
 
-      const mappedVehicles = {};
-      vehiclesData.forEach(v => {
-        const decoded = decodeVinDetails(v.vin);
-        mappedVehicles[v.vin] = {
-          vin: v.vin,
-          model: v.model && v.model !== "Unknown" && v.model !== "Toyota Vehicle" ? v.model : decoded.model,
-          variant: v.variant && v.variant !== "Standard" ? v.variant : decoded.variant,
-          colour: v.colour && v.colour !== "Not set" ? v.colour : decoded.colour,
-          driveType: v.drive_type,
-          vinValid: v.vin_valid,
-          currentStatus: v.current_status,
-          currentYardId: v.current_yard_id,
-          lastChangedAt: v.last_changed_at,
-          outRemark: v.out_remark,
-          keyNo: v.key_no || v.keyNo || "",
-        };
-      });
+      const payload = mapServerResponse(vehiclesData, flagsData, scansData, notifsData, reqsData);
 
-      const mappedFlags = flagsData.map(f => ({
-        id: f.id,
-        vin: f.vin,
-        type: f.flag_type,
-        message: f.message,
-        createdAt: f.created_at,
-        resolved: f.resolved,
-        damageRemark: f.damage_remark,
-        damageImage: f.damage_image,
-        scanType: f.scan_type,
-        yardId: f.yard_id,
-      }));
-
-      const mappedScans = scansData.map(s => ({
-        id: s.id,
-        clientScanId: s.clientScanId || s.id,
-        vin: s.vin,
-        vinRaw: s.vinRaw || s.vin,
-        type: s.type,
-        yardId: s.yardId,
-        scannedAt: s.scannedAt,
-        damaged: Boolean(s.damaged),
-        damageRemark: s.damageRemark || "",
-        damageImage: s.damageImage || "",
-        outRemark: s.outRemark || "",
-        transferDestinationYardId: s.transferDestinationYardId || "",
-        transferRequestedBy: s.transferRequestedBy || "",
-        keyNo: s.keyNo || s.key_no || "",
-        syncStatus: "synced",
-      }));
-
-      setState(s => {
-        return {
-          ...s,
-          vehicles: mappedVehicles,
-          flags: mappedFlags,
-          scans: mappedScans,
-          notifications: notifsData || [],
-          requisitions: reqsData || { incoming: [], outgoing: [] },
-        };
-      });
+      setState((s) => ({ ...s, ...payload }));
+      saveSnapshot(session, payload);
       setLastSyncedAt(new Date());
+      setStaleSnapshotAt(null);
     } catch (err) {
       console.error("Failed to load backend data", err);
+      hydrateFromSnapshot(session, setState, setLastSyncedAt, setStaleSnapshotAt);
+    } finally {
+      setDataReady(true);
     }
   }, [session, online, setState]);
 
@@ -276,18 +298,16 @@ export default function App() {
     }
   };
 
-  if (!configLoaded) {
-    return (
-      <div className="login" style={{ display: 'grid', placeItems: 'center' }}>
-        <div className="skeleton skeleton-card" style={{ width: 300, height: 160, alignItems: 'center', justifyContent: 'center' }}>
-          <div className="skeleton-card-title"></div>
-          <div className="skeleton-card-line"></div>
-        </div>
-      </div>
-    );
-  }
-
   if (!session) return <Login onLogin={(nextSession) => {
+    setDataReady(false);
+    setStaleSnapshotAt(null);
+    const snap = loadSnapshot(nextSession);
+    if (snap) {
+      setState((s) => applySnapshotToState(s, snap));
+      setLastSyncedAt(new Date(snap.syncedAt));
+      setStaleSnapshotAt(snap.syncedAt);
+      setDataReady(true);
+    }
     setSession(nextSession);
     const initialView = nextSession.role === "admin" ? "dashboard" : nextSession.role === "delivery_incharge" ? "requisitions" : "scan";
     setView(initialView);
@@ -307,13 +327,29 @@ export default function App() {
         onNavigate={navigateTo}
         onLogout={() => {
           setSession(null);
+          setStaleSnapshotAt(null);
+          setDataReady(true);
           window.history.replaceState(null, "", "/");
         }}
       />
+      {staleSnapshotAt && (
+        <div className="stale-data-banner" role="status">
+          <span className="material-symbols-outlined" aria-hidden="true">cloud_off</span>
+          <span>
+            {!online ? "Offline" : "Could not refresh"} — showing data from {formatSnapshotAge(staleSnapshotAt)}
+          </span>
+        </div>
+      )}
       <main className="content">
         {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} onRefresh={fetchServerData} lastSyncedAt={lastSyncedAt} />}
         {view === "stock" && <StockView state={state} session={session} />}
-        {view === "dashboard" && (
+        {view === "dashboard" && !dataReady && (
+          <div className="dashboard-loading" style={{ padding: '1rem' }}>
+            <div className="skeleton skeleton-kpi" style={{ height: 80, marginBottom: 12 }} />
+            <div className="skeleton skeleton-kpi" style={{ height: 200 }} />
+          </div>
+        )}
+        {view === "dashboard" && dataReady && (
           isAdmin
             ? <AdminHome stats={stats} state={state} setState={setState} />
             : <DashboardView state={state} stats={stats} session={session} setState={setState} />
@@ -606,9 +642,6 @@ function NavButton({ icon, label, active, badge, onClick }) {
   );
 }
 
-import { YardVehiclesModal } from "./components/YardVehiclesModal.jsx";
-import { AdminHome } from "./components/AdminDashboard.jsx";
-
 function compressImage(file, maxDimension = 1000, quality = 0.8) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -671,6 +704,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const pendingVin = normalizeVin(vin);
   const isCarInCurrentYard = state.vehicles[pendingVin]?.currentStatus === "in" && state.vehicles[pendingVin]?.currentYardId === yard.id;
   const scanType = isCarInCurrentYard ? "out" : "in";
+  const activeScanType = scanSuccess ? scanType : manualScanType;
   const activeFlag = state.flags?.find((f) => f.vin === pendingVin && !f.resolved);
   const isFlagged = Boolean(activeFlag);
   // Item 7: Decoded VIN info for verification
@@ -999,6 +1033,13 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
 
   function finishSubmit(newState, type, msg, flags) {
     setState(newState);
+    saveSnapshot(session, {
+      vehicles: newState.vehicles,
+      flags: newState.flags,
+      scans: newState.scans,
+      notifications: newState.notifications,
+      requisitions: newState.requisitions,
+    });
     setOverlayResult({ type, vin, message: msg, flags });
     setVin("");
     setOutRemark("");
@@ -1038,7 +1079,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
           </div>
         )}
         <div className="scan-ticket">
-          <span className={`scan-badge ${scanType}`}>{scanType.toUpperCase()}</span>
+          <span className={`scan-badge ${activeScanType}`}>{activeScanType.toUpperCase()}</span>
           <div>
             <h1>{yard.code}</h1>
             <p>{yard.name}</p>
@@ -1366,7 +1407,11 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
           <span className="material-symbols-outlined">smartphone</span>
           <span>Device {state.deviceId.slice(-8)}</span>
         </div>
-        <p className="muted">GPS is captured on submit. A connection is required to save a scan.</p>
+        <p className="muted">
+          {online
+            ? "GPS is captured on submit. Scans sync to the server immediately."
+            : "Offline — scans are saved on this device and sync when you reconnect."}
+        </p>
       </aside>
     </section>
   );

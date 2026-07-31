@@ -1,13 +1,19 @@
 const API_BASE = import.meta.env.VITE_API_URL || "https://stockyard-00s6.onrender.com";
 
 // §2.2 — Retry with exponential backoff
+const FETCH_TIMEOUT_MS = 8000;
+
 async function fetchWithRetry(url, options = {}, retries = 3) {
   for (let i = 0; i < retries; i++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const res = await fetch(url, options);
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeout);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res;
     } catch (err) {
+      clearTimeout(timeout);
       if (i === retries - 1) throw err;
       await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
     }
@@ -68,23 +74,17 @@ export async function getYards() {
   return response.data || response;
 }
 
-export async function getBranches() {
-  const cached = getCached('cache:branches');
+export async function getAdminBranches() {
+  const cached = getCached("cache:branches");
   if (cached) return cached;
-  try {
-    const response = await apiFetch("/api/admin/branches");
-    const data = Array.isArray(response) ? response : (response.data || response);
-    setCache('cache:branches', data);
-    return data;
-  } catch {
-    // fallback for non-admin
-    try {
-      const response = await apiFetch("/api/branches");
-      const data = Array.isArray(response) ? response : (response.data || response);
-      setCache('cache:branches', data);
-      return data;
-    } catch { return []; }
-  }
+  const response = await apiFetch("/api/admin/branches");
+  const data = Array.isArray(response) ? response : (response.data || response);
+  if (data?.length) setCache("cache:branches", data);
+  return data || [];
+}
+
+export async function getBranches() {
+  return getAdminBranches();
 }
 
 export async function bulkSync(scans) {
@@ -205,10 +205,6 @@ export async function uploadTransitListApi(vehicles) {
 }
 
 // --- Branches & Requisitions ---
-
-export async function getAdminBranches() {
-  return apiFetch("/api/admin/branches");
-}
 
 export async function createAdminBranch(name) {
   return apiFetch("/api/admin/branches", {
