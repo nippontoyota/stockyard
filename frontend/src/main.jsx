@@ -29,10 +29,7 @@ import {
   getNotifications, getRequisitions,
   getVehicleStatus
 } from "./api.js";
-import "./design-tokens.css";
 import "./styles.css";
-import "./ui-refresh.css";
-import "./ui-product.css";
 
 // Import new components
 import { RequisitionsTab } from "./components/RequisitionsTab.jsx";
@@ -275,14 +272,7 @@ export default function App() {
   }, [view, session, fetchServerData]);
 
   useEffect(() => {
-    let reloading = false;
-    const onControllerChange = () => {
-      if (reloading) return;
-      reloading = true;
-      window.location.reload();
-    };
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
       navigator.serviceWorker.register("/sw.js").then((reg) => {
         reg.update();
       }).catch(() => { });
@@ -292,9 +282,6 @@ export default function App() {
     addEventListener("online", up);
     addEventListener("offline", down);
     return () => {
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-      }
       removeEventListener("online", up);
       removeEventListener("offline", down);
     };

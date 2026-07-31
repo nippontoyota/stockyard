@@ -1,6 +1,6 @@
 export function StatusStrip({ stats, openFlags, damageCount, transitCount, onJump }) {
   return (
-    <div className="admin-metrics-bar" role="navigation" aria-label="Admin status">
+    <div className="admin-status-strip" role="navigation" aria-label="Admin status">
       <button type="button" className="admin-status-chip" onClick={() => onJump("yards")}>
         <span className="admin-status-value">{stats.currentStock}</span>
         <span className="admin-status-label">In stock</span>
