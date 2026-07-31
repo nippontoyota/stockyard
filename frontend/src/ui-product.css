@@ -660,6 +660,250 @@ button.ghost,
   }
 }
 
+/* ─── Desktop / Windows — equal attention to wide layouts ─────── */
+@media (min-width: 60rem) {
+  .app-shell {
+    padding-left: var(--ds-space-6);
+    padding-right: var(--ds-space-6);
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .content {
+    padding-top: var(--ds-space-4);
+    width: min(var(--ds-content-max), 100%);
+  }
+
+  /* Floating nav on desktop — not edge-to-edge mobile bar */
+  .bottom-nav {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(28rem, calc(100% - 2rem));
+    height: 3.5rem;
+    bottom: calc(var(--ds-space-4) + env(safe-area-inset-bottom, 0px));
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius-lg);
+    box-shadow: var(--ds-shadow-md);
+  }
+
+  .bottom-nav-admin {
+    width: min(22rem, calc(100% - 2rem));
+  }
+
+  .topbar {
+    padding-left: var(--ds-space-6);
+    padding-right: var(--ds-space-6);
+  }
+
+  /* Scan — camera + sidebar column */
+  .scan-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    gap: var(--ds-space-6);
+    align-items: start;
+  }
+
+  .scan-yard-sidebar {
+    position: sticky;
+    top: calc(4.75rem + env(safe-area-inset-top, 0px));
+  }
+
+  .scan-card {
+    padding: var(--ds-space-6);
+  }
+
+  .camera {
+    min-height: 26rem;
+    padding: var(--ds-space-8) var(--ds-space-6);
+  }
+
+  .scan-box {
+    width: min(21rem, 100%);
+  }
+
+  /* Stock — room to breathe, full filter row */
+  .stock-container {
+    padding: var(--ds-space-6);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius-lg);
+    background: var(--ds-surface);
+    gap: var(--ds-space-5);
+  }
+
+  .stock-header-bar h2 {
+    font-size: var(--ds-text-xl);
+  }
+
+  .stock-analytics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--ds-space-3);
+  }
+
+  .filter-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--ds-space-3);
+  }
+
+  .filter-drawer {
+    padding: var(--ds-space-4);
+  }
+
+  /* Staff dashboard KPIs */
+  .kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--ds-space-3);
+  }
+
+  .analytics-grid-2col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ds-space-4);
+  }
+
+  /* Login — centered card */
+  .login-panel {
+    width: min(58rem, 100%);
+  }
+
+  .login-form-panel {
+    padding: var(--ds-space-10);
+  }
+}
+
+@media (min-width: 67.5rem) {
+  /* Admin — sidebar + main panel (desktop uses rail, not mobile tabs) */
+  .admin-mobile-tabs {
+    display: none !important;
+  }
+
+  .admin-console.dashboard-workspace {
+    display: grid;
+    grid-template-columns: 12.5rem minmax(0, 1fr);
+    gap: 0;
+    padding: var(--ds-space-4);
+    margin: 0;
+    background: var(--ds-surface);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius-lg);
+    box-shadow: var(--ds-shadow-sm);
+  }
+
+  .admin-console .dashboard-rail {
+    min-height: 36rem;
+    padding: var(--ds-space-5) var(--ds-space-3);
+    border-radius: var(--ds-radius-md) 0 0 var(--ds-radius-md);
+  }
+
+  .admin-console .rail-menu button {
+    min-height: 2.5rem;
+    padding: 0 var(--ds-space-3);
+    font-size: var(--ds-text-sm);
+  }
+
+  .admin-console .rail-menu button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--ds-text-inverse);
+  }
+
+  .admin-console-main,
+  .admin-console .analytical-dashboard {
+    padding: var(--ds-space-6) var(--ds-space-8);
+    background: var(--ds-surface-sunken);
+    border-radius: 0 var(--ds-radius-md) var(--ds-radius-md) 0;
+    gap: var(--ds-space-6);
+  }
+
+  .admin-console-header {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--ds-space-6);
+    border-bottom: 1px solid var(--ds-border);
+    padding-bottom: var(--ds-space-4);
+  }
+
+  .admin-console-header .dashboard-header-copy {
+    padding: 0;
+    border-bottom: none;
+  }
+
+  .admin-console-header h1 {
+    font-size: var(--ds-text-2xl);
+  }
+
+  .admin-metrics-bar {
+    overflow: visible;
+  }
+
+  .admin-metrics-bar .admin-status-chip {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: var(--ds-space-4) var(--ds-space-5);
+    align-items: flex-start;
+  }
+
+  .admin-status-value {
+    font-size: var(--ds-text-xl);
+  }
+
+  .admin-setup-tabs button {
+    flex-direction: row;
+    font-size: var(--ds-text-sm);
+    padding: var(--ds-space-3) var(--ds-space-4);
+  }
+
+  .admin-push-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 44rem;
+  }
+
+  .admin-setup-block,
+  .credentials-workspace {
+    max-width: 52rem;
+  }
+
+  .yard-box-grid {
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: var(--ds-space-4);
+  }
+
+  .admin-issue-list {
+    display: grid;
+    gap: var(--ds-space-2);
+  }
+
+  .admin-export-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ds-space-4);
+  }
+}
+
+@media (min-width: 75rem) {
+  .content {
+    width: min(var(--ds-content-wide), 100%);
+  }
+
+  .admin-console.dashboard-workspace {
+    grid-template-columns: 14rem minmax(0, 1fr);
+  }
+
+  .scan-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+    gap: var(--ds-space-8);
+  }
+
+  .yard-box-grid {
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  }
+
+  .chart-panel,
+  .kpi-card {
+    padding: var(--ds-space-5);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
