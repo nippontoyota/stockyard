@@ -9,7 +9,10 @@ export function initSocket(httpServer: HttpServer): SocketServer {
       origin: '*',
       methods: ['GET', 'POST'],
     },
-    transports: ['websocket', 'polling'],
+    // Match client: polling first, then upgrade — works through Render's load balancer.
+    transports: ['polling', 'websocket'],
+    pingTimeout: 60000,
+    pingInterval: 25000,
   });
 
   io.on('connection', (socket) => {
