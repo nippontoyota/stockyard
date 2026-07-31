@@ -32,6 +32,7 @@ import {
 import "./design-tokens.css";
 import "./styles.css";
 import "./ui-refresh.css";
+import "./ui-product.css";
 
 // Import new components
 import { RequisitionsTab } from "./components/RequisitionsTab.jsx";

@@ -1,0 +1,670 @@
+/**
+ * Product UI system — utilitarian, industrial, task-first.
+ * Loaded after ui-refresh.css. Visual only; no behavior changes.
+ */
+
+/* ─── Foundation ─────────────────────────────────────────────── */
+:root {
+  color: var(--ds-text);
+  background: var(--ds-bg);
+  font-family: var(--ds-font-ui);
+  font-size: var(--ds-text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--ds-font-ui);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ds-text);
+  text-wrap: balance;
+}
+
+h1 { font-size: var(--ds-text-xl); line-height: 1.2; }
+h2 { font-size: var(--ds-text-lg); line-height: 1.25; }
+
+/* Labels: readable, not shouty uppercase kickers */
+label,
+.field-hint,
+.filter-drawer-header span,
+.manual-entry-title {
+  font-family: var(--ds-font-ui);
+  font-size: var(--ds-text-sm);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ds-text-secondary);
+}
+
+.eyebrow {
+  font-size: var(--ds-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ds-primary);
+}
+
+/* ─── App shell ──────────────────────────────────────────────── */
+.app-shell {
+  background: var(--ds-bg);
+}
+
+.content {
+  padding-top: var(--ds-space-2);
+}
+
+/* ─── Top bar — orientation chrome ───────────────────────────── */
+.topbar {
+  background: var(--ds-navy);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+  z-index: var(--ds-z-topbar);
+}
+
+.topbar-brand {
+  font-family: var(--ds-font-brand);
+  font-size: var(--ds-text-sm);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--ds-text-inverse);
+}
+
+.topbar-badge {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: var(--ds-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.icon-btn {
+  color: var(--ds-text-inverse);
+  border-radius: var(--ds-radius-sm);
+  transition: background var(--ds-duration-fast) var(--ds-ease-out);
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.icon-btn .badge {
+  background: var(--ds-primary);
+}
+
+.pill.online-pill {
+  font-size: var(--ds-text-xs);
+  font-weight: 600;
+}
+
+/* ─── Bottom nav — task switcher ─────────────────────────────── */
+.bottom-nav {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg) var(--ds-radius-lg) 0 0;
+  box-shadow: var(--ds-shadow-md);
+  z-index: var(--ds-z-sticky);
+}
+
+.bottom-nav button {
+  font-size: var(--ds-text-xs);
+  font-weight: 600;
+  color: var(--ds-text-muted);
+  border-radius: var(--ds-radius-sm);
+  transition:
+    color var(--ds-duration-fast) var(--ds-ease-out),
+    background var(--ds-duration-fast) var(--ds-ease-out);
+}
+
+.bottom-nav button .material-symbols-outlined {
+  font-size: 1.375rem;
+}
+
+.bottom-nav .active {
+  background: var(--ds-primary-subtle);
+  color: var(--ds-navy);
+}
+
+.bottom-nav .active .nav-badge {
+  background: var(--ds-primary);
+  color: var(--ds-text-inverse);
+}
+
+/* ─── Surfaces — flat by default, shadow only when floating ─── */
+.panel,
+.scan-card,
+.vehicle,
+.stock-stat,
+.yard-box,
+.filter-drawer,
+.admin-setup-block,
+.admin-push-row,
+.credentials-summary {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  box-shadow: none;
+}
+
+.scan-card {
+  background: var(--ds-surface);
+  padding: var(--ds-space-5);
+  gap: var(--ds-space-5);
+}
+
+.stack {
+  gap: var(--ds-space-4);
+}
+
+/* ─── Forms & buttons ────────────────────────────────────────── */
+input,
+select,
+textarea {
+  min-height: var(--ds-touch-min);
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface);
+  font-size: var(--ds-text-base);
+  transition:
+    border-color var(--ds-duration-fast) var(--ds-ease-out),
+    box-shadow var(--ds-duration-fast) var(--ds-ease-out);
+}
+
+.primary,
+button.primary {
+  min-height: var(--ds-touch-min);
+  background: var(--ds-primary);
+  border-color: var(--ds-primary);
+  border-radius: var(--ds-radius-sm);
+  font-weight: 700;
+  font-size: var(--ds-text-sm);
+  letter-spacing: 0;
+  transition: background var(--ds-duration-fast) var(--ds-ease-out);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--ds-primary-hover);
+  border-color: var(--ds-primary-hover);
+}
+
+.ghost,
+button.ghost,
+.btn.btn-outline {
+  min-height: 2.5rem;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface);
+  color: var(--ds-navy);
+  font-weight: 600;
+  font-size: var(--ds-text-sm);
+}
+
+/* Segmented controls — subtle track, not loud pills */
+.segmented {
+  background: var(--ds-surface-sunken);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  padding: var(--ds-space-1);
+  gap: var(--ds-space-1);
+}
+
+.segmented button {
+  min-height: var(--ds-touch-min);
+  border-radius: var(--ds-radius-sm);
+  font-weight: 600;
+  font-size: var(--ds-text-sm);
+  color: var(--ds-text-secondary);
+  transition:
+    background var(--ds-duration-fast) var(--ds-ease-out),
+    color var(--ds-duration-fast) var(--ds-ease-out);
+}
+
+.segmented .active {
+  background: var(--ds-surface);
+  color: var(--ds-navy);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+/* ─── Scan workflow ───────────────────────────────────────────── */
+.scan-ticket {
+  background: var(--ds-chrome);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  padding: var(--ds-space-4);
+}
+
+.scan-ticket h1 {
+  font-size: var(--ds-text-lg);
+  color: var(--ds-navy);
+}
+
+.scan-badge {
+  background: var(--ds-primary);
+  border-radius: var(--ds-radius-sm);
+  font-size: var(--ds-text-sm);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.scan-badge.out {
+  background: var(--ds-navy);
+}
+
+.camera {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: #0c1222;
+}
+
+/* ─── Stock list ──────────────────────────────────────────────── */
+.stock-stat b {
+  color: var(--ds-navy);
+  font-size: var(--ds-text-2xl);
+}
+
+.vehicle {
+  transition: border-color var(--ds-duration-fast) var(--ds-ease-out);
+}
+
+.vehicle:hover {
+  border-color: var(--ds-border-strong);
+}
+
+/* ─── Admin console — flat task surface ───────────────────────── */
+.admin-console.dashboard-workspace {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  gap: 0;
+}
+
+.admin-console .dashboard-rail {
+  background: var(--ds-navy);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--ds-radius-md) 0 0 var(--ds-radius-md);
+}
+
+.admin-console .rail-menu button.active {
+  background: var(--ds-primary);
+}
+
+.admin-console-main {
+  background: transparent;
+  gap: var(--ds-space-5);
+  padding: var(--ds-space-4) 0 var(--ds-space-6);
+  min-width: 0;
+}
+
+.admin-console-header {
+  gap: var(--ds-space-4);
+  padding-bottom: var(--ds-space-2);
+  border-bottom: 1px solid var(--ds-border);
+}
+
+.admin-console-header h1 {
+  font-size: var(--ds-text-xl);
+  font-weight: 700;
+  color: var(--ds-navy);
+  margin: 0;
+}
+
+.admin-console-header .dashboard-subtitle {
+  margin: var(--ds-space-1) 0 0;
+  font-size: var(--ds-text-sm);
+  font-weight: 500;
+  color: var(--ds-text-muted);
+  line-height: 1.5;
+  max-width: 42rem;
+  text-wrap: pretty;
+}
+
+/* Mobile section tabs — underline pattern */
+.admin-mobile-tabs.segmented {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  gap: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.admin-mobile-tabs.segmented::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-mobile-tabs.segmented button {
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border: none;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ds-text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-mobile-tabs.segmented button.active {
+  color: var(--ds-navy);
+  border-bottom-color: var(--ds-primary);
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Metrics bar — one unified strip, not five cards */
+.admin-metrics-bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  overflow: hidden;
+}
+
+.admin-metrics-bar .admin-status-chip {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border: none;
+  border-right: 1px solid var(--ds-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ds-duration-fast) var(--ds-ease-out);
+}
+
+.admin-metrics-bar .admin-status-chip:last-child {
+  border-right: none;
+}
+
+.admin-metrics-bar .admin-status-chip:hover {
+  background: var(--ds-surface-sunken);
+  transform: none;
+  box-shadow: none;
+}
+
+.admin-metrics-bar .admin-status-chip.warn {
+  background: var(--ds-warning-bg);
+}
+
+.admin-metrics-bar .admin-status-chip.info {
+  background: var(--ds-info-bg);
+}
+
+.admin-status-value {
+  font-size: var(--ds-text-lg);
+  font-weight: 700;
+  color: var(--ds-navy);
+  line-height: 1.1;
+}
+
+.admin-status-label {
+  font-size: var(--ds-text-xs);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ds-text-muted);
+}
+
+/* Setup section — lighter chrome */
+.admin-console--setup .admin-console-header {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.admin-setup-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  background: var(--ds-surface-sunken);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  padding: var(--ds-space-1);
+}
+
+.admin-setup-tabs button {
+  justify-content: center;
+  min-height: var(--ds-touch-min);
+  border: none;
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--ds-text-secondary);
+  font-size: var(--ds-text-sm);
+  font-weight: 600;
+  gap: var(--ds-space-1);
+}
+
+.admin-setup-tabs button.active {
+  background: var(--ds-surface);
+  color: var(--ds-navy);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.admin-section.stack {
+  gap: var(--ds-space-5);
+}
+
+.admin-section-intro {
+  gap: var(--ds-space-2);
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.admin-section-intro strong {
+  font-size: var(--ds-text-base);
+  font-weight: 700;
+  color: var(--ds-text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.admin-section-intro span {
+  font-size: var(--ds-text-sm);
+  color: var(--ds-text-muted);
+  line-height: 1.55;
+}
+
+.admin-filter-chips button {
+  min-height: 2.25rem;
+  font-size: var(--ds-text-sm);
+  font-weight: 600;
+  border-color: var(--ds-border-strong);
+}
+
+.admin-filter-chips button.active {
+  background: var(--ds-navy);
+  border-color: var(--ds-navy);
+}
+
+.admin-issue,
+.admin-push-row {
+  padding: var(--ds-space-4);
+}
+
+.admin-push-row {
+  align-items: flex-start;
+}
+
+/* ─── Notices ─────────────────────────────────────────────────── */
+.notice {
+  padding: var(--ds-space-4);
+  border-radius: var(--ds-radius-sm);
+  font-size: var(--ds-text-sm);
+  line-height: 1.5;
+  border: 1px solid transparent;
+}
+
+/* ─── Login ───────────────────────────────────────────────────── */
+.login {
+  background: var(--ds-bg);
+}
+
+.login-panel {
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-lg);
+}
+
+.login h1 {
+  font-family: var(--ds-font-brand);
+  font-size: var(--ds-text-2xl);
+}
+
+/* ─── Modals ──────────────────────────────────────────────────── */
+.modal-overlay,
+.damage-modal-backdrop {
+  z-index: var(--ds-z-overlay);
+  background: rgba(12, 18, 34, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.modal-content,
+.damage-modal-content,
+.confirm-dialog-card {
+  z-index: var(--ds-z-modal);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-lg);
+}
+
+/* ─── Tables & data ───────────────────────────────────────────── */
+.data-table th,
+.damaged-table th {
+  font-size: var(--ds-text-xs);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ds-text-secondary);
+  background: var(--ds-surface-sunken);
+}
+
+/* ─── KPI / charts (non-admin dashboard) ──────────────────────── */
+.kpi-card,
+.chart-panel {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface);
+  box-shadow: none;
+}
+
+.kpi-value {
+  font-size: var(--ds-text-2xl);
+  color: var(--ds-navy);
+}
+
+/* ─── Corporate-modern tabs inside admin ──────────────────────── */
+.bm-container {
+  font-family: var(--ds-font-ui);
+}
+
+.bm-header h2 {
+  font-family: var(--ds-font-ui);
+  font-weight: 700;
+  color: var(--ds-navy);
+}
+
+.bm-card,
+.bm-add-form {
+  border-radius: var(--ds-radius-md);
+  box-shadow: none;
+}
+
+/* ─── Mobile adaptations ──────────────────────────────────────── */
+@media (max-width: 1080px) {
+  .admin-console-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .admin-mobile-tabs.segmented {
+    order: -1;
+    margin: 0 calc(-1 * var(--ds-space-4));
+    padding: 0 var(--ds-space-4);
+    border-bottom: 1px solid var(--ds-border);
+  }
+
+  .dashboard-header-copy {
+    padding-top: var(--ds-space-4);
+    padding-bottom: var(--ds-space-2);
+    border-bottom: 1px solid var(--ds-border);
+  }
+
+  .admin-metrics-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .admin-metrics-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-metrics-bar .admin-status-chip {
+    flex: 0 0 auto;
+    min-width: 6.5rem;
+    border-right: 1px solid var(--ds-border);
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    padding-left: var(--ds-space-4);
+    padding-right: var(--ds-space-4);
+  }
+
+  .admin-setup-tabs button {
+    flex-direction: column;
+    font-size: var(--ds-text-xs);
+    padding: var(--ds-space-2);
+  }
+
+  .admin-setup-tabs button .material-symbols-outlined {
+    font-size: 1.25rem;
+  }
+
+  .admin-push-row {
+    flex-direction: column;
+  }
+
+  .admin-push-row .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .scan-card {
+    padding: var(--ds-space-4);
+  }
+
+  .bottom-nav {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
