@@ -230,6 +230,47 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   background: #EB0A1E; color: #fff; font-weight: 800;
 }
 .scan-badge.out { background: #000; }
+.scan-yard-mark {
+  min-width: 54px;
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef4ff;
+  color: #002046;
+}
+.scan-yard-mark .material-symbols-outlined { font-size: 28px; }
+.scan-camera-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+.manual-entry-section {
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
+.manual-entry-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.manual-entry-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.manual-entry-hint {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
 .status-dot { padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
 .status-dot.ok { background: #000; color: #fff; }
 .status-dot.warn { background: #EB0A1E; color: #fff; }

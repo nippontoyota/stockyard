@@ -699,7 +699,6 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const pendingVin = normalizeVin(vin);
   const isCarInCurrentYard = state.vehicles[pendingVin]?.currentStatus === "in" && state.vehicles[pendingVin]?.currentYardId === yard.id;
   const scanType = isCarInCurrentYard ? "out" : "in";
-  const activeScanType = scanSuccess ? scanType : manualScanType;
   const activeFlag = state.flags?.find((f) => f.vin === pendingVin && !f.resolved);
   const isFlagged = Boolean(activeFlag);
   // Item 7: Decoded VIN info for verification
@@ -1058,7 +1057,15 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
           </div>
         )}
         <div className="scan-ticket">
-          <span className={`scan-badge ${activeScanType}`}>{activeScanType.toUpperCase()}</span>
+          {scanSuccess ? (
+            <span className={`scan-badge ${scanType}`} aria-label={`Will submit as ${scanType.toUpperCase()}`}>
+              {scanType.toUpperCase()}
+            </span>
+          ) : (
+            <span className="scan-yard-mark" aria-hidden="true">
+              <span className="material-symbols-outlined">location_on</span>
+            </span>
+          )}
           <div className="scan-ticket-copy">
             <h1>{yard.code}</h1>
             <p>{yard.name}</p>
@@ -1232,15 +1239,22 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
               <button className="primary scan-submit-button">Submit {scanType.toUpperCase()}</button>
             </div>
           )}
-          <p>{cameraOpen ? "Point the camera at the vehicle QR code." : "Tap the QR grid to open camera scanner."}</p>
+          <p className="scan-camera-hint">
+            {cameraOpen
+              ? "Point the camera at the vehicle QR code."
+              : "Tap to scan — IN or OUT is detected automatically."}
+          </p>
           {cameraError && <p className="camera-error">{cameraError}</p>}
           {cameraOpen && <button type="button" className="ghost" onClick={closeCamera}>Close camera</button>}
           <input ref={fileInputRef} type="file" accept="image/*" onChange={uploadQr} style={{ display: "none" }} />
           <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()}><span className="material-symbols-outlined">upload_file</span> Upload QR</button>
         </div>
         {!scanSuccess && (
-          <>
-            <label htmlFor="vin">Manual VIN entry</label>
+          <div className="manual-entry-section stack">
+            <div className="manual-entry-header">
+              <span className="manual-entry-title">Manual VIN entry</span>
+              <span className="manual-entry-hint">Choose IN or OUT yourself</span>
+            </div>
             <div className="segmented" role="tablist" aria-label="Manual submit type">
               <button
                 type="button"
@@ -1266,7 +1280,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                 OUT
               </button>
             </div>
-          </>
+          </div>
         )}
         <div className={scanSuccess ? "vin-submit-panel scanned" : "inline-form"}>
           <input id="vin" value={vin} onChange={(event) => {
