@@ -918,8 +918,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
 }
 .admin-setup-tabs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 .admin-setup-tabs button {
@@ -1036,10 +1036,23 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 }
 @media (max-width: 720px) {
   .admin-status-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 10px;
+    padding-bottom: 4px;
+  }
+  .admin-status-strip::-webkit-scrollbar {
+    display: none;
+  }
+  .admin-status-strip .admin-status-chip {
+    flex: 0 0 auto;
+    min-width: 7.5rem;
   }
   .admin-status-strip .admin-status-chip:last-child {
-    grid-column: 1 / -1;
+    grid-column: unset;
   }
   .bottom-nav-admin {
     width: min(280px, calc(100% - 24px));
