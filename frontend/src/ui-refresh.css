@@ -484,7 +484,221 @@ button.ghost {
   border-color: var(--ds-navy);
 }
 
-/* ─── Login (hierarchy + alignment) ─────────────────────────────── */
+.admin-setup-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ds-space-2);
+}
+
+.admin-setup-tabs button {
+  justify-content: center;
+  min-height: var(--ds-touch-min);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  font-size: var(--ds-text-sm);
+}
+
+.admin-section.stack {
+  gap: var(--ds-space-5);
+}
+
+.admin-console-main {
+  gap: var(--ds-space-5);
+}
+
+.admin-status-strip {
+  gap: var(--ds-space-3);
+}
+
+.admin-status-chip {
+  padding: var(--ds-space-3) var(--ds-space-4);
+}
+
+.admin-status-value {
+  font-size: var(--ds-text-xl);
+}
+
+.admin-setup-block {
+  gap: var(--ds-space-4);
+}
+
+.admin-push-row {
+  padding: var(--ds-space-4) var(--ds-space-5);
+  border-radius: var(--ds-radius-md);
+  gap: var(--ds-space-4);
+}
+
+.admin-push-row > div {
+  gap: var(--ds-space-1);
+}
+
+/* ─── Mobile: breathing room (admin + platform) ───────────────── */
+@media (max-width: 1080px) {
+  .admin-console-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--ds-space-4);
+  }
+
+  .admin-mobile-tabs.segmented {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: var(--ds-space-1);
+    padding: var(--ds-space-1);
+  }
+
+  .admin-mobile-tabs.segmented::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-mobile-tabs.segmented button {
+    flex: 0 0 auto;
+    min-height: var(--ds-touch-min);
+    padding: 0 var(--ds-space-4);
+    white-space: nowrap;
+    font-size: var(--ds-text-sm);
+  }
+
+  .admin-console.dashboard-workspace {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .admin-console-main {
+    background: transparent;
+    padding: var(--ds-space-2) 0 var(--ds-space-4);
+    border-radius: 0;
+  }
+
+  .admin-console-header h1 {
+    font-size: var(--ds-text-xl);
+  }
+
+  .admin-console-header .dashboard-subtitle {
+    font-size: var(--ds-text-sm);
+    line-height: 1.5;
+    max-width: none;
+  }
+
+  .admin-status-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: var(--ds-space-1);
+  }
+
+  .admin-status-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-status-strip .admin-status-chip {
+    flex: 0 0 auto;
+    min-width: 7.5rem;
+  }
+
+  .admin-status-strip .admin-status-chip:last-child {
+    grid-column: unset;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    padding-left: var(--ds-space-4);
+    padding-right: var(--ds-space-4);
+  }
+
+  .stack {
+    gap: var(--ds-space-4);
+  }
+
+  .scan-card,
+  .panel,
+  .vehicle,
+  .stock-stat,
+  .yard-card {
+    padding: var(--ds-space-4);
+  }
+
+  .admin-section-intro {
+    gap: var(--ds-space-2);
+    padding-bottom: var(--ds-space-1);
+  }
+
+  .admin-section-intro strong {
+    font-size: var(--ds-text-base);
+  }
+
+  .admin-section-intro span {
+    font-size: var(--ds-text-sm);
+    line-height: 1.55;
+  }
+
+  .admin-setup-tabs button {
+    flex-direction: column;
+    gap: var(--ds-space-1);
+    padding: var(--ds-space-3) var(--ds-space-2);
+    font-size: var(--ds-text-xs);
+  }
+
+  .admin-setup-tabs button .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  .admin-push-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-push-row .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .notice {
+    padding: var(--ds-space-4);
+    line-height: 1.55;
+  }
+
+  .admin-filter-chips {
+    gap: var(--ds-space-2);
+  }
+
+  .admin-filter-chips button {
+    min-height: 40px;
+    padding: 0 var(--ds-space-4);
+  }
+
+  .admin-issue {
+    padding: var(--ds-space-4);
+  }
+
+  .flag-row {
+    padding: var(--ds-space-4) 0;
+    gap: var(--ds-space-3);
+  }
+
+  .credentials-workspace {
+    gap: var(--ds-space-5);
+  }
+
+  .bottom-nav {
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .bottom-nav button {
+    gap: var(--ds-space-1);
+    padding: var(--ds-space-2);
+  }
+}
+
 .login {
   background: linear-gradient(160deg, var(--ds-bg) 0%, var(--ds-surface-sunken) 50%, var(--ds-bg) 100%);
 }

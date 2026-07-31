@@ -8,11 +8,6 @@ export function SetupSection({ setupTab, setSetupTab, pushState }) {
 
   return (
     <div className="admin-section stack">
-      <div className="admin-section-intro">
-        <strong>Access & configuration</strong>
-        <span>Passwords, delivery branches, and push alerts.</span>
-      </div>
-
       <div className="admin-setup-tabs" role="tablist" aria-label="Setup sections">
         {SETUP_TABS.map((tab) => (
           <button
