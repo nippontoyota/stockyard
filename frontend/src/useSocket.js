@@ -5,59 +5,61 @@ const API_BASE = import.meta.env.VITE_API_URL || 'https://stockyard-00s6.onrende
 
 /**
  * §1.1 — WebSocket hook. Replaces 5s polling with event-driven updates.
- * Falls back to 30s heartbeat poll if WebSocket disconnects.
+ * Falls back to 30s heartbeat poll if Socket.IO disconnects.
  */
-export function useSocket(onDataChange) {
+export function useSocket(onDataChange, enabled = true) {
   const socketRef = useRef(null);
   const heartbeatRef = useRef(null);
+  const onDataChangeRef = useRef(onDataChange);
+  onDataChangeRef.current = onDataChange;
 
   useEffect(() => {
-    if (!onDataChange) return;
+    if (!enabled || !onDataChange) return;
+
+    const refresh = () => onDataChangeRef.current?.();
 
     const socket = io(API_BASE, {
-      transports: ['websocket', 'polling'],
+      // Polling first — Render's proxy handles long-polling reliably; upgrade to WS when possible.
+      transports: ['polling', 'websocket'],
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 10000,
+      timeout: 20000,
     });
     socketRef.current = socket;
 
-    // Real-time events trigger data refresh
-    socket.on('scan:new', () => onDataChange());
-    socket.on('flag:created', () => onDataChange());
-    socket.on('vehicle:status-changed', () => onDataChange());
-    socket.on('requisition:changed', () => onDataChange());
+    const events = ['scan:new', 'flag:created', 'vehicle:status-changed', 'requisition:changed'];
+    for (const event of events) socket.on(event, refresh);
 
     socket.on('connect', () => {
-      // Connected via WebSocket — drop heartbeat to 30s
       clearInterval(heartbeatRef.current);
-      heartbeatRef.current = setInterval(onDataChange, 30000);
+      heartbeatRef.current = setInterval(refresh, 30000);
     });
 
     socket.on('disconnect', () => {
-      // Disconnected — increase heartbeat frequency
       clearInterval(heartbeatRef.current);
-      heartbeatRef.current = setInterval(onDataChange, 10000);
+      heartbeatRef.current = setInterval(refresh, 10000);
     });
 
-    // Reconnect on tab focus
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
         if (!socket.connected) socket.connect();
-        onDataChange();
+        refresh();
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
 
-    // Initial heartbeat
-    heartbeatRef.current = setInterval(onDataChange, 30000);
+    heartbeatRef.current = setInterval(refresh, 30000);
 
     return () => {
+      for (const event of events) socket.off(event, refresh);
+      socket.removeAllListeners();
       socket.disconnect();
       clearInterval(heartbeatRef.current);
       document.removeEventListener('visibilitychange', onVisibility);
+      socketRef.current = null;
     };
-  }, [onDataChange]);
+  }, [enabled, !!onDataChange]);
 
   return socketRef;
 }

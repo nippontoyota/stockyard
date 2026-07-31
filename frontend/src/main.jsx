@@ -266,8 +266,8 @@ export default function App() {
     };
   }, [fetchServerData]);
 
-  // Â§1.1 â€” Socket.io event-driven updates
-  useSocket(fetchServerData);
+  // §1.1 — Socket.io event-driven updates (only when logged in)
+  useSocket(fetchServerData, Boolean(session));
 
   useEffect(() => {
     if (!session) return;
