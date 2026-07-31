@@ -1489,33 +1489,48 @@ function StockView({ state, session }) {
               )}
             </div>
             <div className="filter-grid">
-              <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Status filter">
-                <option value="all">Status: All (In/Out)</option>
-                <option value="in">Status: IN Only</option>
-                <option value="out">Status: OUT Only</option>
-              </select>
-              <select value={model} onChange={(event) => setModel(event.target.value)} aria-label="Model filter">
-                <option value="all">Model: All Models</option>
-                {options("model").map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-              <select value={variant} onChange={(event) => setVariant(event.target.value)} aria-label="Variant filter">
-                <option value="all">Variant: All Variants</option>
-                {options("variant").map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-              <select value={colour} onChange={(event) => setColour(event.target.value)} aria-label="Colour filter">
-                <option value="all">Colour: All Colours</option>
-                {options("colour").map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-              <select value={yardId} onChange={(event) => setYardId(event.target.value)} aria-label="Stockyard location filter">
-                <option value="all">Yard: All Locations</option>
-                {yardsByRegion().map(({ region, yards: regionYards }) => (
-                  <optgroup key={region} label={region}>
-                    {regionYards.map((yard) => (
-                      <option key={yard.id} value={yard.id}>{yard.code} Â· {yard.name}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+              <label className="filter-field">
+                <span>Status</span>
+                <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Status filter">
+                  <option value="all">All (In/Out)</option>
+                  <option value="in">IN only</option>
+                  <option value="out">OUT only</option>
+                </select>
+              </label>
+              <label className="filter-field">
+                <span>Model</span>
+                <select value={model} onChange={(event) => setModel(event.target.value)} aria-label="Model filter">
+                  <option value="all">All models</option>
+                  {options("model").map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+              <label className="filter-field">
+                <span>Variant</span>
+                <select value={variant} onChange={(event) => setVariant(event.target.value)} aria-label="Variant filter">
+                  <option value="all">All variants</option>
+                  {options("variant").map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+              <label className="filter-field">
+                <span>Colour</span>
+                <select value={colour} onChange={(event) => setColour(event.target.value)} aria-label="Colour filter">
+                  <option value="all">All colours</option>
+                  {options("colour").map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+              <label className="filter-field">
+                <span>Yard</span>
+                <select value={yardId} onChange={(event) => setYardId(event.target.value)} aria-label="Stockyard location filter">
+                  <option value="all">All locations</option>
+                  {yardsByRegion().map(({ region, yards: regionYards }) => (
+                    <optgroup key={region} label={region}>
+                      {regionYards.map((yard) => (
+                        <option key={yard.id} value={yard.id}>{yard.code} · {yard.name}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
         )}
