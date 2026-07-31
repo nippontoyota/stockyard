@@ -1,46 +1,5 @@
-const CACHE = "yard-scan-v6";
+const CACHE = "yard-scan-v5";
 const PRECACHE = ["/", "/index.html", "/manifest.webmanifest", "/favicon.svg"];
-
-function isSameOrigin(url) {
-  try {
-    return new URL(url).origin === self.location.origin;
-  } catch {
-    return false;
-  }
-}
-
-function isAssetPath(pathname) {
-  return pathname.startsWith("/assets/");
-}
-
-function shouldCacheResponse(request, response) {
-  if (!response || !response.ok) return false;
-  const { pathname } = new URL(request.url);
-  if (isAssetPath(pathname)) {
-    const type = response.headers.get("content-type") || "";
-    return type.includes("text/css") || type.includes("javascript") || type.includes("wasm");
-  }
-  return true;
-}
-
-async function putInCache(request, response) {
-  if (!shouldCacheResponse(request, response)) return;
-  const cache = await caches.open(CACHE);
-  await cache.put(request, response);
-}
-
-async function offlineFallback(request) {
-  const cached = await caches.match(request);
-  if (cached) return cached;
-
-  const accept = request.headers.get("accept") || "";
-  if (request.mode === "navigate" || accept.includes("text/html")) {
-    const shell = (await caches.match("/index.html")) || (await caches.match("/"));
-    if (shell) return shell;
-  }
-
-  return Response.error();
-}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -57,23 +16,46 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+async function cacheFirstFallback(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  if (request.mode === "navigate") {
+    return caches.match("/index.html") || caches.match("/");
+  }
+  return undefined;
+}
+
 self.addEventListener("fetch", (event) => {
-  const { request } = event;
-  if (request.method !== "GET") return;
-  if (!isSameOrigin(request.url)) return;
+  if (event.request.method !== "GET") return;
+  if (event.request.url.includes("supabase.co")) return;
 
-  const { pathname } = new URL(request.url);
-  if (pathname.startsWith("/api/")) return;
+  // Network-first for navigate / HTML requests to prevent stale bundle caching
+  if (event.request.mode === "navigate" || event.request.headers.get("accept")?.includes("text/html")) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => cacheFirstFallback(event.request))
+    );
+    return;
+  }
 
+  // Network-first for assets, cache for offline PWA launch
   event.respondWith(
-    fetch(request)
-      .then(async (response) => {
-        if (shouldCacheResponse(request, response)) {
-          await putInCache(request, response.clone());
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
         }
         return response;
       })
-      .catch(() => offlineFallback(request))
+      .catch(() => cacheFirstFallback(event.request))
   );
 });
 
