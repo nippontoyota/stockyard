@@ -4,7 +4,6 @@ import { eq, and, count, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { scans, vehicles, vehicleStatus, devices, flags, yards, requisitions, notifications } from '../db/schema.js';
 import { isValidVin, detectModel, resolveVehicleMetadata } from '../lib/vin.js';
-import { haversineMeters } from '../lib/geo.js';
 import { authenticate } from '../middleware/auth.js';
 import { emitScanEvent, emitFlagEvent, emitRequisitionEvent } from '../lib/socket.js';
 import { uploadBase64Image } from '../lib/supabase.js';
@@ -19,9 +18,6 @@ const scanInBase = z.object({
   vin: z.string().min(1),
   scanned_at: z.string().datetime(),
   yard_id: z.string().optional(),
-  latitude: z.number().nullish(),
-  longitude: z.number().nullish(),
-  gps_accuracy_meters: z.number().nullish(),
   device_fingerprint: z.string().min(1),
   client_scan_id: z.string().min(1),
   key_no: z.string().optional(),
@@ -102,17 +98,6 @@ async function createFlag(vehicleId: string, scanId: string | null, flagType: st
   emitFlagEvent({ id: flag.id, vehicleId, vin: vin ?? '', flagType, message });
 }
 
-async function checkGps(yardId: string, lat: number | undefined, lon: number | undefined, vehicleId: string, scanId: string, txOrDb: any = db) {
-  if (lat == null || lon == null) return;
-  const [yard] = await txOrDb.select({ latitude: yards.latitude, longitude: yards.longitude, gps_radius_meters: yards.gps_radius_meters }).from(yards).where(eq(yards.id, yardId));
-  if (!yard?.latitude || !yard?.longitude) return;
-
-  const distance = haversineMeters(Number(yard.latitude), Number(yard.longitude), lat, lon);
-  if (distance > yard.gps_radius_meters) {
-    await createFlag(vehicleId, scanId, 'gps_outside_yard', `Scan GPS is ${Math.round(distance)}m from yard center (radius: ${yard.gps_radius_meters}m)`, undefined, txOrDb);
-  }
-}
-
 // ─── Core Logic ──────────────────────────────────────────────────────
 
 async function processScanIn(body: ScanIn, yardId: string) {
@@ -134,13 +119,13 @@ async function processScanIn(body: ScanIn, yardId: string) {
 
     if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id === yardId) {
       const [scan] = await tx.insert(scans).values({
-        client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, status: 'rejected',
+        client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, status: 'rejected',
       }).returning();
       return { scan_id: scan.id, status: 'rejected' as const, error: 'Vehicle is already marked IN at this yard' };
     }
 
     const [scan] = await tx.insert(scans).values({
-      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted',
+      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted',
     }).returning();
 
     const scanTime = new Date(body.scanned_at);
@@ -171,8 +156,6 @@ async function processScanIn(body: ScanIn, yardId: string) {
       flagsList.push('duplicate_yard_status');
     }
     
-    await checkGps(yardId, body.latitude ?? undefined, body.longitude ?? undefined, vehicleId, scan.id, tx);
-
     return { scan_id: scan.id, status: 'accepted' as const, flags: flagsList };
   });
 }
@@ -194,7 +177,7 @@ async function processScanOut(body: ScanOut, yardId: string) {
     const [currentStatus] = await tx.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
     const [scan] = await tx.insert(scans).values({
-      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), latitude: body.latitude?.toString(), longitude: body.longitude?.toString(), gps_accuracy_meters: body.gps_accuracy_meters?.toString(), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted',
+      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted',
     }).returning();
 
     const scanTime = new Date(body.scanned_at);
@@ -211,7 +194,6 @@ async function processScanOut(body: ScanOut, yardId: string) {
     if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`, undefined, tx); flagsList.push('invalid_vin'); }
     if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported', undefined, tx); flagsList.push('damage_reported'); }
     if (body.damage_image && !damageImageUrl) { await createFlag(vehicleId, scan.id, 'photo_upload_failed', 'Damage photo upload failed — image not saved', undefined, tx); flagsList.push('photo_upload_failed'); }
-    await checkGps(yardId, body.latitude ?? undefined, body.longitude ?? undefined, vehicleId, scan.id, tx);
 
     if (body.out_remark === 'stockyard_transfer') {
       const [reqRecord] = await tx

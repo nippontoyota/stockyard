@@ -90,7 +90,6 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         vin,
         type: "out",
         yardId: yard.id,
-        gps: {},
         outRemark,
         transferDestinationYardId,
         transferRequestedBy,
@@ -100,25 +99,14 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         damageImage: "",
         driveType,
       });
-      const prevFlagIds = new Set(state.flags.map((f) => f.id));
       const result = applyScan(state, scan);
       if (!result.accepted) {
         setError(result.message || "OUT rejected.");
         setLoading(false);
         return;
       }
-      // Desk OUT has no GPS — drop the false gps_outside_yard flag applyScan adds
-      const flags = result.state.flags.filter(
-        (f) => prevFlagIds.has(f.id) || f.type !== "gps_outside_yard"
-      );
-      const newNonGps = flags.filter((f) => !prevFlagIds.has(f.id));
-      const scans = result.state.scans.map((s) =>
-        s.clientScanId === scan.clientScanId
-          ? { ...s, status: newNonGps.some((f) => f.vin === vin) ? "flagged" : "accepted" }
-          : s
-      );
       await bulkSync([scan]);
-      setState({ ...result.state, flags, scans });
+      setState(result.state);
       onDone();
     } catch (err) {
       setError(err.message || "OUT failed. Check connection and try again.");

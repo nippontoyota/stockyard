@@ -50,14 +50,13 @@ export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, gps, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "" }) {
+export function createScan({ vin, type, yardId, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "" }) {
   return {
     id: crypto.randomUUID(),
     clientScanId: createClientScanId(),
     vinRaw: vin,
     type,
     yardId,
-    gps,
     outRemark,
     transferDestinationYardId,
     transferRequestedBy,
@@ -100,7 +99,6 @@ export function applyScan(state, scan) {
   const duplicateIn = scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId !== scan.yardId;
 
   if (!vinValid) flags.push(flag(vin, "invalid_vin", "VIN format needs admin review."));
-  if (gpsFlag(scan.gps, yard)) flags.push(flag(vin, "gps_outside_yard", "GPS missing or outside yard radius."));
 
   if (duplicateIn) flags.push(flag(vin, "duplicate_yard_status", duplicateMessage(existing.currentYardId, scan.yardId)));
 
@@ -136,20 +134,6 @@ function duplicateMessage(currentYardId, scanYardId) {
   const currentYard = yards.find((item) => item.id === currentYardId);
   const scanYard = yards.find((item) => item.id === scanYardId);
   return `Vehicle was IN at ${currentYard?.code || currentYardId} (${currentYard?.name || "Unknown"}), now scanned IN at ${scanYard?.code || scanYardId} (${scanYard?.name || "Unknown"}) without prior OUT scan.`;
-}
-
-function gpsFlag(gps, yard) {
-  if (!gps?.latitude || !gps?.longitude || !yard) return true;
-  return distanceMeters(gps.latitude, gps.longitude, yard.latitude, yard.longitude) > yard.gpsRadiusMeters;
-}
-
-function distanceMeters(lat1, lon1, lat2, lon2) {
-  const toRad = (value) => (value * Math.PI) / 180;
-  const earth = 6371000;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return earth * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export function dashboard(state, yardId = null) {
@@ -256,7 +240,6 @@ export function dashboard(state, yardId = null) {
 function formatFlagLabel(type) {
   const map = {
     damage_reported: "Damage Reported",
-    gps_outside_yard: "GPS Radius Violation",
     unverified_in: "Unverified OUT",
     yard_capacity_exceeded: "Capacity Exceeded",
     duplicate_yard_status: "Duplicate Status",
@@ -322,7 +305,6 @@ export function removeDeliveredVehicles(state, vins) {
 export function flagLabel(type) {
   return {
     damage_reported: "Damage Reported",
-    gps_outside_yard: "GPS Outside Yard",
     unverified_in: "OUT Without IN",
     yard_capacity_exceeded: "Capacity Exceeded",
     duplicate_yard_status: "Duplicate Yard IN",

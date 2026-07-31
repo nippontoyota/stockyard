@@ -158,8 +158,6 @@ router.get('/:vin/history', async (req, res, next) => {
         key_no: scans.key_no,
         damaged: scans.damaged,
         damage_remark: scans.damage_remark,
-        latitude: scans.latitude,
-        longitude: scans.longitude,
       })
       .from(scans)
       .where(

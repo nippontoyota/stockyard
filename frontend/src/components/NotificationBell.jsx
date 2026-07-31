@@ -12,9 +12,13 @@ export function NotificationBell({ notifications = [], onNavigate }) {
         setOpen(false);
       }
     }
-    if (open) document.addEventListener("mousedown", handleClickOutside);
-    else document.removeEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    if (!open) return undefined;
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
   }, [open]);
 
   async function handleMarkRead(id) {
@@ -54,7 +58,9 @@ export function NotificationBell({ notifications = [], onNavigate }) {
       </button>
 
       {open && (
-        <div className="dropdown-panel notifications-panel">
+        <>
+          <button type="button" className="dropdown-backdrop" aria-label="Close notifications" onClick={() => setOpen(false)} />
+          <div className="dropdown-panel notifications-panel">
           <div className="dropdown-header">
             <strong>Notifications</strong>
             {unreadCount > 0 && (
@@ -82,7 +88,8 @@ export function NotificationBell({ notifications = [], onNavigate }) {
               </ul>
             )}
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

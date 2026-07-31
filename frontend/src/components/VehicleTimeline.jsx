@@ -69,9 +69,6 @@ export function VehicleTimeline({ scans = [], vin }) {
                     {scan.transferDestinationYardId || scan.transfer_destination_yard_id ? (
                       <p><strong>Transfer to:</strong> {scan.transferDestinationYardId || scan.transfer_destination_yard_id}</p>
                     ) : null}
-                    {(scan.latitude || scan.gps_accuracy_meters) && (
-                      <p className="timeline-gps"><strong>GPS:</strong> ±{scan.gps_accuracy_meters || '?'}m</p>
-                    )}
                   </div>
                 )}
               </div>

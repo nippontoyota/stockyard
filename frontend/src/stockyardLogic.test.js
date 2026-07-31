@@ -26,7 +26,6 @@ const baseScan = {
   type: "in",
   yardId: "CO01B-1",
   keyNo: "K-901",
-  gps: { latitude: 10.0529, longitude: 76.3157, accuracy: 20 },
   deviceId: "device-1",
   scannedAt: new Date().toISOString(),
   syncStatus: "synced",
@@ -47,7 +46,7 @@ assert.equal(sameYardDuplicate.message, "Vehicle is already IN at this yard.");
 assert.equal(sameYardDuplicate.state.flags.some((flag) => flag.type === "duplicate_yard_status"), false);
 
 // Third scan at a DIFFERENT yard: should be accepted as IN at new yard, update location, and raise duplicate_yard_status flag
-const transferConflict = applyScan(firstScanResult.state, { ...baseScan, clientScanId: "client-3", yardId: "CO01A-1", gps: { latitude: 9.9369, longitude: 76.3149 } });
+const transferConflict = applyScan(firstScanResult.state, { ...baseScan, clientScanId: "client-3", yardId: "CO01A-1" });
 assert.equal(transferConflict.accepted, true);
 assert.equal(transferConflict.state.vehicles.JTMBA38V70D123456.currentYardId, "CO01A-1");
 assert.equal(transferConflict.state.vehicles.JTMBA38V70D123456.currentStatus, "in");
