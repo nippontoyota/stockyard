@@ -1,0 +1,82 @@
+/**
+ * Stockyard design tokens — hierarchy, consistency, contrast, proximity, alignment.
+ * Visual only; components keep existing class names.
+ */
+:root {
+  /* Brand */
+  --ds-primary: #d91021;
+  --ds-primary-hover: #b80d1c;
+  --ds-primary-subtle: #fef2f2;
+  --ds-navy: #002046;
+  --ds-navy-muted: #1e3a5f;
+
+  /* Surfaces */
+  --ds-bg: #f0f3f8;
+  --ds-surface: #ffffff;
+  --ds-surface-sunken: #f8fafc;
+  --ds-surface-elevated: #ffffff;
+
+  /* Text hierarchy */
+  --ds-text: #0f172a;
+  --ds-text-secondary: #475569;
+  --ds-text-muted: #64748b;
+  --ds-text-inverse: #ffffff;
+
+  /* Borders */
+  --ds-border: #e2e8f0;
+  --ds-border-strong: #cbd5e1;
+
+  /* Status */
+  --ds-success: #15803d;
+  --ds-success-bg: #f0fdf4;
+  --ds-warning: #c2410c;
+  --ds-warning-bg: #fff7ed;
+  --ds-error: #b91c1c;
+  --ds-error-bg: #fef2f2;
+  --ds-info: #1d4ed8;
+  --ds-info-bg: #eff6ff;
+
+  /* Spacing (proximity) */
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-8: 32px;
+
+  /* Radius */
+  --ds-radius-sm: 8px;
+  --ds-radius-md: 12px;
+  --ds-radius-lg: 16px;
+  --ds-radius-pill: 999px;
+
+  /* Elevation */
+  --ds-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --ds-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
+  --ds-shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.12);
+
+  /* Typography */
+  --ds-font-ui: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+  --ds-font-brand: "Tenor Sans", Georgia, serif;
+  --ds-text-xs: 11px;
+  --ds-text-sm: 13px;
+  --ds-text-base: 15px;
+  --ds-text-lg: 18px;
+  --ds-text-xl: 22px;
+  --ds-text-2xl: 28px;
+
+  /* Touch & focus (accessibility) */
+  --ds-touch-min: 44px;
+  --ds-focus-ring: 0 0 0 3px rgba(217, 16, 33, 0.28);
+
+  /* Layout */
+  --ds-content-max: 1120px;
+  --ds-nav-width: min(440px, calc(100% - 24px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ds-motion: 0ms;
+  }
+}
