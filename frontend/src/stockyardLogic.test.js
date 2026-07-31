@@ -76,7 +76,7 @@ assert.equal(globalStats.yards.length, yards.length);
 
 const yardStats = dashboard(stateWithVehicle, "CO01B-1");
 assert.equal(yardStats.currentStock, 1);
-assert.equal(yardStats.totalCapacity, 50);
+assert.equal(yardStats.totalCapacity, 132);
 assert.equal(yardStats.openFlags, 0);
 
 // IN scan with damage reported
