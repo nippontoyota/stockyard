@@ -29,7 +29,9 @@ import {
   getNotifications, getRequisitions,
   getVehicleStatus
 } from "./api.js";
+import "./design-tokens.css";
 import "./styles.css";
+import "./ui-refresh.css";
 
 // Import new components
 import { RequisitionsTab } from "./components/RequisitionsTab.jsx";
