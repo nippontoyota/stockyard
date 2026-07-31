@@ -43,11 +43,6 @@ function flagDecisionCopy(type) {
         help: "Parked longer than 30 days. Review the vehicle, then close this alert when handled.",
         resolveLabel: "Mark reviewed",
       };
-    case "gps_outside_yard":
-      return {
-        help: "Scan GPS was outside the yard radius. Close after verifying the vehicle location.",
-        resolveLabel: "Mark verified",
-      };
     case "invalid_vin":
       return {
         help: "VIN format looks invalid. Close after correcting the record or confirming the plate.",

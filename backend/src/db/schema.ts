@@ -3,7 +3,6 @@ import {
   uuid,
   text,
   integer,
-  numeric,
   boolean,
   timestamp,
   index,
@@ -17,9 +16,6 @@ export const yards = pgTable('yards', {
   name: text('name').notNull(),
   city: text('city'),
   capacity: integer('capacity').notNull(),
-  latitude: numeric('latitude', { precision: 10, scale: 7 }),
-  longitude: numeric('longitude', { precision: 10, scale: 7 }),
-  gps_radius_meters: integer('gps_radius_meters').default(500).notNull(),
   active: boolean('active').default(true).notNull(),
 });
 
@@ -69,9 +65,6 @@ export const scans = pgTable(
     device_id: uuid('device_id').notNull().references(() => devices.id),
     scanned_at: timestamp('scanned_at', { withTimezone: true }).notNull(),
     received_at: timestamp('received_at', { withTimezone: true }).defaultNow().notNull(),
-    latitude: numeric('latitude', { precision: 10, scale: 7 }),
-    longitude: numeric('longitude', { precision: 10, scale: 7 }),
-    gps_accuracy_meters: numeric('gps_accuracy_meters', { precision: 8, scale: 2 }),
     out_remark: text('out_remark'), // 'customer_acquisition' | 'stockyard_transfer'
     transfer_destination_yard_id: text('transfer_destination_yard_id').references(() => yards.id),
     transfer_requested_by: text('transfer_requested_by'),
