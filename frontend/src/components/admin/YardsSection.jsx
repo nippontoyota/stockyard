@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { yardsByRegion } from "../../stockyardLogic.js";
+import { YARD_REGIONS } from "../../stockyardLogic.js";
 
 const RISK_FILTERS = [
   { id: "all", label: "All yards" },
@@ -24,13 +24,16 @@ export function YardsSection({ stats, yardSearch, setYardSearch, yardRiskFilter,
   }, [stats.yards, yardSearch, yardRiskFilter]);
 
   const yardsGroupedByRegion = useMemo(() => {
-    const ids = new Set(searchFilteredYards.map((yard) => yard.id));
-    return yardsByRegion()
-      .map(({ region, yards: regionYards }) => ({
-        region,
-        yards: regionYards.filter((yard) => ids.has(yard.id)),
-      }))
-      .filter((group) => group.yards.length > 0);
+    const groups = new Map(YARD_REGIONS.map((region) => [region, []]));
+    for (const yard of searchFilteredYards) {
+      const region = yard.city;
+      if (!groups.has(region)) groups.set(region, []);
+      groups.get(region).push(yard);
+    }
+    return YARD_REGIONS.map((region) => ({
+      region,
+      yards: groups.get(region) || [],
+    })).filter((group) => group.yards.length > 0);
   }, [searchFilteredYards]);
 
   return (
@@ -93,7 +96,10 @@ export function YardsSection({ stats, yardSearch, setYardSearch, yardRiskFilter,
             <div className="analytics-yards-region-label">{region}</div>
             <div className="yard-box-grid">
               {regionYards.map((yard) => {
-                const empty = Math.max(0, yard.capacity - yard.count);
+                const count = yard.count ?? 0;
+                const capacity = yard.capacity ?? 0;
+                const utilization = yard.utilization ?? 0;
+                const empty = Math.max(0, capacity - count);
                 const openFlags = flagsByYard[yard.id] || 0;
                 return (
                   <article
@@ -109,21 +115,21 @@ export function YardsSection({ stats, yardSearch, setYardSearch, yardRiskFilter,
                       </div>
                       {openFlags > 0 && <span className="yard-flag-badge" title={`${openFlags} open flag${openFlags === 1 ? "" : "s"}`}>{openFlags}</span>}
                     </div>
-                    <div className="yard-count">{yard.count}</div>
+                    <div className="yard-count">{count}</div>
                     <div className="yard-box-metrics">
                       <span>
-                        <b>{yard.count}</b>Utilised
+                        <b>{count}</b>Utilised
                       </span>
                       <span>
                         <b>{empty}</b>Empty
                       </span>
                       <span>
-                        <b>{yard.capacity}</b>Capacity
+                        <b>{capacity}</b>Capacity
                       </span>
                     </div>
                     <div className="progress-wrapper">
-                      <progress max="100" value={Math.min(100, yard.utilization)} />
-                      <span className="progress-lbl">{yard.utilization}%</span>
+                      <progress max="100" value={Math.min(100, utilization)} />
+                      <span className="progress-lbl">{utilization}%</span>
                     </div>
                     <div className="yard-box-tap-hint">
                       <span className="material-symbols-outlined">directions_car</span>
