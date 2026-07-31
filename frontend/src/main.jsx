@@ -9,7 +9,6 @@ import {
   dashboard,
   decodeVinDetails,
   normalizeVin,
-  resolveFlag,
   flagLabel,
   yards,
   fallbackBranches,
@@ -23,12 +22,11 @@ import {
   ModelDonutChart,
   YardCapacityBarChart,
   DwellDistributionChart,
-  FlagDistributionChart,
-  DwellByModelChart,
 } from "./AnalyticsCharts.jsx";
 import {
-  bulkSync, getVehicles, getFlags, getScans, resolveFlag as apiResolveFlag, loginApi,
-  getNotifications, getRequisitions, getAdminBranches, getBranches,
+  bulkSync, getVehicles, getFlags, getScans, loginApi,
+  getAdminBranches,
+  getNotifications, getRequisitions,
   getVehicleStatus
 } from "./api.js";
 import "./styles.css";
@@ -187,7 +185,7 @@ export default function App() {
     // Yards are hardcoded in stockyardLogic â€” do not fetch (filtered API + cache
     // was causing login to show only the previously selected yard after logout).
     localStorage.removeItem("cache:yards");
-    getBranches()
+    getAdminBranches()
       .then((newBranches) => setConfig(null, newBranches))
       .catch((e) => console.error("Failed to load branches config", e));
   }, []);
@@ -350,7 +348,7 @@ export default function App() {
         )}
         {view === "dashboard" && dataReady && (
           isAdmin
-            ? <AdminHome stats={stats} state={state} setState={setState} />
+            ? <AdminHome stats={stats} state={state} setState={setState} onRefresh={fetchServerData} />
             : <DashboardView state={state} stats={stats} session={session} setState={setState} />
         )}
         {view === "requisitions" && <RequisitionsTab state={state} session={session} onRefresh={fetchServerData} />}
@@ -1643,20 +1641,10 @@ function DashboardView({ state, stats, session, setState }) {
                 <span>
                   <b>{flag.vin}</b>
                   <small>
-                    {flag.createdAt && <span className="flag-time">{new Date(flag.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}{" Â· "}
+                    {flag.createdAt && <span className="flag-time">{new Date(flag.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}{" · "}
                     <strong className="flag-kind">{flagLabel(flag.type)}</strong> {flag.message}
                   </small>
                 </span>
-                {session.role === "admin" && (
-                  <button onClick={async () => {
-                    try {
-                      await apiResolveFlag(flag.id);
-                      setState(resolveFlag(state, flag.id));
-                    } catch (err) {
-                      alert(err.message);
-                    }
-                  }}>Resolve</button>
-                )}
               </div>
             ))
           )}

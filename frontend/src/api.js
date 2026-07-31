@@ -68,12 +68,6 @@ function setCache(key, data) {
   localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
 }
 
-/** @deprecated Yards are hardcoded in stockyardLogic.js — do not use for login/config. */
-export async function getYards() {
-  const response = await apiFetch("/api/yards");
-  return response.data || response;
-}
-
 export async function getAdminBranches() {
   const cached = getCached("cache:branches");
   if (cached) return cached;
@@ -81,10 +75,6 @@ export async function getAdminBranches() {
   const data = Array.isArray(response) ? response : (response.data || response);
   if (data?.length) setCache("cache:branches", data);
   return data || [];
-}
-
-export async function getBranches() {
-  return getAdminBranches();
 }
 
 export async function bulkSync(scans) {
@@ -134,20 +124,8 @@ export async function getScans() {
   return response.data || [];
 }
 
-export async function getAdminDashboard() {
-  return apiFetch("/api/admin/dashboard");
-}
-
 export async function resolveFlag(id) {
   return apiFetch(`/api/admin/flags/${id}/resolve`, { method: "PATCH" });
-}
-
-// §4.1 — Bulk flag resolution
-export async function bulkResolveFlags(flagIds) {
-  return apiFetch("/api/admin/flags/bulk-resolve", {
-    method: "PATCH",
-    body: JSON.stringify({ flag_ids: flagIds }),
-  });
 }
 
 export async function adminOverrideVehicle(vin, status, reason, yardId) {
@@ -266,51 +244,29 @@ export async function markAllNotificationsRead() {
 
 // --- §4.4 Data Export ---
 
-export function getExportUrl(type, params = {}) {
+export async function downloadExport(type, params = {}) {
+  const headers = await getAuthHeaders();
   const query = new URLSearchParams(params).toString();
-  return `${API_BASE}/api/export/${type}${query ? '?' + query : ''}`;
+  const url = `${API_BASE}/api/export/${type}${query ? `?${query}` : ""}`;
+  const response = await fetch(url, { headers, cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Export failed. Please try again.");
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match?.[1] || `${type}-export-${new Date().toISOString().slice(0, 10)}.csv`;
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
-// --- §4.2 Vehicle History ---
-
-export async function getVehicleHistory(vin) {
-  const response = await apiFetch(`/api/vehicles/${vin}`);
-  return response;
-}
-
-export async function getVehicleScans(vin) {
-  const response = await apiFetch(`/api/scans?limit=100`);
-  // Filter client-side for now (backend could add vin filter)
-  return (response.data || []).filter(s => (s.vin || s.vinRaw || '').toUpperCase() === vin.toUpperCase());
-}
-
-// --- F7 Analytics ---
-
-export async function getAnalyticsTrends(from, to) {
-  return apiFetch(`/api/analytics/trends?from=${from}&to=${to}`);
-}
-
-export async function getAnalyticsThroughput(days = 30) {
-  return apiFetch(`/api/analytics/throughput?days=${days}`);
-}
-
-export async function getAnalyticsDamageRate(days = 30) {
-  return apiFetch(`/api/analytics/damage-rate?days=${days}`);
-}
-
-// --- F9 Audit Logs ---
-
-export async function getAuditLogs(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  return apiFetch(`/api/admin/audit-logs${query ? '?' + query : ''}`);
-}
-
-// Item 2: Live vehicle status check before scan
 export async function getVehicleStatus(vin) {
   return apiFetch(`/api/vehicles/${encodeURIComponent(vin.toUpperCase())}`);
 }
 
-// Item 3: Backend-synced delivered vehicles
 export async function deliverVehicles(vins) {
   return apiFetch("/api/vehicles/deliver", {
     method: "PATCH",

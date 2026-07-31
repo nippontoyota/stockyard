@@ -87,22 +87,6 @@ export function requireRole(role: AuthUser['role']) {
 }
 
 /**
- * Require access to a specific branch. Use after authenticate().
- * For stockyard, they implicitly access their branch via yard_id in the endpoints.
- */
-export function requireBranchAccess(branchIdParam: string) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const branchId = req.params[branchIdParam] || req.body[branchIdParam];
-    if (req.user?.role === 'admin') return next();
-    if (req.user?.role === 'delivery_incharge' && req.user.branch_id === branchId) return next();
-    // stockyard authorization check requires DB lookup, typically handled in route
-    if (req.user?.role === 'stockyard') return next(); // Relaxed here, enforce in route
-    
-    res.status(403).json({ error: 'Forbidden branch access' });
-  };
-}
-
-/**
  * Verify Supabase JWT from Authorization header but do not reject if missing.
  */
 export async function optionalAuthenticate(req: Request, res: Response, next: NextFunction) {

@@ -138,9 +138,9 @@ async function processScanIn(body: ScanIn, yardId: string) {
     }
 
     const flagsList: string[] = [];
-    if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`, undefined, tx); flagsList.push('invalid_vin'); }
-    if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported', undefined, tx); flagsList.push('damage_reported'); }
-    if (body.damage_image && !damageImageUrl) { await createFlag(vehicleId, scan.id, 'photo_upload_failed', 'Damage photo upload failed — image not saved', undefined, tx); flagsList.push('photo_upload_failed'); }
+    if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`, body.vin, tx); flagsList.push('invalid_vin'); }
+    if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported', body.vin, tx); flagsList.push('damage_reported'); }
+    if (body.damage_image && !damageImageUrl) { await createFlag(vehicleId, scan.id, 'photo_upload_failed', 'Damage photo upload failed — image not saved', body.vin, tx); flagsList.push('photo_upload_failed'); }
     
     if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id !== yardId) {
       let oldYardCode = String(currentStatus.current_yard_id);
@@ -152,7 +152,7 @@ async function processScanIn(body: ScanIn, yardId: string) {
       const [newY] = await tx.select({ code: yards.code }).from(yards).where(eq(yards.id, yardId));
       if (newY) newYardCode = newY.code;
 
-      await createFlag(vehicleId, scan.id, 'duplicate_yard_status', `Vehicle was IN at yard ${oldYardCode}, now scanned IN at ${newYardCode}`, undefined, tx);
+      await createFlag(vehicleId, scan.id, 'duplicate_yard_status', `Vehicle was IN at yard ${oldYardCode}, now scanned IN at ${newYardCode}`, body.vin, tx);
       flagsList.push('duplicate_yard_status');
     }
     
@@ -190,10 +190,10 @@ async function processScanOut(body: ScanOut, yardId: string) {
     }
 
     const flagsList: string[] = [];
-    if (!currentStatus || currentStatus.current_status !== 'in') { await createFlag(vehicleId, scan.id, 'unverified_in', 'OUT scan with no prior IN record', undefined, tx); flagsList.push('unverified_in'); }
-    if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`, undefined, tx); flagsList.push('invalid_vin'); }
-    if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported', undefined, tx); flagsList.push('damage_reported'); }
-    if (body.damage_image && !damageImageUrl) { await createFlag(vehicleId, scan.id, 'photo_upload_failed', 'Damage photo upload failed — image not saved', undefined, tx); flagsList.push('photo_upload_failed'); }
+    if (!currentStatus || currentStatus.current_status !== 'in') { await createFlag(vehicleId, scan.id, 'unverified_in', 'OUT scan with no prior IN record', body.vin, tx); flagsList.push('unverified_in'); }
+    if (!vinValid) { await createFlag(vehicleId, scan.id, 'invalid_vin', `VIN "${body.vin}" does not match expected format`, body.vin, tx); flagsList.push('invalid_vin'); }
+    if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported', body.vin, tx); flagsList.push('damage_reported'); }
+    if (body.damage_image && !damageImageUrl) { await createFlag(vehicleId, scan.id, 'photo_upload_failed', 'Damage photo upload failed — image not saved', body.vin, tx); flagsList.push('photo_upload_failed'); }
 
     if (body.out_remark === 'stockyard_transfer') {
       const [reqRecord] = await tx

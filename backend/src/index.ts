@@ -16,8 +16,6 @@ import branchRoutes from './routes/branches.js';
 import requisitionRoutes from './routes/requisitions.js';
 import notificationRoutes from './routes/notifications.js';
 import exportRoutes from './routes/export.js';
-import analyticsRoutes from './routes/analytics.js';
-import auditLogRoutes from './routes/auditLogs.js';
 import { authRouter } from './routes/auth.js';
 import { authenticate } from './middleware/auth.js';
 import { initSocket } from './lib/socket.js';
@@ -54,9 +52,7 @@ app.use('/api', limiter);
 // Stats/aggregate endpoints get short-lived caching; mutation endpoints get no-store
 app.use('/api', (req, res, next) => {
   // Dashboard and stats endpoints can be cached briefly
-  const isStatsEndpoint =
-    req.path === '/admin/dashboard' ||
-    req.path.endsWith('/stats');
+  const isStatsEndpoint = req.path.endsWith('/stats');
 
   if (isStatsEndpoint && req.method === 'GET') {
     res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
@@ -87,8 +83,6 @@ app.use('/api/branches', branchRoutes);
 app.use('/api/requisitions', requisitionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/export', exportRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/admin/audit-logs', auditLogRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/admin', authRouter);

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { yards, yardsByRegion, normalizeVin, isValidVin, detectModel } from "../stockyardLogic.js";
 import { uploadTransitListApi } from "../api.js";
+import { ConfirmDialog } from "./ConfirmDialog.jsx";
 
 export function TransitUploadTab({ onUploadComplete }) {
   const [file, setFile] = useState(null);
@@ -9,6 +10,7 @@ export function TransitUploadTab({ onUploadComplete }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function findYard(value) {
     if (!value) return null;
@@ -110,14 +112,17 @@ export function TransitUploadTab({ onUploadComplete }) {
     );
   }
 
-  async function handleConfirm() {
+  function requestConfirm() {
     if (readyCount === 0) return;
     if (unmatchedCount > 0) {
-      const go = window.confirm(
-        `${unmatchedCount} row${unmatchedCount === 1 ? "" : "s"} still have no yard.\n\nUpload the ${readyCount} matched vehicle${readyCount === 1 ? "" : "s"} and skip the rest?`
-      );
-      if (!go) return;
+      setConfirmOpen(true);
+      return;
     }
+    handleConfirm();
+  }
+
+  async function handleConfirm() {
+    if (readyCount === 0) return;
 
     const payload = parsedData.filter((v) => v.yard_id).map(({ vin, model, yard_id }) => ({ vin, model, yard_id }));
     setLoading(true);
@@ -127,6 +132,7 @@ export function TransitUploadTab({ onUploadComplete }) {
       setSuccessMsg(response.message || `Uploaded ${payload.length} vehicles as in transit.`);
       setParsedData([]);
       setFile(null);
+      setConfirmOpen(false);
       if (onUploadComplete) onUploadComplete();
     } catch (err) {
       setError("Upload failed: " + err.message);
@@ -246,7 +252,7 @@ export function TransitUploadTab({ onUploadComplete }) {
           <button
             type="button"
             className="primary"
-            onClick={handleConfirm}
+            onClick={requestConfirm}
             disabled={loading || readyCount === 0}
           >
             {loading ? "Uploading…" : `Confirm ${readyCount} in transit`}
@@ -254,6 +260,25 @@ export function TransitUploadTab({ onUploadComplete }) {
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Upload with unmatched rows?"
+        message={
+          <>
+            <p>
+              {unmatchedCount} row{unmatchedCount === 1 ? "" : "s"} still have no yard.
+            </p>
+            <p>
+              Upload the {readyCount} matched vehicle{readyCount === 1 ? "" : "s"} and skip the rest?
+            </p>
+          </>
+        }
+        confirmLabel={`Upload ${readyCount}`}
+        loading={loading}
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </section>
   );
 }

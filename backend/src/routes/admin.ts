@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { eq, and, sql, count, desc } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { vehicles, vehicleStatus, scans, yards, flags } from '../db/schema.js';
+import { vehicles, vehicleStatus, scans, flags } from '../db/schema.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { isValidVin, detectModel } from '../lib/vin.js';
 
@@ -11,106 +11,6 @@ router.use(authenticate);
 router.use((req, res, next) => {
   if (req.path === '/flags' && req.method === 'GET') return next();
   return requireRole('admin')(req, res, next);
-});
-
-// ─── GET /dashboard ──────────────────────────────────────────────────
-
-router.get('/dashboard', async (req, res, next) => {
-  try {
-    // Total IN count
-    const [{ value: totalIn }] = await db
-      .select({ value: count() })
-      .from(vehicleStatus)
-      .where(eq(vehicleStatus.current_status, 'in'));
-
-    // Per-yard breakdown
-    const yardBreakdown = await db
-      .select({
-        yard_id: yards.id,
-        code: yards.code,
-        name: yards.name,
-        capacity: yards.capacity,
-        current_count: count(vehicleStatus.vehicle_id),
-      })
-      .from(yards)
-      .leftJoin(
-        vehicleStatus,
-        and(
-          eq(vehicleStatus.current_yard_id, yards.id),
-          eq(vehicleStatus.current_status, 'in'),
-        ),
-      )
-      .where(eq(yards.active, true))
-      .groupBy(yards.id, yards.code, yards.name, yards.capacity)
-      .orderBy(yards.code);
-
-    const yardsData = yardBreakdown.map((y) => ({
-      ...y,
-      current_count: Number(y.current_count),
-      utilization_pct: y.capacity > 0 ? Math.round((Number(y.current_count) / y.capacity) * 100) : 0,
-    }));
-
-    // Model split
-    const modelSplit = await db
-      .select({
-        model: vehicles.model,
-        count: count(),
-      })
-      .from(vehicleStatus)
-      .innerJoin(vehicles, eq(vehicleStatus.vehicle_id, vehicles.id))
-      .where(eq(vehicleStatus.current_status, 'in'))
-      .groupBy(vehicles.model)
-      .orderBy(desc(count()));
-
-    // Average dwell time (vehicles currently IN)
-    // ponytail: raw SQL for interval arithmetic — Drizzle's builder is clunkier here
-    const dwellByYard = await db.execute(sql`
-      SELECT
-        y.id AS yard_id,
-        y.code,
-        y.name,
-        ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - vs.last_changed_at)) / 3600)::numeric, 1) AS avg_dwell_hours
-      FROM vehicle_status vs
-      JOIN yards y ON y.id = vs.current_yard_id
-      WHERE vs.current_status = 'in'
-      GROUP BY y.id, y.code, y.name
-      ORDER BY y.code
-    `);
-
-    const dwellByModel = await db.execute(sql`
-      SELECT
-        v.model,
-        ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - vs.last_changed_at)) / 3600)::numeric, 1) AS avg_dwell_hours
-      FROM vehicle_status vs
-      JOIN vehicles v ON v.id = vs.vehicle_id
-      WHERE vs.current_status = 'in'
-      GROUP BY v.model
-      ORDER BY v.model
-    `);
-
-    // Open flags by type
-    const openFlags = await db
-      .select({
-        flag_type: flags.flag_type,
-        count: count(),
-      })
-      .from(flags)
-      .where(eq(flags.resolved, false))
-      .groupBy(flags.flag_type);
-
-    res.json({
-      total_in: Number(totalIn),
-      yards: yardsData,
-      model_split: modelSplit.map((m) => ({ model: m.model ?? 'Unknown', count: Number(m.count) })),
-      dwell_time: {
-        by_yard: dwellByYard,
-        by_model: dwellByModel,
-      },
-      open_flags: openFlags.map((f) => ({ type: f.flag_type, count: Number(f.count) })),
-    });
-  } catch (err) {
-    next(err);
-  }
 });
 
 // ─── GET /flags ──────────────────────────────────────────────────────
@@ -185,33 +85,6 @@ router.patch('/flags/:id/resolve', async (req, res, next) => {
     }
 
     res.json(updated);
-  } catch (err) {
-    next(err);
-  }
-});
-
-// ─── PATCH /flags/bulk-resolve (§4.1) ────────────────────────────────
-
-const bulkResolveBody = z.object({
-  flag_ids: z.array(z.string().uuid()).min(1).max(500),
-});
-
-router.patch('/flags/bulk-resolve', async (req, res, next) => {
-  try {
-    const body = bulkResolveBody.parse(req.body);
-    const now = new Date();
-    let resolved = 0;
-
-    for (const id of body.flag_ids) {
-      const [updated] = await db
-        .update(flags)
-        .set({ resolved: true, resolved_by: req.user!.id, resolved_at: now })
-        .where(and(eq(flags.id, id), eq(flags.resolved, false)))
-        .returning();
-      if (updated) resolved++;
-    }
-
-    res.json({ resolved, total: body.flag_ids.length });
   } catch (err) {
     next(err);
   }
