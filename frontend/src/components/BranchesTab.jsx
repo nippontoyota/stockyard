@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getAdminBranches, createAdminBranch, updateAdminBranch, assignBranchYards } from "../api.js";
 import { yardsByRegion } from "../stockyardLogic.js";
-import "../design-tokens.css";
 import "../corporate-modern.css";
 
 export function BranchesTab() {

@@ -76,7 +76,7 @@ export function AdminHome({ stats, state, setState, onRefresh }) {
   }
 
   return (
-    <section className={`dashboard-workspace admin-console admin-console--${section}`}>
+    <section className="dashboard-workspace admin-console">
       <aside className="dashboard-rail" aria-label="Admin sections">
         <div className="rail-brand">
           <span className="material-symbols-outlined">admin_panel_settings</span>
@@ -111,6 +111,10 @@ export function AdminHome({ stats, state, setState, onRefresh }) {
 
       <div className="stack analytical-dashboard admin-console-main">
         <header className="admin-console-header">
+          <div className="dashboard-header-copy">
+            <h1>{ADMIN_SECTIONS.find((s) => s.id === section)?.label || "Admin"}</h1>
+            <p className="dashboard-subtitle">{adminSectionSubtitle(section)}</p>
+          </div>
           <div className="segmented dashboard-mobile-tabs admin-mobile-tabs" role="tablist" aria-label="Admin sections">
             {ADMIN_SECTIONS.map((s) => {
               const badge = getAdminSectionBadge(s.id, { openFlags: activeFlagsList.length, transitCount });
@@ -129,21 +133,15 @@ export function AdminHome({ stats, state, setState, onRefresh }) {
               );
             })}
           </div>
-          <div className="dashboard-header-copy">
-            <h1>{ADMIN_SECTIONS.find((s) => s.id === section)?.label || "Admin"}</h1>
-            <p className="dashboard-subtitle">{adminSectionSubtitle(section)}</p>
-          </div>
         </header>
 
-        {section !== "setup" && (
-          <StatusStrip
-            stats={stats}
-            openFlags={activeFlagsList.length}
-            damageCount={damageFlagCount + damageExtrasCount}
-            transitCount={transitCount}
-            onJump={handleJump}
-          />
-        )}
+        <StatusStrip
+          stats={stats}
+          openFlags={activeFlagsList.length}
+          damageCount={damageFlagCount + damageExtrasCount}
+          transitCount={transitCount}
+          onJump={handleJump}
+        />
 
         {toastMessage && <div className="notice ok">{toastMessage}</div>}
 
