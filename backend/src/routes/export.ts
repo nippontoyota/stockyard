@@ -125,7 +125,6 @@ router.get('/history', async (req, res, next) => {
         damaged: scans.damaged,
         damage_remark: scans.damage_remark,
         status: scans.status,
-        gps_accuracy_meters: scans.gps_accuracy_meters,
       })
       .from(scans)
       .innerJoin(vehicles, eq(scans.vehicle_id, vehicles.id))
@@ -135,9 +134,9 @@ router.get('/history', async (req, res, next) => {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="history-${req.query.vin}-${new Date().toISOString().slice(0,10)}.csv"`);
 
-    res.write(csvRow(['Type', 'VIN', 'Yard', 'Scanned At', 'Remark', 'Key No', 'Damaged', 'Damage Remark', 'Status', 'GPS Accuracy']) + '\n');
+    res.write(csvRow(['Type', 'VIN', 'Yard', 'Scanned At', 'Remark', 'Key No', 'Damaged', 'Damage Remark', 'Status']) + '\n');
     for (const r of rows) {
-      res.write(csvRow([r.scan_type, r.vin_raw, r.yard_id, r.scanned_at?.toISOString(), r.out_remark, r.key_no, r.damaged, r.damage_remark, r.status, r.gps_accuracy_meters]) + '\n');
+      res.write(csvRow([r.scan_type, r.vin_raw, r.yard_id, r.scanned_at?.toISOString(), r.out_remark, r.key_no, r.damaged, r.damage_remark, r.status]) + '\n');
     }
     res.end();
   } catch (err) { next(err); }

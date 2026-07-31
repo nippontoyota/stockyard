@@ -10,6 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
+    "db:clear": "tsx src/db/clear.ts",
+    "db:drop-gps": "tsx src/db/dropGpsColumns.ts",
     "db:sync-yards": "tsx src/db/syncYards.ts",
     "test": "vitest run",
     "test:watch": "vitest"

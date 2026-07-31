@@ -38,7 +38,6 @@ import { RequisitionsTab } from "./components/RequisitionsTab.jsx";
 import { NotificationBell } from "./components/NotificationBell.jsx";
 import { useSocket } from "./useSocket.js";
 import { ScanOverlay } from "./components/ScanOverlay.jsx";
-import { GpsStatus } from "./components/GpsStatus.jsx";
 import { enqueueScan, getPendingCount, drainQueue } from "./offlineQueue.js";
 import { saveSnapshot, loadSnapshot, formatSnapshotAge, applySnapshotToState } from "./offlineSnapshot.js";
 import { usePwaInstall } from "./usePwaInstall.js";
@@ -609,9 +608,10 @@ function Login({ onLogin }) {
 
 function Header({ session, online, notifications, onNavigate, onLogout }) {
   const { isInstallable, promptInstall } = usePwaInstall();
+  const topbarClass = session.role === "stockyard" ? "topbar topbar-stockyard" : "topbar";
 
   return (
-    <header className="topbar">
+    <header className={topbarClass}>
       <div className="topbar-brand-section">
         <strong className="topbar-brand">Nippon Yard Scan</strong>
         <div className="topbar-badge">
@@ -621,11 +621,14 @@ function Header({ session, online, notifications, onNavigate, onLogout }) {
       <div className="top-actions">
         {isInstallable && (
           <button className="primary pwa-install-btn" onClick={promptInstall}>
-            <span className="material-symbols-outlined">install_mobile</span> Install App
+            <span className="material-symbols-outlined">install_mobile</span>
+            <span className="pwa-install-label">Install App</span>
           </button>
         )}
         {session.role !== "admin" && <NotificationBell notifications={notifications || []} onNavigate={onNavigate} />}
-        <span className={online ? "pill ok" : "pill warn"}>{online ? "Online" : "Offline"}</span>
+        <span className={online ? "pill ok online-pill" : "pill warn online-pill"} aria-label={online ? "Online" : "Offline"}>
+          {online ? "Online" : "Offline"}
+        </span>
         <button className="icon-btn" onClick={onLogout} aria-label="Log out"><span className="material-symbols-outlined">logout</span></button>
       </div>
     </header>
@@ -690,7 +693,6 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const [supportsTorch, setSupportsTorch] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(null);
   const [overlayResult, setOverlayResult] = useState(null);
-  const [gpsData, setGpsData] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [message, setMessage] = useState(null);
   // Item 5: OUT confirmation
@@ -719,20 +721,6 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     const destYard = req.requesting_branch?.yards?.[0]?.id;
     if (destYard) setTransferDestinationYardId(destYard);
   }, [pendingVin, scanType, state.requisitions]);
-
-  // F12 indoor GPS fallback
-  useEffect(() => {
-    function onKeyDown(e) {
-      if (e.key === 'F12') {
-        e.preventDefault();
-        if (!gpsData) {
-          setGpsData({ latitude: yard.latitude, longitude: yard.longitude, accuracy: null });
-        }
-      }
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [gpsData, yard]);
 
   useEffect(() => {
     getPendingCount().then(setPendingCount);
@@ -971,8 +959,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   async function doSubmit(confirmedScanType) {
     const finalScanType = confirmedScanType || scanType;
 
-    const gps = gpsData || { latitude: yard.latitude, longitude: yard.longitude, accuracy: online ? 24 : null };
-    const scan = createScan({ vin, type: finalScanType, yardId: yard.id, gps, outRemark, transferDestinationYardId, transferRequestedBy, keyNo, damaged, damageRemark, damageImage, driveType, online });
+    const scan = createScan({ vin, type: finalScanType, yardId: yard.id, outRemark, transferDestinationYardId, transferRequestedBy, keyNo, damaged, damageRemark, damageImage, driveType });
     const result = applyScan(state, scan);
 
     if (!result.accepted) return setOverlayResult({ type: "error", message: result.message });
@@ -1059,7 +1046,6 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
 
   return (
     <section className="scan-grid">
-      <GpsStatus onGpsReady={setGpsData} onGpsOverride={setGpsData} />
       {pendingCount > 0 && <div className="offline-badge">Offline Mode <span className="pending-count-badge">{pendingCount}</span></div>}
       <form className="scan-card stack" onSubmit={submit}>
         {confirmOutData && (
@@ -1080,10 +1066,17 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
         )}
         <div className="scan-ticket">
           <span className={`scan-badge ${activeScanType}`}>{activeScanType.toUpperCase()}</span>
-          <div>
+          <div className="scan-ticket-copy">
             <h1>{yard.code}</h1>
             <p>{yard.name}</p>
-            {lastSyncedAt && <small className="last-synced" style={{color: 'var(--text-dim)', fontSize: '0.75rem'}}>Last synced: {Math.round((Date.now() - lastSyncedAt.getTime()) / 60000)}m ago</small>}
+            <div className="scan-ticket-meta">
+              <span>Capacity {yard.capacity}</span>
+              {lastSyncedAt && (
+                <span>Synced {Math.round((Date.now() - lastSyncedAt.getTime()) / 60000)}m ago</span>
+              )}
+              {!online && <span className="scan-ticket-offline">Offline</span>}
+              {pendingCount > 0 && <span className="scan-ticket-queue">{pendingCount} queued</span>}
+            </div>
           </div>
         </div>
         <div className="camera">
@@ -1399,17 +1392,16 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
         {message && !scanSuccess && <p className={`notice ${message.kind}`}>{message.text}</p>}
       </form>
       <ScanOverlay result={overlayResult} onDismiss={() => setOverlayResult(null)} />
-      <aside className="panel yard-card">
-        <span className="eyebrow">Assigned yard</span>
-        <h2>{yard.name}</h2>
+      <aside className="panel yard-card scan-yard-sidebar" aria-label="Yard details">
+        <h2 className="yard-card-title">{yard.name}</h2>
         <div className="yard-meta"><span>{yard.code}</span><b>Capacity {yard.capacity}</b></div>
         <div className="yard-device">
-          <span className="material-symbols-outlined">smartphone</span>
+          <span className="material-symbols-outlined" aria-hidden="true">smartphone</span>
           <span>Device {state.deviceId.slice(-8)}</span>
         </div>
-        <p className="muted">
+        <p className="yard-sync-note muted">
           {online
-            ? "GPS is captured on submit. Scans sync to the server immediately."
+            ? "Scans sync to the server immediately."
             : "Offline — scans are saved on this device and sync when you reconnect."}
         </p>
       </aside>
