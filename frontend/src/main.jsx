@@ -506,12 +506,7 @@ function Login({ onLogin }) {
   return (
     <main className="login">
       <section className="login-panel">
-        <div className="login-visual" aria-hidden="true">
-          <div className="yard-strip">
-            <span>Authorised access only</span>
-            <b>{yards.length} yards Â· {YARD_REGIONS.length} regions</b>
-          </div>
-        </div>
+        <div className="login-visual" aria-hidden="true" />
         <div className="login-form-panel">
           <div className="brand-row">
             <div className="brand-mark"><span className="material-symbols-outlined">qr_code_scanner</span></div>
