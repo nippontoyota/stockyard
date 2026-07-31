@@ -42,7 +42,7 @@ function buildForm(vehicle) {
   };
 }
 
-export function AllVehiclesTab({ state, setState }) {
+export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditConsumed }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingVin, setEditingVin] = useState(null);
@@ -53,6 +53,12 @@ export function AllVehiclesTab({ state, setState }) {
 
   const allVehicles = state ? Object.values(state.vehicles) : [];
   const editingVehicle = editingVin ? state?.vehicles?.[editingVin] : null;
+
+  useEffect(() => {
+    if (!initialEditVin || !state?.vehicles?.[initialEditVin]) return;
+    setEditingVin(initialEditVin);
+    onInitialEditConsumed?.();
+  }, [initialEditVin, state?.vehicles, onInitialEditConsumed]);
 
   useEffect(() => {
     if (!editingVehicle) {

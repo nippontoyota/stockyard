@@ -136,6 +136,10 @@ function duplicateMessage(currentYardId, scanYardId) {
   return `Vehicle was IN at ${currentYard?.code || currentYardId} (${currentYard?.name || "Unknown"}), now scanned IN at ${scanYard?.code || scanYardId} (${scanYard?.name || "Unknown"}) without prior OUT scan.`;
 }
 
+function groupCount(items, key) {
+  return items.reduce((acc, item) => ({ ...acc, [item[key]]: (acc[item[key]] || 0) + 1 }), {});
+}
+
 export function dashboard(state, yardId = null) {
   const visibleYardIds = yardId ? [yardId] : yards.map((yard) => yard.id);
   const visibleYards = yards.filter((yard) => visibleYardIds.includes(yard.id));
@@ -180,39 +184,12 @@ export function dashboard(state, yardId = null) {
     else dwellDistribution["> 14 days"]++;
   });
 
-  // Dwell by model
-  const modelDwellMap = {};
-  inVehicles.forEach((v) => {
-    const m = v.model || "Unknown";
-    const days = Math.max(1, Math.ceil((now - Date.parse(v.lastChangedAt || now)) / 86400000));
-    if (!modelDwellMap[m]) modelDwellMap[m] = { totalDays: 0, count: 0 };
-    modelDwellMap[m].totalDays += days;
-    modelDwellMap[m].count += 1;
-  });
-
-  const dwellByModel = Object.entries(modelDwellMap).map(([model, data]) => ({
-    model,
-    avgDays: Math.round(data.totalDays / data.count),
-    count: data.count,
-  }));
-
-  // Flag breakdown
+  // Open flags for this scope
   const openFlagItems = state.flags.filter((f) => {
     if (f.resolved) return false;
     if (!yardId) return true;
     return state.vehicles[f.vin]?.currentYardId === yardId;
   });
-  const flagTypeCounts = {};
-  openFlagItems.forEach((f) => {
-    const type = f.type || "other";
-    flagTypeCounts[type] = (flagTypeCounts[type] || 0) + 1;
-  });
-
-  const flagBreakdown = Object.entries(flagTypeCounts).map(([type, count]) => ({
-    type,
-    label: formatFlagLabel(type),
-    count,
-  }));
 
   const totalCapacity = visibleYards.reduce((sum, y) => sum + y.capacity, 0);
   const overallUtilization = totalCapacity > 0 ? Math.round((inVehicles.length / totalCapacity) * 100) : 0;
@@ -232,26 +209,19 @@ export function dashboard(state, yardId = null) {
     models,
     yards: yardsData,
     dwellDistribution,
-    dwellByModel,
-    flagBreakdown,
   };
 }
 
-function formatFlagLabel(type) {
-  const map = {
+export function flagLabel(type) {
+  return {
     damage_reported: "Damage Reported",
-    unverified_in: "Unverified OUT",
+    unverified_in: "OUT Without IN",
     yard_capacity_exceeded: "Capacity Exceeded",
-    duplicate_yard_status: "Duplicate Status",
-    invalid_vin: "Invalid VIN Format",
+    duplicate_yard_status: "Duplicate Yard IN",
+    invalid_vin: "Invalid VIN",
     manual_admin_override: "Admin Override",
     dwell_exceeded: "Dwell Time Exceeded",
-  };
-  return map[type] || type.replace(/_/g, " ");
-}
-
-function groupCount(items, key) {
-  return items.reduce((acc, item) => ({ ...acc, [item[key]]: (acc[item[key]] || 0) + 1 }), {});
+  }[type] || String(type || "Flag").replace(/_/g, " ");
 }
 
 export function resolveFlag(state, id) {
@@ -300,16 +270,4 @@ export function removeDeliveredVehicles(state, vins) {
     ...[...deliveredVins].map((vin) => ({ vin, deliveredAt: new Date().toISOString() })),
   ];
   return { ...state, vehicles, delivered };
-}
-
-export function flagLabel(type) {
-  return {
-    damage_reported: "Damage Reported",
-    unverified_in: "OUT Without IN",
-    yard_capacity_exceeded: "Capacity Exceeded",
-    duplicate_yard_status: "Duplicate Yard IN",
-    invalid_vin: "Invalid VIN",
-    manual_admin_override: "Admin Override",
-    dwell_exceeded: "Dwell Time Exceeded",
-  }[type] || String(type || "Flag").replace(/_/g, " ");
 }

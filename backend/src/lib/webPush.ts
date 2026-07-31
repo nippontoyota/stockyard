@@ -51,3 +51,16 @@ export async function notifyRoleAtBranch(role: string, branchId: string, payload
     console.error('notifyRoleAtBranch failed:', err);
   }
 }
+
+export async function notifyAdmins(payload: { title: string; body: string; url?: string }) {
+  try {
+    const { credentials } = await import('../db/schema.js');
+    const users = await db.select({ id: credentials.id })
+      .from(credentials)
+      .where(eq(credentials.role, 'admin'));
+
+    await Promise.all(users.map((u) => sendPushNotification(u.id, payload)));
+  } catch (err) {
+    console.error('notifyAdmins failed:', err);
+  }
+}
