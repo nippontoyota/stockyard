@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getAdminBranches, getBranchStock, createRequisition, approveRequisition, rejectRequisition } from "../api.js";
+import "../design-tokens.css";
 import "../corporate-modern.css";
 
 const ACTIVE_STATUSES = new Set(["pending", "approved"]);

@@ -1,7 +1,9 @@
+@import "./design-tokens.css";
+
 :root {
-  color: #0b1c30;
-  background: #f8f9ff;
-  font-family: "Tenor Sans", system-ui, sans-serif;
+  color: var(--ds-text);
+  background: var(--ds-bg);
+  font-family: var(--ds-font-ui);
 }
 
 * { box-sizing: border-box; }
