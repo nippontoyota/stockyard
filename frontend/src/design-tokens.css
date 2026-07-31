@@ -75,7 +75,11 @@
 
   /* Layout */
   --ds-content-max: 70rem;
+  --ds-content-wide: 80rem;
   --ds-nav-width: min(27.5rem, calc(100% - 1.5rem));
+  --ds-bp-tablet: 48rem;
+  --ds-bp-desktop: 60rem;
+  --ds-bp-wide: 75rem;
 
   /* Z-index scale */
   --ds-z-dropdown: 100;
