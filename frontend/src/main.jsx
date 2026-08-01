@@ -31,6 +31,9 @@ import {
   getNotifications, getRequisitions,
   getVehicleStatus,
   isNetworkError,
+  isAuthError,
+  humanizeApiError,
+  SESSION_EXPIRED_MESSAGE,
 } from "./api.js";
 import "./styles.css";
 
@@ -215,7 +218,7 @@ export default function App() {
       setStaleSnapshotAt(null);
       setLoadWarning("");
       setDataReady(true);
-      setAuthExpiredMessage("Your session expired after a security update. Please log in again.");
+      setAuthExpiredMessage("Your session expired. Please log in again.");
       window.history.replaceState(null, "", "/");
     };
     window.addEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
@@ -1036,13 +1039,16 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       if (err.rejected) {
         return setOverlayResult({ type: "error", message: err.message });
       }
+      if (isAuthError(err)) {
+        return setOverlayResult({ type: "error", message: SESSION_EXPIRED_MESSAGE });
+      }
       if (isNetworkError(err)) {
         await enqueueScan(scan);
         setPendingCount(c => c + 1);
         finishSubmit(result.state, resultType, result.message + " (Saved offline)", newFlags.map(f => flagLabel(f.type)));
         return;
       }
-      setOverlayResult({ type: "error", message: err.message || "Sync failed. Please try again." });
+      setOverlayResult({ type: "error", message: humanizeApiError(err) });
     }
 
   }
@@ -1072,8 +1078,11 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
           const liveIsIn = liveStatus.current_status === 'in' && liveStatus.current_yard_id === yard.id;
           effectiveType = liveIsIn ? 'out' : 'in';
         }
-      } catch {
-        // Offline or not found â€” use local/auto type
+      } catch (err) {
+        if (isAuthError(err)) {
+          return setOverlayResult({ type: "error", message: SESSION_EXPIRED_MESSAGE });
+        }
+        // Offline or not found — use local/auto type
       }
     }
 

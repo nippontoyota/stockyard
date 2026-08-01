@@ -3,6 +3,8 @@
  * Stores scans when offline, drains on reconnect.
  */
 
+import { isAuthError } from "./api.js";
+
 const DB_NAME = 'stockyard-offline';
 const STORE = 'pending-scans';
 const DB_VERSION = 1;
@@ -103,6 +105,9 @@ export async function drainQueue(bulkSyncFn, maxRetries = 3) {
     } catch (err) {
       if (err.rejected) {
         return { synced: 0, failed: 0, rejected: pending.length };
+      }
+      if (isAuthError(err)) {
+        return { synced: 0, failed: pending.length, rejected: 0, authExpired: true };
       }
       if (attempt === maxRetries - 1) {
         console.error('[offline-queue] Failed after retries:', err);
