@@ -460,7 +460,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 
 .vehicle-list { display: grid; gap: 8px; }
 .vehicle {
-  min-height: 88px; display: grid; grid-template-columns: minmax(280px, 1fr) minmax(180px, .55fr) 120px;
+  min-height: 88px; display: grid; grid-template-columns: minmax(280px, 1fr) minmax(180px, .55fr) 120px auto;
   align-items: center; gap: 14px; padding: 14px; border-left-width: 0; border-color: #dfe6ec;
   box-shadow: 0 8px 20px rgba(15,23,42,.035);
 }
@@ -3059,12 +3059,53 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 }
 .vehicle-edit-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 10px;
   padding: 14px 20px 18px;
   border-top: 1px solid #e2e8f0;
   background: #f8fafc;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.vehicle-edit-actions-main {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-left: auto;
+}
+.admin-vehicle-delete-btn.ghost {
+  background: #fff;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+.admin-vehicle-delete-btn.ghost:hover {
+  background: #fef2f2;
+  border-color: #f87171;
+}
+.vehicle-history-delete {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+.vehicle-admin-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.vehicle-delete-btn {
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff;
+}
+.vehicle-delete-btn:hover {
+  background: #fef2f2;
+  border-color: #f87171;
 }
 .vehicle-edit-actions .primary {
   min-height: 44px;
