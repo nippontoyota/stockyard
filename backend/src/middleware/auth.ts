@@ -1,10 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { createRemoteJWKSet, jwtVerify } from 'jose';
-
-// Supabase JWKS — keys are cached automatically by jose
-const JWKS = createRemoteJWKSet(
-  new URL(`${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
-);
+import { verifySessionToken } from '../lib/session.js';
 
 export interface AuthUser {
   id: string;
@@ -13,7 +8,6 @@ export interface AuthUser {
   branch_id: string | null;
 }
 
-// Extend Express Request
 declare global {
   namespace Express {
     interface Request {
@@ -22,10 +16,26 @@ declare global {
   }
 }
 
-/**
- * Verify Supabase JWT from Authorization header.
- * Reads role and yard_id from app_metadata in the JWT claims.
- */
+const isDev = () => process.env.NODE_ENV !== 'production';
+
+function resolveMockUser(token: string): AuthUser | null {
+  if (!isDev()) return null;
+  if (token === 'mock-admin') {
+    return { id: 'mock-admin-id', role: 'admin', yard_id: null, branch_id: null };
+  }
+  if (token.startsWith('mock-yard-')) {
+    return { id: 'mock-yard-id', role: 'stockyard', yard_id: token.slice(10), branch_id: null };
+  }
+  if (token.startsWith('mock-delivery-')) {
+    return { id: 'mock-delivery-id', role: 'delivery_incharge', yard_id: null, branch_id: token.slice(14) };
+  }
+  return null;
+}
+
+function resolveUser(token: string): AuthUser | null {
+  return verifySessionToken(token) ?? resolveMockUser(token);
+}
+
 export async function authenticate(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   const token = header?.startsWith('Bearer ') ? header.slice(7) : null;
@@ -35,47 +45,16 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     return;
   }
 
-  // Mock token support for local dev without Supabase
-  if (token === 'mock-admin') {
-    req.user = { id: 'mock-admin-id', role: 'admin', yard_id: null, branch_id: null };
-    return next();
-  }
-  if (token.startsWith('mock-yard-')) {
-    req.user = { id: 'mock-yard-id', role: 'stockyard', yard_id: token.slice(10), branch_id: null };
-    return next();
-  }
-  if (token.startsWith('mock-delivery-')) {
-    req.user = { id: 'mock-delivery-id', role: 'delivery_incharge', yard_id: null, branch_id: token.slice(14) };
-    return next();
-  }
-
-  try {
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: `${process.env.SUPABASE_URL}/auth/v1`,
-      audience: 'authenticated',
-    });
-
-    const appMeta = (payload as Record<string, unknown>).app_metadata as
-      | { role?: string; yard_id?: string; branch_id?: string }
-      | undefined;
-
-    req.user = {
-      id: payload.sub!,
-      role: (appMeta?.role as AuthUser['role']) ?? 'stockyard',
-      yard_id: appMeta?.yard_id ?? null,
-      branch_id: appMeta?.branch_id ?? null,
-    };
-
-    next();
-  } catch {
+  const user = resolveUser(token);
+  if (!user) {
     res.status(401).json({ error: 'Invalid or expired token' });
     return;
   }
+
+  req.user = user;
+  next();
 }
 
-/**
- * Require a specific role. Use after authenticate().
- */
 export function requireRole(role: AuthUser['role']) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (req.user?.role !== role) {
@@ -86,46 +65,14 @@ export function requireRole(role: AuthUser['role']) {
   };
 }
 
-/**
- * Verify Supabase JWT from Authorization header but do not reject if missing.
- */
-export async function optionalAuthenticate(req: Request, res: Response, next: NextFunction) {
+export async function optionalAuthenticate(req: Request, _res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   const token = header?.startsWith('Bearer ') ? header.slice(7) : null;
 
-  if (!token) return next();
-
-  if (token === 'mock-admin') {
-    req.user = { id: 'mock-admin-id', role: 'admin', yard_id: null, branch_id: null };
-    return next();
-  }
-  if (token.startsWith('mock-yard-')) {
-    req.user = { id: 'mock-yard-id', role: 'stockyard', yard_id: token.slice(10), branch_id: null };
-    return next();
-  }
-  if (token.startsWith('mock-delivery-')) {
-    req.user = { id: 'mock-delivery-id', role: 'delivery_incharge', yard_id: null, branch_id: token.slice(14) };
-    return next();
+  if (token) {
+    const user = resolveUser(token);
+    if (user) req.user = user;
   }
 
-  try {
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: `${process.env.SUPABASE_URL}/auth/v1`,
-      audience: 'authenticated',
-    });
-
-    const appMeta = (payload as Record<string, unknown>).app_metadata as
-      | { role?: string; yard_id?: string; branch_id?: string }
-      | undefined;
-
-    req.user = {
-      id: payload.sub!,
-      role: (appMeta?.role as AuthUser['role']) ?? 'stockyard',
-      yard_id: appMeta?.yard_id ?? null,
-      branch_id: appMeta?.branch_id ?? null,
-    };
-  } catch {
-    // Ignore invalid tokens for optional auth
-  }
   next();
 }
