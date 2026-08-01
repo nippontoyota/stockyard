@@ -50,6 +50,7 @@ import { AdminHome } from "./components/AdminDashboard.jsx";
 import { YardVehiclesModal } from "./components/YardVehiclesModal.jsx";
 import { DeliveryBranchStock } from "./components/DeliveryBranchStock.jsx";
 import { exportVehiclesExcel } from "./exportStockExcel.js";
+import { AdminVehicleDeleteButton } from "./components/AdminVehicleDeleteButton.jsx";
 
 function getRoutePath(viewName, role) {
   if (role === "admin") {
@@ -405,7 +406,7 @@ export default function App() {
       )}
       <main className="content">
         {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} onRefresh={fetchServerData} lastSyncedAt={lastSyncedAt} />}
-        {view === "stock" && <StockView state={state} session={session} />}
+        {view === "stock" && <StockView state={state} setState={setState} session={session} />}
         {view === "dashboard" && !dataReady && (
           <div className="dashboard-loading" style={{ padding: '1rem' }}>
             <div className="skeleton skeleton-kpi" style={{ height: 80, marginBottom: 12 }} />
@@ -1501,14 +1502,14 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   );
 }
 
-function StockView({ state, session }) {
+function StockView({ state, setState, session }) {
   if (session.role === "delivery_incharge") {
     return <DeliveryBranchStock state={state} session={session} />;
   }
-  return <StockInventoryView state={state} session={session} />;
+  return <StockInventoryView state={state} setState={setState} session={session} />;
 }
 
-function StockInventoryView({ state, session }) {
+function StockInventoryView({ state, setState, session }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [model, setModel] = useState("all");
@@ -1680,6 +1681,8 @@ function StockInventoryView({ state, session }) {
               key={vehicle.vin}
               vehicle={vehicle}
               flags={state.flags.filter((flag) => flag.vin === vehicle.vin && !flag.resolved)}
+              isAdmin={session.role === "admin"}
+              setState={setState}
             />
           ))
         )}
@@ -1700,7 +1703,7 @@ function StockStat({ icon, label, value, tone = "" }) {
   );
 }
 
-function VehicleCard({ vehicle, flags }) {
+function VehicleCard({ vehicle, flags, isAdmin = false, setState }) {
   const yard = findYardById(vehicle.currentYardId);
   const statusText = flags.length ? "Flagged" : vehicle.currentStatus === "in" ? "In yard" : "Out";
   return (
@@ -1710,7 +1713,7 @@ function VehicleCard({ vehicle, flags }) {
         <div>
           <strong>{vehicle.vin}</strong>
           <span>{vehicle.model}</span>
-          <small>{vehicle.variant || "Standard"} Â· {vehicle.colour || "Not set"}{vehicle.keyNo ? ` Â· Key No: ${vehicle.keyNo}` : ""}</small>
+          <small>{vehicle.variant || "Standard"} · {vehicle.colour || "Not set"}{vehicle.keyNo ? ` · Key No: ${vehicle.keyNo}` : ""}</small>
         </div>
       </div>
       <div className="vehicle-yard">
@@ -1721,6 +1724,17 @@ function VehicleCard({ vehicle, flags }) {
         <b>{statusText}</b>
         <small>{new Date(vehicle.lastChangedAt).toLocaleDateString("en-GB")}</small>
       </div>
+      {isAdmin && setState && (
+        <div className="vehicle-admin-actions">
+          <AdminVehicleDeleteButton
+            vin={vehicle.vin}
+            setState={setState}
+            compact
+            className="icon-btn vehicle-delete-btn"
+            label="Delete vehicle"
+          />
+        </div>
+      )}
     </article>
   );
 }

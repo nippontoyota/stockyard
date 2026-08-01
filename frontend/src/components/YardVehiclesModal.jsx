@@ -3,6 +3,7 @@ import { decodeVinDetails, flagLabel, createScan, applyScan, yardsByRegion, find
 import { bulkSync } from "../api.js";
 import { exportYardVehiclesExcel } from "../exportStockExcel.js";
 import { VehicleTimeline } from "./VehicleTimeline.jsx";
+import { AdminVehicleDeleteButton } from "./AdminVehicleDeleteButton.jsx";
 
 function driveLabel(value) {
   if (!value) return "";
@@ -404,6 +405,15 @@ export function YardVehiclesModal({ yard, state, setState, onClose, readOnly = f
                 vin={selectedVin}
                 scans={state?.scans?.filter((s) => s.vin === selectedVin) || []}
               />
+              {!readOnly && setState && (
+                <div className="vehicle-history-delete">
+                  <AdminVehicleDeleteButton
+                    vin={selectedVin}
+                    setState={setState}
+                    onDeleted={() => setSelectedVin(null)}
+                  />
+                </div>
+              )}
               {canMarkOut && setState && (
                 <AdminOutForm
                   key={selectedVin}

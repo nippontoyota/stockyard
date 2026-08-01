@@ -262,6 +262,18 @@ export function parseDeliveredVins(text) {
   return [...new Set(String(text || "").split(/\s|,|;|\t|\n|\r/).map(normalizeVin).filter(isValidVin))];
 }
 
+export function removeVehicleFromState(state, vin) {
+  const normalized = normalizeVin(vin);
+  const vehicles = { ...state.vehicles };
+  delete vehicles[normalized];
+  return {
+    ...state,
+    vehicles,
+    flags: (state.flags || []).filter((f) => f.vin !== normalized),
+    scans: (state.scans || []).filter((s) => s.vin !== normalized),
+  };
+}
+
 export function removeDeliveredVehicles(state, vins) {
   const deliveredVins = new Set(vins.map(normalizeVin).filter(isValidVin));
   const vehicles = Object.fromEntries(Object.entries(state.vehicles).filter(([vin]) => !deliveredVins.has(vin)));

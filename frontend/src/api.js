@@ -221,6 +221,12 @@ export async function adminUpdateVehicle(vin, fields) {
   });
 }
 
+export async function deleteAdminVehicle(vin) {
+  return apiFetch(`/api/admin/vehicles/${encodeURIComponent(String(vin).toUpperCase())}`, {
+    method: "DELETE",
+  });
+}
+
 export async function loginApi(username, password) {
   const res = await fetchWithRetry(`${API_BASE}/api/auth/login`, {
     method: "POST",

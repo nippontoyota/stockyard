@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { decodeVinDetails, updateVehicleDetails, findYardById, yardsByRegion } from "../stockyardLogic.js";
 import { adminUpdateVehicle } from "../api.js";
+import { AdminVehicleDeleteButton } from "./AdminVehicleDeleteButton.jsx";
 
 const DRIVE_TYPES = [
   { value: "", label: "Not set" },
@@ -293,12 +294,21 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
             </div>
 
             <footer className="vehicle-edit-actions">
-              <button type="button" className="cred-modal-cancel" onClick={closeEditor}>
-                Cancel
-              </button>
-              <button type="submit" className="primary" disabled={saving || !form.model.trim()}>
-                {saving ? "Saving…" : "Save vehicle"}
-              </button>
+              {setState && (
+                <AdminVehicleDeleteButton
+                  vin={editingVin}
+                  setState={setState}
+                  onDeleted={closeEditor}
+                />
+              )}
+              <div className="vehicle-edit-actions-main">
+                <button type="button" className="cred-modal-cancel" onClick={closeEditor}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary" disabled={saving || !form.model.trim()}>
+                  {saving ? "Saving…" : "Save vehicle"}
+                </button>
+              </div>
             </footer>
           </form>
         </div>
