@@ -243,6 +243,10 @@ export async function getBranchStock(branchId) {
   return apiFetch(`/api/branches/${branchId}/stock`);
 }
 
+export async function getBranchOverview(branchId) {
+  return apiFetch(`/api/branches/${branchId}/overview`);
+}
+
 export async function getRequisitions() {
   return apiFetch("/api/requisitions");
 }

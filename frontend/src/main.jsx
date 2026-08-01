@@ -43,6 +43,8 @@ import { usePwaInstall } from "./usePwaInstall.js";
 import { YARD_REGIONS } from "./yardData.js";
 import { AdminHome } from "./components/AdminDashboard.jsx";
 import { YardVehiclesModal } from "./components/YardVehiclesModal.jsx";
+import { DeliveryBranchStock } from "./components/DeliveryBranchStock.jsx";
+import { exportVehiclesExcel } from "./exportStockExcel.js";
 
 function getRoutePath(viewName, role) {
   if (role === "admin") {
@@ -1467,6 +1469,13 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
 }
 
 function StockView({ state, session }) {
+  if (session.role === "delivery_incharge") {
+    return <DeliveryBranchStock state={state} session={session} />;
+  }
+  return <StockInventoryView state={state} session={session} />;
+}
+
+function StockInventoryView({ state, session }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [model, setModel] = useState("all");
@@ -1474,6 +1483,7 @@ function StockView({ state, session }) {
   const [colour, setColour] = useState("all");
   const [yardId, setYardId] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const visibleVehicles = Object.values(state.vehicles).filter((vehicle) => session.role === "admin" || vehicle.currentYardId === session.yardId);
   const options = (key) => [...new Set(visibleVehicles.map((vehicle) => vehicle[key]).filter(Boolean))].sort();
@@ -1505,6 +1515,21 @@ function StockView({ state, session }) {
     .filter((vehicle) => `${vehicle.vin} ${vehicle.model} ${vehicle.variant || ""} ${vehicle.colour || ""}`.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => String(b.lastChangedAt || "").localeCompare(String(a.lastChangedAt || "")));
 
+  function handleExport() {
+    setExporting(true);
+    try {
+      const label = session.role === "admin" ? "all_stock" : findYardById(session.yardId)?.code || "yard_stock";
+      exportVehiclesExcel({
+        vehicles: rows,
+        flags: state.flags || [],
+        filename: label,
+        sheetName: session.role === "admin" ? "All Stock" : "Yard Stock",
+      });
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <section className="stack stock-container">
       <div className="stock-header-bar">
@@ -1513,6 +1538,15 @@ function StockView({ state, session }) {
           <h2>Live Stock ({rows.length})</h2>
         </div>
         <div className="stock-actions">
+          <button
+            type="button"
+            className="yard-export-btn"
+            disabled={!rows.length || exporting}
+            onClick={handleExport}
+          >
+            <span className="material-symbols-outlined">download</span>
+            <span>{exporting ? "Exporting…" : "Download Excel"}</span>
+          </button>
           <button
             type="button"
             className={`filter-toggle-btn ${activeFilterCount > 0 ? "active" : ""}`}

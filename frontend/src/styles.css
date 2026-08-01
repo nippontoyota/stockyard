@@ -1719,6 +1719,88 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   cursor: not-allowed;
 }
 
+.delivery-branch-stock .delivery-stock-subtitle {
+  margin: 4px 0 0;
+  color: #475569;
+  font-size: 14px;
+}
+.delivery-stock-loading,
+.delivery-stock-error {
+  padding: 1rem 0;
+}
+.delivery-yard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+.delivery-yard-card {
+  border: 1px solid #d7dee8;
+  border-radius: 10px;
+  background: #fff;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.delivery-yard-card h3 {
+  margin: 4px 0 0;
+  font-size: 16px;
+  color: #00152c;
+}
+.delivery-yard-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.delivery-yard-meta {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+.delivery-yard-stats {
+  text-align: right;
+  min-width: 72px;
+}
+.delivery-yard-stats strong {
+  display: block;
+  font-size: 22px;
+  line-height: 1;
+  color: #002046;
+}
+.delivery-yard-stats span {
+  font-size: 12px;
+  color: #64748b;
+}
+.delivery-yard-util {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+}
+.delivery-yard-util-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+.delivery-yard-util-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #166534, #22c55e);
+}
+.delivery-yard-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.delivery-yard-actions .btn-outline {
+  flex: 1;
+  min-height: 40px;
+}
+
 /* Admin Flag Resolution Action Buttons */
 .flag-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .flag-btn {
