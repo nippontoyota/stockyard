@@ -56,6 +56,7 @@ export function parseBulkSyncResponse(response) {
 }
 
 export const AUTH_EXPIRED_EVENT = "yard-auth-expired";
+export const SESSION_EXPIRED_MESSAGE = "Session expired. Please log in again.";
 
 function clearStoredSession() {
   localStorage.removeItem("yardSession");
@@ -65,6 +66,21 @@ function clearStoredSession() {
 export function notifyAuthExpired() {
   clearStoredSession();
   window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+}
+
+export function isAuthError(err) {
+  if (!err) return false;
+  if (err.status === 401) return true;
+  const msg = String(err.message || "");
+  return msg.includes("Session expired") || msg.includes("log in again");
+}
+
+export function humanizeApiError(err) {
+  if (isAuthError(err)) return SESSION_EXPIRED_MESSAGE;
+  if (String(err?.message || "").startsWith("HTTP ")) {
+    return "Server request failed. Please try again.";
+  }
+  return err?.message || "Something went wrong. Please try again.";
 }
 
 export async function getAuthHeaders() {
@@ -98,9 +114,9 @@ export async function apiFetch(endpoint, options = {}) {
       throw new Error(errMessage);
     }
   } catch (err) {
-    if (err.status === 401 && localStorage.getItem("yardSession")) {
+    if (err.status === 401) {
       notifyAuthExpired();
-      throw new Error("Session expired. Please log in again.");
+      throw new Error(SESSION_EXPIRED_MESSAGE);
     }
     throw err;
   }
