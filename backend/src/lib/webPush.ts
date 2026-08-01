@@ -3,13 +3,22 @@ import { db } from '../db/client.js';
 import { pushSubscriptions } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 
-const publicVapidKey = process.env.VAPID_PUBLIC_KEY || 'BL9rJDXqSOkX-bSi1XfgrqQxbv0VazOVJfgJPXTqXpC3qC-FZJAKAL8vt2Tb90Nzd2olfpbjv6Py4dKIqSjF79I';
-const privateVapidKey = process.env.VAPID_PRIVATE_KEY || 'IsxWBhTvT_QOorgwpLokuSd5BwInY3gKFUZv6UmlEuM';
-const subject = process.env.VAPID_SUBJECT || 'mailto:admin@nippontoyota.example.com';
+const publicVapidKey = process.env.VAPID_PUBLIC_KEY;
+const privateVapidKey = process.env.VAPID_PRIVATE_KEY;
+const subject = process.env.VAPID_SUBJECT || process.env.VAPID_EMAIL || 'mailto:admin@nippontoyota.example.com';
 
-webpush.setVapidDetails(subject, publicVapidKey, privateVapidKey);
+if (process.env.NODE_ENV === 'production' && (!publicVapidKey || !privateVapidKey)) {
+  console.warn('VAPID keys not set — push notifications disabled in production');
+} else {
+  webpush.setVapidDetails(
+    subject,
+    publicVapidKey || 'BL9rJDXqSOkX-bSi1XfgrqQxbv0VazOVJfgJPXTqXpC3qC-FZJAKAL8vt2Tb90Nzd2olfpbjv6Py4dKIqSjF79I',
+    privateVapidKey || 'IsxWBhTvT_QOorgwpLokuSd5BwInY3gKFUZv6UmlEuM',
+  );
+}
 
 export async function sendPushNotification(userId: string, payload: any) {
+  if (process.env.NODE_ENV === 'production' && (!publicVapidKey || !privateVapidKey)) return;
   try {
     const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.user_id, userId));
     

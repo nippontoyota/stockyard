@@ -1,7 +1,11 @@
 const API_BASE = import.meta.env.VITE_API_URL || "https://stockyard-00s6.onrender.com";
 
-// §2.2 — Retry with exponential backoff
 const FETCH_TIMEOUT_MS = 8000;
+
+function isRetryableError(err, status) {
+  if (status && status >= 400 && status < 500) return false;
+  return true;
+}
 
 async function fetchWithRetry(url, options = {}, retries = 3) {
   for (let i = 0; i < retries; i++) {
@@ -10,22 +14,56 @@ async function fetchWithRetry(url, options = {}, retries = 3) {
     try {
       const res = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeout);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const err = new Error(`HTTP ${res.status}`);
+        err.status = res.status;
+        if (isRetryableError(err, res.status) && i < retries - 1) {
+          await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+          continue;
+        }
+        throw err;
+      }
       return res;
     } catch (err) {
       clearTimeout(timeout);
-      if (i === retries - 1) throw err;
+      if (!isRetryableError(err, err.status) || i === retries - 1) throw err;
       await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
     }
   }
 }
 
+export function isNetworkError(err) {
+  if (!err) return false;
+  if (err.offline) return true;
+  if (err.name === "AbortError") return true;
+  if (err.status && err.status >= 400 && err.status < 500) return false;
+  return true;
+}
+
+export function parseBulkSyncResponse(response) {
+  const results = response?.results || [];
+  if (!results.length) {
+    throw new Error("Server returned no sync results.");
+  }
+  const rejected = results.filter((r) => r.status === "rejected");
+  if (rejected.length) {
+    const err = new Error(rejected[0].error || "Scan rejected by server.");
+    err.rejected = true;
+    err.results = results;
+    throw err;
+  }
+  return response;
+}
+
 export async function getAuthHeaders() {
   const session = JSON.parse(localStorage.getItem("yardSession") || "null");
   if (!session) return {};
-  const token = session.token || (session.role === "admin" ? "mock-admin"
-    : session.role === "delivery_incharge" ? `mock-delivery-${session.branchId}`
-    : `mock-yard-${session.yardId}`);
+  const token = session.token || (import.meta.env.DEV
+    ? session.role === "admin" ? "mock-admin"
+      : session.role === "delivery_incharge" ? `mock-delivery-${session.branchId}`
+      : `mock-yard-${session.yardId}`
+    : null);
+  if (!token) return {};
   return {
     "Authorization": `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -48,8 +86,7 @@ export async function apiFetch(endpoint, options = {}) {
   }
 }
 
-// §A3 — Dynamic yards/branches with localStorage cache
-const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const CACHE_TTL = 60 * 60 * 1000;
 
 function getCached(key) {
   try {
@@ -97,13 +134,13 @@ export async function bulkSync(scans) {
     } : {})
   }));
 
-  return apiFetch("/api/scans/bulk-sync", {
+  const response = await apiFetch("/api/scans/bulk-sync", {
     method: "POST",
     body: JSON.stringify({ scans: formattedScans }),
   });
+  return parseBulkSyncResponse(response);
 }
 
-// §1.3 — Paginated vehicle list
 export async function getVehicles(params = {}) {
   const { page = 1, limit = 1000, yardId, status, model } = params;
   let url = `/api/vehicles?page=${page}&limit=${limit}`;
@@ -143,11 +180,11 @@ export async function adminUpdateVehicle(vin, fields) {
 }
 
 export async function loginApi(username, password) {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
+  const res = await fetchWithRetry(`${API_BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
-  });
+  }, 2);
   if (!res.ok) {
     let msg = "Incorrect password or credentials. Please try again.";
     try {
@@ -156,7 +193,9 @@ export async function loginApi(username, password) {
         msg = b.error;
       }
     } catch {}
-    throw new Error(msg);
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
@@ -178,8 +217,6 @@ export async function uploadTransitListApi(vehicles) {
     body: JSON.stringify({ vehicles }),
   });
 }
-
-// --- Branches & Requisitions ---
 
 export async function createAdminBranch(name) {
   return apiFetch("/api/admin/branches", {
@@ -228,8 +265,6 @@ export async function rejectRequisition(id, reason = '') {
   });
 }
 
-// --- Notifications ---
-
 export async function getNotifications() {
   return apiFetch("/api/notifications");
 }
@@ -241,8 +276,6 @@ export async function markNotificationRead(id) {
 export async function markAllNotificationsRead() {
   return apiFetch("/api/notifications/read-all", { method: "POST" });
 }
-
-// --- §4.4 Data Export ---
 
 export async function downloadExport(type, params = {}) {
   const headers = await getAuthHeaders();

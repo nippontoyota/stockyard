@@ -27,7 +27,8 @@ import {
   bulkSync, getVehicles, getFlags, getScans, loginApi,
   getAdminBranches,
   getNotifications, getRequisitions,
-  getVehicleStatus
+  getVehicleStatus,
+  isNetworkError,
 } from "./api.js";
 import "./styles.css";
 
@@ -81,6 +82,21 @@ function getViewFromPath(pathname, role) {
   return "scan";
 }
 
+function mapApiRole(role) {
+  if (role === "yard") return "stockyard";
+  return role;
+}
+
+function sessionFromLogin(res, { name, yardId, branchId }) {
+  const role = mapApiRole(res.user.role);
+  return {
+    role,
+    yardId: res.user.yardId || yardId || null,
+    branchId: res.user.branch_id || branchId || null,
+    name,
+    token: res.token,
+  };
+}
 function getStoredSession() {
   try {
     return JSON.parse(localStorage.getItem("yardSession") || "null");
@@ -180,6 +196,7 @@ export default function App() {
     return snap ? new Date(snap.syncedAt) : null;
   });
   const [staleSnapshotAt, setStaleSnapshotAt] = useState(() => loadSnapshot(getStoredSession())?.syncedAt || null);
+  const [loadWarning, setLoadWarning] = useState("");
 
   useEffect(() => {
     // Yards are hardcoded in stockyardLogic â€” do not fetch (filtered API + cache
@@ -224,13 +241,25 @@ export default function App() {
     }
     try {
       const isDeliveryOrYard = session.role === "delivery_incharge" || session.role === "stockyard";
-      const [vehiclesData, flagsData, scansData, notifsData, reqsData] = await Promise.all([
-        getVehicles().catch(() => []),
-        getFlags().catch(() => []),
-        getScans().catch(() => []),
-        isDeliveryOrYard ? getNotifications().catch(() => []) : Promise.resolve([]),
-        isDeliveryOrYard ? getRequisitions().catch(() => ({ incoming: [], outgoing: [] })) : Promise.resolve({ incoming: [], outgoing: [] }),
-      ]);
+      const tasks = [
+        { key: "vehicles", run: () => getVehicles() },
+        { key: "flags", run: () => getFlags() },
+        { key: "scans", run: () => getScans() },
+        { key: "notifications", run: () => isDeliveryOrYard ? getNotifications() : Promise.resolve([]) },
+        { key: "requisitions", run: () => isDeliveryOrYard ? getRequisitions() : Promise.resolve({ incoming: [], outgoing: [] }) },
+      ];
+      const settled = await Promise.allSettled(tasks.map((t) => t.run()));
+      const failures = settled
+        .map((result, i) => (result.status === "rejected" ? tasks[i].key : null))
+        .filter(Boolean);
+
+      if (failures.length === tasks.length) {
+        throw new Error("All data endpoints failed");
+      }
+
+      const [vehiclesData, flagsData, scansData, notifsData, reqsData] = settled.map((result, i) =>
+        result.status === "fulfilled" ? result.value : (i === 4 ? { incoming: [], outgoing: [] } : [])
+      );
 
       const payload = mapServerResponse(vehiclesData, flagsData, scansData, notifsData, reqsData);
 
@@ -238,9 +267,11 @@ export default function App() {
       saveSnapshot(session, payload);
       setLastSyncedAt(new Date());
       setStaleSnapshotAt(null);
+      setLoadWarning(failures.length ? `Partial load — could not refresh: ${failures.join(", ")}` : "");
     } catch (err) {
       console.error("Failed to load backend data", err);
       hydrateFromSnapshot(session, setState, setLastSyncedAt, setStaleSnapshotAt);
+      setLoadWarning("Could not refresh data from server.");
     } finally {
       setDataReady(true);
     }
@@ -325,6 +356,7 @@ export default function App() {
         onLogout={() => {
           setSession(null);
           setStaleSnapshotAt(null);
+          setLoadWarning("");
           setDataReady(true);
           window.history.replaceState(null, "", "/");
         }}
@@ -335,6 +367,12 @@ export default function App() {
           <span>
             {!online ? "Offline" : "Could not refresh"} — showing data from {formatSnapshotAge(staleSnapshotAt)}
           </span>
+        </div>
+      )}
+      {loadWarning && !staleSnapshotAt && (
+        <div className="stale-data-banner" role="status">
+          <span className="material-symbols-outlined" aria-hidden="true">warning</span>
+          <span>{loadWarning}</span>
         </div>
       )}
       <main className="content">
@@ -461,39 +499,44 @@ function Login({ onLogin }) {
       }
     } catch (e) { }
 
-    // 2. Try online server login (or skip wait if locally valid)
-    if (isLocalValid) {
-      // Fire and forget, don't wait for the sleepy backend
-      loginApi(cleanUsername, cleanPassword).catch(() => { });
-
-      if (role === "admin") {
-        onLogin({ role: "admin", yardId: null, name: "Admin Console" });
-      } else if (role === "delivery_incharge") {
-        onLogin({ role: "delivery_incharge", branchId: branchId, name: `Delivery: ${targetBranch ? targetBranch.name : branchId}` });
-      } else {
-        onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
-      }
-      return;
-    }
-
+    // 2. Authenticate with server and store signed session token
     try {
       const res = await loginApi(cleanUsername, cleanPassword);
-      if (res && res.user) {
-        if (res.user.role === "admin") {
+      if (!res?.token || !res?.user) {
+        setErrorMsg("Invalid credentials. Please try again.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (res.user.role === "admin") {
+        onLogin(sessionFromLogin(res, { name: "Admin Console" }));
+      } else if (res.user.role === "delivery_incharge") {
+        const userBranchId = res.user.branch_id || branchId;
+        const userBranch = branches.find(b => b.id === userBranchId);
+        onLogin(sessionFromLogin(res, {
+          name: `Delivery: ${userBranch ? userBranch.name : userBranchId}`,
+          branchId: userBranchId,
+        }));
+      } else {
+        const yard = findYardById(res.user.yardId) || targetYard;
+        onLogin(sessionFromLogin(res, {
+          name: yard.name,
+          yardId: yard.id,
+        }));
+      }
+      return;
+    } catch (apiErr) {
+      if (isLocalValid && import.meta.env.DEV) {
+        if (role === "admin") {
           onLogin({ role: "admin", yardId: null, name: "Admin Console" });
-        } else if (res.user.role === "delivery_incharge") {
-          const userBranchId = res.user.branch_id || branchId;
-          const userBranch = branches.find(b => b.id === userBranchId);
-          onLogin({ role: "delivery_incharge", branchId: userBranchId, name: `Delivery: ${userBranch ? userBranch.name : userBranchId}` });
+        } else if (role === "delivery_incharge") {
+          onLogin({ role: "delivery_incharge", branchId: branchId, name: `Delivery: ${targetBranch ? targetBranch.name : branchId}` });
         } else {
-          const yard = findYardById(res.user.yardId) || targetYard;
-          onLogin({ role: "stockyard", yardId: yard.id, name: yard.name });
+          onLogin({ role: "stockyard", yardId: targetYard.id, name: targetYard.name });
         }
         return;
       }
-    } catch (apiErr) {
-      // Backend failed and local was false, show error
-      setErrorMsg("Invalid credentials. Please try again.");
+      setErrorMsg(apiErr.message || "Invalid credentials. Please try again.");
     }
 
     setIsLoading(false);
@@ -959,16 +1002,23 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     const newFlags = result.state.flags.filter(f => f.vin === scan.vin && !f.resolved);
     const resultType = newFlags.length ? "flagged" : "success";
 
-    try {
-      if (!online) throw new Error("Offline");
+        try {
+      if (!online) throw Object.assign(new Error("Offline"), { offline: true });
       await bulkSync([scan]);
       finishSubmit(result.state, resultType, result.message, newFlags.map(f => flagLabel(f.type)));
     } catch (err) {
-      // Item 9: Offline or failed â†’ enqueue to IndexedDB
-      await enqueueScan(scan);
-      setPendingCount(c => c + 1);
-      finishSubmit(result.state, resultType, result.message + " (Saved offline)", newFlags.map(f => flagLabel(f.type)));
+      if (err.rejected) {
+        return setOverlayResult({ type: "error", message: err.message });
+      }
+      if (isNetworkError(err)) {
+        await enqueueScan(scan);
+        setPendingCount(c => c + 1);
+        finishSubmit(result.state, resultType, result.message + " (Saved offline)", newFlags.map(f => flagLabel(f.type)));
+        return;
+      }
+      setOverlayResult({ type: "error", message: err.message || "Sync failed. Please try again." });
     }
+
   }
 
   async function submit(event) {

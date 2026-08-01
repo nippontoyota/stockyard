@@ -1,10 +1,12 @@
 import { Router } from 'express';
-import { z } from 'zod';
 import { db } from '../db/client.js';
 import { branches, branchYards, yards } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { authenticate, requireRole } from '../middleware/auth.js';
 
 const router = Router();
+router.use(authenticate);
+router.use(requireRole('admin'));
 
 router.get('/', async (req, res, next) => {
   try {

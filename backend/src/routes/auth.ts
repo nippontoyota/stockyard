@@ -13,6 +13,8 @@ import {
   normalizeUsername,
   legacyUsername,
 } from '../lib/credentials.js';
+import { signSessionToken } from '../lib/session.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
 
 export const authRouter = Router();
 
@@ -137,6 +139,12 @@ authRouter.post('/login', async (req: Request, res: Response) => {
       if (user.password === cleanPassword) {
         return res.json({
           success: true,
+          token: signSessionToken({
+            id: user.id,
+            role: user.role,
+            yard_id: user.yard_id,
+            branch_id: user.branch_id,
+          }),
           user: {
             username: user.username,
             role: user.role,
@@ -158,7 +166,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
 /**
  * GET /api/admin/credentials
  */
-authRouter.get('/credentials', async (req: Request, res: Response) => {
+authRouter.get('/credentials', authenticate, requireRole('admin'), async (req: Request, res: Response) => {
   try {
     await seedDefaultCredentials();
     const rows = await db.select().from(credentials);
@@ -201,7 +209,7 @@ authRouter.get('/credentials', async (req: Request, res: Response) => {
 /**
  * POST /api/admin/credentials/update
  */
-authRouter.post('/credentials/update', async (req: Request, res: Response) => {
+authRouter.post('/credentials/update', authenticate, requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {

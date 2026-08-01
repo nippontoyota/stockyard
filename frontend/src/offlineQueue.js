@@ -1,6 +1,6 @@
 /**
- * §2.1 — IndexedDB offline scan queue.
- * Zero dependencies. Stores scans when offline, drains on reconnect.
+ * IndexedDB offline scan queue.
+ * Stores scans when offline, drains on reconnect.
  */
 
 const DB_NAME = 'stockyard-offline';
@@ -73,42 +73,43 @@ export async function removeScan(clientScanId) {
 
 /**
  * Drain the queue with exponential backoff retry.
- * Item 9: Per-scan sync tracking — only remove scans confirmed synced by server.
- * @param {Function} bulkSyncFn - async function that sends scans to server, returns { results: [...] }
- * @returns {{ synced: number, failed: number }}
+ * Only removes scans confirmed accepted or already_processed by server.
  */
 export async function drainQueue(bulkSyncFn, maxRetries = 3) {
   const pending = await getPendingScans();
-  if (!pending.length) return { synced: 0, failed: 0 };
+  if (!pending.length) return { synced: 0, failed: 0, rejected: 0 };
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await bulkSyncFn(pending);
-      // Per-scan: remove only those that the server accepted or already processed
       const results = response?.results || [];
+      if (!results.length) {
+        throw new Error('Server returned no sync results');
+      }
       let synced = 0;
       let failed = 0;
+      let rejected = 0;
       for (const r of results) {
-        if (r.status === 'accepted' || r.status === 'already_processed' || r.status === 'rejected') {
+        if (r.status === 'accepted' || r.status === 'already_processed') {
           await removeScan(r.client_scan_id);
           synced++;
+        } else if (r.status === 'rejected') {
+          rejected++;
         } else {
           failed++;
         }
       }
-      // If server returned no results array, fall back to clearing all (legacy compat)
-      if (!results.length && pending.length) {
-        await clearPendingScans();
-        return { synced: pending.length, failed: 0 };
-      }
-      return { synced, failed };
+      return { synced, failed, rejected };
     } catch (err) {
+      if (err.rejected) {
+        return { synced: 0, failed: 0, rejected: pending.length };
+      }
       if (attempt === maxRetries - 1) {
         console.error('[offline-queue] Failed after retries:', err);
-        return { synced: 0, failed: pending.length };
+        return { synced: 0, failed: pending.length, rejected: 0 };
       }
       await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
     }
   }
-  return { synced: 0, failed: pending.length };
+  return { synced: 0, failed: pending.length, rejected: 0 };
 }
