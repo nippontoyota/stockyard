@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { eq, and, sql, count, desc } from 'drizzle-orm';
+import { eq, and, sql, count, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { vehicles, vehicleStatus, scans, flags } from '../db/schema.js';
+import { vehicles, vehicleStatus, scans, flags, requisitions, notifications } from '../db/schema.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { isValidVin, detectModel } from '../lib/vin.js';
 
@@ -287,6 +287,54 @@ router.patch('/vehicles/:vin', async (req, res, next) => {
       .where(eq(vehicles.id, vehicle.id));
 
     res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── DELETE /vehicles/:vin ───────────────────────────────────────────
+
+router.delete('/vehicles/:vin', async (req, res, next) => {
+  try {
+    const vin = req.params.vin.toUpperCase();
+
+    const [vehicle] = await db
+      .select({ id: vehicles.id })
+      .from(vehicles)
+      .where(eq(vehicles.vin, vin));
+
+    if (!vehicle) {
+      res.status(404).json({ error: 'Vehicle not found' });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      const vehicleId = vehicle.id;
+
+      const reqs = await tx
+        .select({ id: requisitions.id })
+        .from(requisitions)
+        .where(eq(requisitions.vehicle_id, vehicleId));
+      const reqIds = reqs.map((r) => r.id);
+
+      if (reqIds.length) {
+        await tx.delete(notifications).where(inArray(notifications.related_req_id, reqIds));
+        await tx.delete(requisitions).where(eq(requisitions.vehicle_id, vehicleId));
+      }
+
+      await tx.delete(flags).where(eq(flags.vehicle_id, vehicleId));
+
+      await tx
+        .update(vehicleStatus)
+        .set({ last_in_scan_id: null, last_out_scan_id: null })
+        .where(eq(vehicleStatus.vehicle_id, vehicleId));
+
+      await tx.delete(scans).where(eq(scans.vehicle_id, vehicleId));
+      await tx.delete(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
+      await tx.delete(vehicles).where(eq(vehicles.id, vehicleId));
+    });
+
+    res.json({ vin, deleted: true });
   } catch (err) {
     next(err);
   }
