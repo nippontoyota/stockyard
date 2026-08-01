@@ -6,6 +6,19 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
+router.get('/list', async (_req, res, next) => {
+  try {
+    const rows = await db
+      .select({ id: branches.id, name: branches.name })
+      .from(branches)
+      .where(eq(branches.active, true))
+      .orderBy(branches.name);
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.use(authenticate);
 
 // Branch overview: yards + stock counts for delivery incharge and admin

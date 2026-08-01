@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getAdminBranches, getBranchStock, createRequisition, approveRequisition, rejectRequisition } from "../api.js";
+import { getBranchesForLogin, getBranchStock, createRequisition, approveRequisition, rejectRequisition } from "../api.js";
 import "../corporate-modern.css";
 
 const ACTIVE_STATUSES = new Set(["pending", "approved"]);
@@ -245,7 +245,7 @@ function CreateRequisitionModal({ session, onClose, onRefresh }) {
   const [selectedVin, setSelectedVin] = useState("");
 
   useEffect(() => {
-    getAdminBranches()
+    getBranchesForLogin()
       .then((res) => {
         const list = (res || []).filter((b) => b.id !== session.branchId);
         setBranches(list);
