@@ -55,6 +55,18 @@ export function parseBulkSyncResponse(response) {
   return response;
 }
 
+export const AUTH_EXPIRED_EVENT = "yard-auth-expired";
+
+function clearStoredSession() {
+  localStorage.removeItem("yardSession");
+  localStorage.removeItem("cache:branches");
+}
+
+export function notifyAuthExpired() {
+  clearStoredSession();
+  window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+}
+
 export async function getAuthHeaders() {
   const session = JSON.parse(localStorage.getItem("yardSession") || "null");
   if (!session) return {};
@@ -72,17 +84,25 @@ export async function getAuthHeaders() {
 
 export async function apiFetch(endpoint, options = {}) {
   const headers = await getAuthHeaders();
-  const response = await fetchWithRetry(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers: { ...headers, ...options.headers },
-    cache: "no-store",
-  });
-  let errMessage = "Server request failed. Please try again.";
   try {
-    const body = await response.json();
-    return body;
-  } catch (e) {
-    throw new Error(errMessage);
+    const response = await fetchWithRetry(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers: { ...headers, ...options.headers },
+      cache: "no-store",
+    });
+    let errMessage = "Server request failed. Please try again.";
+    try {
+      const body = await response.json();
+      return body;
+    } catch (e) {
+      throw new Error(errMessage);
+    }
+  } catch (err) {
+    if (err.status === 401 && localStorage.getItem("yardSession")) {
+      notifyAuthExpired();
+      throw new Error("Session expired. Please log in again.");
+    }
+    throw err;
   }
 }
 
@@ -103,6 +123,12 @@ function getCached(key) {
 
 function setCache(key, data) {
   localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
+}
+
+export async function getBranchesForLogin() {
+  const res = await fetch(`${API_BASE}/api/branches/list`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Could not load branches.");
+  return res.json();
 }
 
 export async function getAdminBranches() {

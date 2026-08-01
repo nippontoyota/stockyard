@@ -26,6 +26,8 @@ import {
 import {
   bulkSync, getVehicles, getFlags, getScans, loginApi,
   getAdminBranches,
+  getBranchesForLogin,
+  AUTH_EXPIRED_EVENT,
   getNotifications, getRequisitions,
   getVehicleStatus,
   isNetworkError,
@@ -101,7 +103,13 @@ function sessionFromLogin(res, { name, yardId, branchId }) {
 }
 function getStoredSession() {
   try {
-    return JSON.parse(localStorage.getItem("yardSession") || "null");
+    const session = JSON.parse(localStorage.getItem("yardSession") || "null");
+    if (!session) return null;
+    if (!import.meta.env.DEV && !session.token) {
+      localStorage.removeItem("yardSession");
+      return null;
+    }
+    return session;
   } catch {
     return null;
   }
@@ -199,12 +207,26 @@ export default function App() {
   });
   const [staleSnapshotAt, setStaleSnapshotAt] = useState(() => loadSnapshot(getStoredSession())?.syncedAt || null);
   const [loadWarning, setLoadWarning] = useState("");
+  const [authExpiredMessage, setAuthExpiredMessage] = useState("");
+
+  useEffect(() => {
+    const onAuthExpired = () => {
+      setSession(null);
+      setStaleSnapshotAt(null);
+      setLoadWarning("");
+      setDataReady(true);
+      setAuthExpiredMessage("Your session expired after a security update. Please log in again.");
+      window.history.replaceState(null, "", "/");
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
+  }, []);
 
   useEffect(() => {
     // Yards are hardcoded in stockyardLogic â€” do not fetch (filtered API + cache
     // was causing login to show only the previously selected yard after logout).
     localStorage.removeItem("cache:yards");
-    getAdminBranches()
+    getBranchesForLogin()
       .then((newBranches) => setConfig(null, newBranches))
       .catch((e) => console.error("Failed to load branches config", e));
   }, []);
@@ -329,6 +351,7 @@ export default function App() {
   };
 
   if (!session) return <Login onLogin={(nextSession) => {
+    setAuthExpiredMessage("");
     setDataReady(false);
     setStaleSnapshotAt(null);
     const snap = loadSnapshot(nextSession);
@@ -342,7 +365,7 @@ export default function App() {
     const initialView = nextSession.role === "admin" ? "dashboard" : nextSession.role === "delivery_incharge" ? "requisitions" : "scan";
     setView(initialView);
     window.history.replaceState(null, "", getRoutePath(initialView, nextSession.role));
-  }} />;
+  }} authExpiredMessage={authExpiredMessage} />;
 
   const isAdmin = session.role === "admin";
   const stats = dashboard(state, isAdmin ? null : session.yardId);
@@ -413,7 +436,7 @@ export default function App() {
   );
 }
 
-function Login({ onLogin }) {
+function Login({ onLogin, authExpiredMessage = "" }) {
   const [role, setRole] = useState("stockyard");
   const [region, setRegion] = useState(YARD_REGIONS[0]);
   const [yardId, setYardId] = useState(() => yards.find((y) => y.city === YARD_REGIONS[0])?.id || yards[0]?.id || "");
@@ -436,7 +459,7 @@ function Login({ onLogin }) {
   }, [region, regionYards, yardId]);
 
   useEffect(() => {
-    getAdminBranches().then(res => {
+    getBranchesForLogin().then(res => {
       if (res && res.length > 0) {
         setBranches(res);
         setBranchId(prev => res.some(b => b.id === prev) ? prev : res[0].id);
@@ -560,6 +583,7 @@ function Login({ onLogin }) {
           </div>
           <p>Select your yard location and enter password to sign in.</p>
 
+          {authExpiredMessage && <div className="notice bad" role="alert">{authExpiredMessage}</div>}
           {errorMsg && <div className="notice bad">{errorMsg}</div>}
 
           <form onSubmit={submit} className="stack">
