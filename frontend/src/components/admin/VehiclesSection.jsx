@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { yards } from "../../stockyardLogic.js";
 import { downloadExport } from "../../api.js";
+import { exportVehiclesExcel } from "../../exportStockExcel.js";
 import { AllVehiclesTab } from "../AllVehiclesTab.jsx";
 import { TransitUploadTab } from "../TransitUploadTab.jsx";
 import { ManualOverride } from "./ManualOverride.jsx";
@@ -27,7 +28,7 @@ export function VehiclesSection({
     }
   }, [editVinRequest?.tool]);
 
-  async function handleExport(type, params, label) {
+  async function handleCsvExport(type, params, label) {
     setExporting(label);
     try {
       await downloadExport(type, params);
@@ -39,6 +40,26 @@ export function VehiclesSection({
     }
   }
 
+  function handleExcelExport(vehicles, label, filename) {
+    setExporting(label);
+    try {
+      exportVehiclesExcel({
+        vehicles,
+        flags: state.flags || [],
+        filename,
+        sheetName: label,
+      });
+      toast(`Downloaded ${label}.`);
+    } catch (err) {
+      onError(err.message || "Export failed.");
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  const allVehicles = Object.values(state.vehicles || {});
+  const inVehicles = allVehicles.filter((v) => v.currentStatus === "in");
+
   return (
     <div className="admin-section stack">
       <div className="admin-section-intro">
@@ -47,39 +68,42 @@ export function VehiclesSection({
       </div>
 
       <div className="admin-export-row">
-        <span className="field-hint">Export CSV</span>
+        <span className="field-hint">Download Excel</span>
         <div className="admin-export-buttons">
           <button
             type="button"
-            className="btn btn-outline"
-            disabled={!!exporting}
-            onClick={() => handleExport("stock", {}, "all stock")}
+            className="yard-export-btn"
+            disabled={!!exporting || !allVehicles.length}
+            onClick={() => handleExcelExport(allVehicles, "All stock", "all_stock")}
           >
-            {exporting === "all stock" ? "Exporting…" : "All stock"}
+            <span className="material-symbols-outlined">download</span>
+            <span>{exporting === "All stock" ? "Exporting…" : "All vehicles"}</span>
+          </button>
+          <button
+            type="button"
+            className="yard-export-btn"
+            disabled={!!exporting || !inVehicles.length}
+            onClick={() => handleExcelExport(inVehicles, "IN stock", "in_stock")}
+          >
+            <span className="material-symbols-outlined">download</span>
+            <span>{exporting === "IN stock" ? "Exporting…" : "IN only"}</span>
+          </button>
+          <button
+            type="button"
+            className="yard-export-btn"
+            disabled={!!exporting || !transitVehicles.length}
+            onClick={() => handleExcelExport(transitVehicles, "In transit", "in_transit")}
+          >
+            <span className="material-symbols-outlined">download</span>
+            <span>{exporting === "In transit" ? "Exporting…" : "In transit"}</span>
           </button>
           <button
             type="button"
             className="btn btn-outline"
             disabled={!!exporting}
-            onClick={() => handleExport("stock", { status: "in" }, "vehicles IN")}
+            onClick={() => handleCsvExport("flags", { resolved: "false" }, "open flags CSV")}
           >
-            {exporting === "vehicles IN" ? "Exporting…" : "IN only"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline"
-            disabled={!!exporting}
-            onClick={() => handleExport("stock", { status: "transit" }, "in transit")}
-          >
-            {exporting === "in transit" ? "Exporting…" : "In transit"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline"
-            disabled={!!exporting}
-            onClick={() => handleExport("flags", { resolved: "false" }, "open flags")}
-          >
-            {exporting === "open flags" ? "Exporting…" : "Open flags"}
+            {exporting === "open flags CSV" ? "Exporting…" : "Open flags (CSV)"}
           </button>
         </div>
       </div>

@@ -6,8 +6,6 @@ import { authenticate, optionalAuthenticate } from '../middleware/auth.js';
 
 const router = Router();
 
-// ─── GET / ───────────────────────────────────────────────────────────
-
 router.get('/', optionalAuthenticate, async (req, res, next) => {
   try {
     if (req.user?.role === 'stockyard') {
@@ -40,10 +38,11 @@ router.get('/', optionalAuthenticate, async (req, res, next) => {
 
 // ─── GET /:id/stock ──────────────────────────────────────────────────
 
-router.get('/:id/stock', async (req, res, next) => {
+router.get('/:id/stock', authenticate, async (req, res, next) => {
   try {
+    const yardId = String(req.params.id);
     // Stockyard users can only see their own yard
-    if (req.user!.role === 'stockyard' && req.user!.yard_id !== req.params.id) {
+    if (req.user!.role === 'stockyard' && req.user!.yard_id !== yardId) {
       res.status(403).json({ error: 'Access denied to this yard' });
       return;
     }
@@ -59,7 +58,7 @@ router.get('/:id/stock', async (req, res, next) => {
       .innerJoin(vehicles, eq(vehicleStatus.vehicle_id, vehicles.id))
       .where(
         and(
-          eq(vehicleStatus.current_yard_id, req.params.id),
+          eq(vehicleStatus.current_yard_id, yardId),
           eq(vehicleStatus.current_status, 'in'),
         ),
       )
@@ -73,9 +72,10 @@ router.get('/:id/stock', async (req, res, next) => {
 
 // ─── GET /:id/utilization ────────────────────────────────────────────
 
-router.get('/:id/utilization', async (req, res, next) => {
+router.get('/:id/utilization', authenticate, async (req, res, next) => {
   try {
-    if (req.user!.role === 'stockyard' && req.user!.yard_id !== req.params.id) {
+    const yardId = String(req.params.id);
+    if (req.user!.role === 'stockyard' && req.user!.yard_id !== yardId) {
       res.status(403).json({ error: 'Access denied to this yard' });
       return;
     }
@@ -83,7 +83,7 @@ router.get('/:id/utilization', async (req, res, next) => {
     const [yard] = await db
       .select({ capacity: yards.capacity, name: yards.name, code: yards.code })
       .from(yards)
-      .where(eq(yards.id, req.params.id));
+      .where(eq(yards.id, yardId));
 
     if (!yard) {
       res.status(404).json({ error: 'Yard not found' });
@@ -95,7 +95,7 @@ router.get('/:id/utilization', async (req, res, next) => {
       .from(vehicleStatus)
       .where(
         and(
-          eq(vehicleStatus.current_yard_id, req.params.id),
+          eq(vehicleStatus.current_yard_id, yardId),
           eq(vehicleStatus.current_status, 'in'),
         ),
       );
