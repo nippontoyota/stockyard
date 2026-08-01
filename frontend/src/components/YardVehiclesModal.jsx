@@ -138,7 +138,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         </div>
       </div>
 
-      <label htmlFor="admin-out-reason">OUT reason</label>
+      <label className="admin-out-field-label" htmlFor="admin-out-reason">OUT reason</label>
       <select
         id="admin-out-reason"
         value={outRemark}
@@ -159,7 +159,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
 
       {outRemark === "stockyard_transfer" && (
         <>
-          <label htmlFor="admin-out-dest">Transfer destination</label>
+          <label className="admin-out-field-label" htmlFor="admin-out-dest">Transfer destination</label>
           <select
             id="admin-out-dest"
             value={transferDestinationYardId}
@@ -183,7 +183,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
             })}
           </select>
 
-          <label htmlFor="admin-out-requester">Requested by</label>
+          <label className="admin-out-field-label" htmlFor="admin-out-requester">Requested by</label>
           <input
             id="admin-out-requester"
             value={transferRequestedBy}
@@ -197,7 +197,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         </>
       )}
 
-      <label htmlFor="admin-out-key">Key No.</label>
+      <label className="admin-out-field-label" htmlFor="admin-out-key">Key No.</label>
       <input
         id="admin-out-key"
         value={keyNo}
@@ -205,7 +205,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         placeholder="Optional, e.g. K-101"
       />
 
-      <label htmlFor="admin-out-drive">Drive type</label>
+      <label className="admin-out-field-label" htmlFor="admin-out-drive">Drive type</label>
       <select
         id="admin-out-drive"
         value={driveType}

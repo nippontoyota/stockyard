@@ -1570,11 +1570,17 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .nested-modal-overlay {
   z-index: 1100;
 }
-.vehicle-history-modal {
+.modal-content.vehicle-history-modal {
   width: min(600px, 100%);
   max-height: min(90vh, 720px);
   overflow: auto;
   padding: 20px;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.3);
+  border: 1px solid #d7dee3;
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .vehicle-history-header {
   display: flex;
@@ -1585,6 +1591,9 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 }
 .vehicle-history-header h3 {
   margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #002046;
 }
 
 @keyframes fadeIn {
@@ -3209,6 +3218,7 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #f8fafc;
+  color: #111827;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -3235,10 +3245,14 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   font-size: 13px;
   color: #4b5563;
 }
+.admin-out-field-label,
 .admin-out-panel label:not(.check) {
+  display: block;
   font-size: 12px;
   font-weight: 700;
-  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #1f2937;
   margin-top: 4px;
 }
 .admin-out-panel select,
@@ -3252,6 +3266,15 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   font: inherit;
   background: #fff;
   color: #111827;
+}
+.admin-out-panel input::placeholder,
+.admin-out-panel textarea::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+.admin-out-panel select option {
+  color: #111827;
+  background: #ffffff;
 }
 .admin-out-panel textarea {
   min-height: 72px;
@@ -3270,6 +3293,7 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
   margin: 0 0 12px;
   font-size: 16px;
   font-weight: 800;
+  color: #111827;
 }
 .admin-out-summary {
   margin: 0;
