@@ -824,6 +824,35 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     }
   }
 
+  const discardScan = useCallback(({ reopenCamera = false } = {}) => {
+    setVin("");
+    setOutRemark("");
+    setTransferDestinationYardId("");
+    setTransferRequestedBy("");
+    setKeyNo("");
+    setDriveType("");
+    setDamaged(false);
+    setDamageRemark("");
+    setDamageImage("");
+    setScanSuccess(null);
+    setMessage(null);
+    setOverlayResult(null);
+    scanLockedRef.current = false;
+    if (reopenCamera) {
+      setTorchOn(false);
+      setCameraOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!scanSuccess) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") discardScan();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [scanSuccess, discardScan]);
+
   const signalScanSuccess = useCallback(() => {
     if (navigator.vibrate?.([200])) return;
     try {
@@ -1202,7 +1231,22 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
             )}
           </button>
           {scanSuccess && (
-            <div className="scan-result-popover" aria-live="polite">
+            <>
+              <button
+                type="button"
+                className="scan-popover-backdrop"
+                aria-label="Discard scan"
+                onClick={() => discardScan()}
+              />
+              <div className="scan-result-popover" aria-live="polite" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="scan-popover-close"
+                  aria-label="Discard scan"
+                  onClick={() => discardScan()}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">close</span>
+                </button>
               <span className="material-symbols-outlined">check_circle</span>
               <div>
                 <b>VIN {scanSuccess} scanned.</b>
@@ -1322,8 +1366,14 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                 </div>
               )}
               {message && <small className={`scan-popover-message ${message.kind}`}>{message.text}</small>}
-              <button className="primary scan-submit-button">Submit {scanType.toUpperCase()}</button>
+              <div className="scan-popover-actions">
+                <button type="button" className="ghost scan-discard-button" onClick={() => discardScan()}>
+                  Discard
+                </button>
+                <button className="primary scan-submit-button">Submit {scanType.toUpperCase()}</button>
+              </div>
             </div>
+            </>
           )}
           <p className="scan-camera-hint">
             {cameraOpen
@@ -1375,21 +1425,9 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
           }} placeholder="Enter VIN" aria-live={scanSuccess ? "polite" : undefined} />
           {!scanSuccess && <button className="primary">Submit {manualScanType.toUpperCase()}</button>}
           {scanSuccess && (
-            <button type="button" className="scan-next-button" onClick={() => {
-              setVin("");
-              setOutRemark("");
-              setTransferDestinationYardId("");
-              setTransferRequestedBy("");
-              setKeyNo("");
-              setDamaged(false);
-              setDamageRemark("");
-              setDamageImage("");
-              setScanSuccess(null);
-              setMessage(null);
-              scanLockedRef.current = false;
-              setTorchOn(false);
-              setCameraOpen(true);
-            }}>Scan next</button>
+            <button type="button" className="scan-next-button" onClick={() => discardScan({ reopenCamera: true })}>
+              Scan next
+            </button>
           )}
         </div>
         {!scanSuccess && (

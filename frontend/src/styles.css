@@ -318,11 +318,63 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .scan-box .torch-toggle[aria-pressed="true"] { background: #EB0A1E; color: #ffffff; border-color: #EB0A1E; }
 .scan-result-popover {
   position: absolute; z-index: 3; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: min(340px, calc(100% - 32px)); min-height: 78px; padding: 14px 16px;
+  width: min(340px, calc(100% - 32px)); min-height: 78px; padding: 38px 16px 14px;
   display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 10px;
   background: #fff; color: #000; border: 3px solid #EB0A1E; border-radius: 8px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, .26);
   max-height: calc(100% - 24px); overflow-y: auto;
+}
+.scan-popover-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+}
+.scan-popover-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.scan-popover-close:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+.scan-popover-close .material-symbols-outlined {
+  font-size: 20px;
+  color: inherit;
+}
+.scan-popover-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.scan-discard-button {
+  min-height: 46px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  font-weight: 700;
+}
+.scan-discard-button:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
 }
 .scan-result-popover .material-symbols-outlined { color: #EB0A1E; font-size: 28px; }
 .scan-result-popover b { font-size: 16px; line-height: 1.25; overflow-wrap: anywhere; }
@@ -333,6 +385,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .scan-result-popover .damage-inputs,
 .scan-result-popover .scan-damage-check,
 .scan-result-popover .scan-submit-button,
+.scan-result-popover .scan-popover-actions,
 .scan-result-popover .scan-popover-message,
 .scan-result-popover .notice {
   grid-column: 1 / -1;
