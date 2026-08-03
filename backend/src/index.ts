@@ -23,6 +23,8 @@ import { checkDwellAlerts } from './lib/dwellCheck.js';
 import { ensureBuckets } from './lib/supabase.js';
 import uploadRoutes from './routes/upload.js';
 import pushRoutes from './routes/pushSubscriptions.js';
+import { db } from './db/client.js';
+import { sql } from 'drizzle-orm';
 
 const app = express();
 const httpServer = createServer(app);
@@ -111,6 +113,10 @@ httpServer.listen(port, '0.0.0.0', () => {
   console.log(`Stockyard API listening on port ${port}`);
 
   ensureBuckets();
+
+  db.execute(
+    sql`ALTER TABLE requisitions ADD COLUMN IF NOT EXISTS destination_yard_id text REFERENCES yards(id)`,
+  ).catch((err) => console.error('Failed to ensure destination_yard_id column:', err));
 
   // F6 — Run dwell check every 6 hours
   checkDwellAlerts().catch(console.error);

@@ -320,10 +320,14 @@ export async function getRequisitions() {
   return apiFetch("/api/requisitions");
 }
 
-export async function createRequisition(sourceBranchId, vehicleId) {
+export async function createRequisition(sourceBranchId, vehicleId, destinationYardId) {
   return apiFetch("/api/requisitions", {
     method: "POST",
-    body: JSON.stringify({ source_branch_id: sourceBranchId, vehicle_id: vehicleId }),
+    body: JSON.stringify({
+      source_branch_id: sourceBranchId,
+      vehicle_id: vehicleId,
+      destination_yard_id: destinationYardId,
+    }),
   });
 }
 
