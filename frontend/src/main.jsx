@@ -645,7 +645,7 @@ function Login({ onLogin, authExpiredMessage = "" }) {
                   <select id="yardSelect" value={yardId} onChange={handleYardChange} required>
                     {regionYards.map((yard) => (
                       <option key={yard.id} value={yard.id}>
-                        {yard.code} Â· {yard.name}
+                        {yard.code} · {yard.name}
                       </option>
                     ))}
                   </select>
@@ -1300,11 +1300,13 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                 >
                   <span className="material-symbols-outlined" aria-hidden="true">close</span>
                 </button>
-              <span className="material-symbols-outlined">check_circle</span>
-              <div>
-                <b>VIN {scanSuccess} scanned.</b>
-                <small>Ready for vehicle {scanType.toUpperCase()}.</small>
-              </div>
+                <div className="scan-popover-header">
+                  <span className="material-symbols-outlined scan-popover-status-icon" aria-hidden="true">check_circle</span>
+                  <div className="scan-popover-summary">
+                    <b>VIN {scanSuccess} scanned.</b>
+                    <small>Ready for vehicle {scanType.toUpperCase()}.</small>
+                  </div>
+                </div>
               {scanType === "in" && (
                 <select
                   value={carModel}
@@ -1349,7 +1351,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                       return (
                         <optgroup key={region} label={region}>
                           {options.map((y) => (
-                            <option key={y.id} value={y.id}>{y.code} Â· {y.name}</option>
+                            <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
                           ))}
                         </optgroup>
                       );
@@ -1380,7 +1382,6 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                   setMessage(null);
                 }}
                 aria-label="Drive type"
-                style={{ marginTop: '8px' }}
               >
                 <option value="">Select Drive Type</option>
                 <option value="neo_drive">Neo Drive</option>
@@ -1389,7 +1390,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                 <option value="diesel">Diesel</option>
               </select>
               {isFlagged && (
-                <div className="notice warn" style={{ marginTop: '12px', marginBottom: '12px' }}>
+                <div className="notice warn">
                   <strong>Active Flag:</strong> A photo of the vehicle is required to complete this scan.
                 </div>
               )}
@@ -1524,7 +1525,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                         return (
                           <optgroup key={region} label={region}>
                             {options.map((y) => (
-                              <option key={y.id} value={y.id}>{y.code} Â· {y.name}</option>
+                              <option key={y.id} value={y.id}>{y.code} · {y.name}</option>
                             ))}
                           </optgroup>
                         );

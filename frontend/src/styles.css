@@ -325,12 +325,27 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .scan-box .torch-toggle:hover { transform: scale(1.08); background: #002046; }
 .scan-box .torch-toggle[aria-pressed="true"] { background: #EB0A1E; color: #ffffff; border-color: #EB0A1E; }
 .scan-result-popover {
-  position: absolute; z-index: 3; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: min(340px, calc(100% - 32px)); min-height: 78px; padding: 38px 16px 14px;
-  display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 10px;
-  background: #fff; color: #000; border: 3px solid #EB0A1E; border-radius: 8px;
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, calc(100% - 24px));
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fff;
+  color: #0b1c30;
+  border: 3px solid #EB0A1E;
+  border-radius: 10px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, .26);
-  max-height: calc(100% - 24px); overflow-y: auto;
+  max-height: calc(100% - 24px);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .scan-popover-backdrop {
   position: absolute;
@@ -346,32 +361,73 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   position: absolute;
   top: 8px;
   right: 8px;
-  width: 32px;
-  height: 32px;
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
-  background: #fff;
-  color: #475569;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #c4c6cf;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0b1c30;
   display: grid;
   place-items: center;
   padding: 0;
   cursor: pointer;
-  z-index: 1;
+  z-index: 2;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 .scan-popover-close:hover {
   background: #fee2e2;
   color: #b91c1c;
   border-color: #fca5a5;
 }
+.scan-popover-close:focus-visible {
+  outline: 2px solid #EB0A1E;
+  outline-offset: 2px;
+}
 .scan-popover-close .material-symbols-outlined {
-  font-size: 20px;
+  font-size: 22px;
   color: inherit;
+  line-height: 1;
+}
+.scan-popover-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding-right: 44px;
+}
+.scan-popover-status-icon {
+  flex: 0 0 auto;
+  color: #EB0A1E;
+  font-size: 28px;
+  line-height: 1;
+  margin-top: 1px;
+}
+.scan-popover-summary {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.scan-popover-summary b {
+  display: block;
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 800;
+  color: #0b1c30;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.scan-popover-summary small {
+  display: block;
+  margin-top: 4px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 .scan-popover-actions {
-  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+  width: 100%;
 }
 .scan-discard-button {
   min-height: 46px;
@@ -384,9 +440,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   background: #f8fafc;
   border-color: #94a3b8;
 }
-.scan-result-popover .material-symbols-outlined { color: #EB0A1E; font-size: 28px; }
-.scan-result-popover b { font-size: 16px; line-height: 1.25; overflow-wrap: anywhere; }
-.scan-result-popover small { display: block; margin-top: 4px; color: #58595B; font-size: 12px; font-weight: 700; }
 .scan-result-popover select,
 .scan-result-popover > input,
 .scan-result-popover textarea,
@@ -396,7 +449,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .scan-result-popover .scan-popover-actions,
 .scan-result-popover .scan-popover-message,
 .scan-result-popover .notice {
-  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .scan-result-popover select,
 .scan-result-popover > input { min-height: 44px; }
