@@ -39,6 +39,7 @@ export function IncomingTab({ session, onRefresh }) {
   }, [load, session?.yardId, session?.branchId]);
 
   const confirmItem = items.find((v) => v.vin === confirmVin) || null;
+  const confirmYard = confirmItem ? findYardById(confirmItem.current_yard_id) : null;
 
   async function handleReceive() {
     if (!confirmItem) return;
@@ -125,28 +126,47 @@ export function IncomingTab({ session, onRefresh }) {
       )}
 
       {confirmItem && (
-        <div className="modal-overlay" onClick={() => !receivingVin && setConfirmVin(null)} role="dialog" aria-modal="true">
+        <div
+          className="modal-overlay"
+          onClick={() => !receivingVin && setConfirmVin(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="incoming-confirm-title"
+        >
           <div className="modal-content incoming-confirm" onClick={(e) => e.stopPropagation()}>
-            <h3>Confirm receive</h3>
-            <dl className="incoming-confirm-summary">
-              <div><dt>Model</dt><dd>{confirmItem.model || "Model not set"}</dd></div>
-              <div><dt>VIN</dt><dd>{confirmItem.vin}</dd></div>
-              <div>
-                <dt>Yard</dt>
-                <dd>
-                  {findYardById(confirmItem.current_yard_id)?.name || confirmItem.current_yard_id}
-                </dd>
+            <header className="incoming-confirm-header">
+              <span className="eyebrow">Incoming</span>
+              <h3 id="incoming-confirm-title">Confirm receive</h3>
+            </header>
+            <div className="incoming-confirm-body">
+              <dl className="incoming-confirm-summary">
+                <div>
+                  <dt>Model</dt>
+                  <dd>{confirmItem.model || "Model not set"}</dd>
+                </div>
+                <div>
+                  <dt>VIN</dt>
+                  <dd>{confirmItem.vin}</dd>
+                </div>
+                <div>
+                  <dt>Yard</dt>
+                  <dd>
+                    {confirmYard
+                      ? `${confirmYard.code} · ${confirmYard.name}`
+                      : (confirmItem.current_yard_id || "—")}
+                  </dd>
+                </div>
+              </dl>
+              <p className="incoming-confirm-hint">This marks the vehicle IN at the destination yard.</p>
+              {actionError && <p className="notice bad">{actionError}</p>}
+              <div className="incoming-confirm-actions">
+                <button type="button" className="ghost" disabled={Boolean(receivingVin)} onClick={() => setConfirmVin(null)}>
+                  Cancel
+                </button>
+                <button type="button" className="primary" disabled={Boolean(receivingVin)} onClick={handleReceive}>
+                  {receivingVin ? "Receiving…" : "Confirm receive"}
+                </button>
               </div>
-            </dl>
-            <p className="muted">This marks the vehicle IN at the destination yard.</p>
-            {actionError && <p className="notice bad">{actionError}</p>}
-            <div className="incoming-confirm-actions">
-              <button type="button" className="ghost" disabled={Boolean(receivingVin)} onClick={() => setConfirmVin(null)}>
-                Cancel
-              </button>
-              <button type="button" className="primary" disabled={Boolean(receivingVin)} onClick={handleReceive}>
-                {receivingVin ? "Receiving…" : "Confirm receive"}
-              </button>
             </div>
           </div>
         </div>
