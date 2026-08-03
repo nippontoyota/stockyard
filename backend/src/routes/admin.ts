@@ -4,7 +4,7 @@ import { eq, and, sql, count, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { vehicles, vehicleStatus, scans, flags, requisitions, notifications } from '../db/schema.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
-import { isValidVin, detectModel } from '../lib/vin.js';
+import { isValidVin } from '../lib/vin.js';
 
 const router = Router();
 router.use(authenticate);
@@ -177,8 +177,6 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
 
 const editVehicleBody = z.object({
   model: z.string().trim().min(1).max(120).optional(),
-  variant: z.string().trim().max(120).optional().nullable(),
-  colour: z.string().trim().max(80).optional().nullable(),
   drive_type: z.enum(['neo_drive', 'hybrid', 'petrol', 'diesel', '']).optional().nullable(),
   key_no: z.string().trim().max(40).optional().nullable(),
   status: z.enum(['in', 'out', 'transit']).optional(),
@@ -186,17 +184,16 @@ const editVehicleBody = z.object({
   vin_valid: z.boolean().optional(),
 });
 
-let vehicleExtraColumnsReady = false;
-async function ensureVehicleExtraColumns() {
-  if (vehicleExtraColumnsReady) return;
-  await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS variant text`);
-  await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS colour text`);
-  vehicleExtraColumnsReady = true;
+let variantColourCleared = false;
+async function clearLegacyVariantColour() {
+  if (variantColourCleared) return;
+  await db.execute(sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`);
+  variantColourCleared = true;
 }
 
 router.patch('/vehicles/:vin', async (req, res, next) => {
   try {
-    await ensureVehicleExtraColumns();
+    await clearLegacyVariantColour();
     const body = editVehicleBody.parse(req.body);
     const vin = req.params.vin.toUpperCase();
 
@@ -210,10 +207,8 @@ router.patch('/vehicles/:vin', async (req, res, next) => {
       return;
     }
 
-    const vehiclePatch: Record<string, unknown> = { updated_at: new Date() };
+    const vehiclePatch: Record<string, unknown> = { updated_at: new Date(), variant: null, colour: null };
     if (body.model !== undefined) vehiclePatch.model = body.model;
-    if (body.variant !== undefined) vehiclePatch.variant = body.variant || null;
-    if (body.colour !== undefined) vehiclePatch.colour = body.colour || null;
     if (body.drive_type !== undefined) vehiclePatch.drive_type = body.drive_type || null;
     if (body.vin_valid !== undefined) vehiclePatch.vin_valid = body.vin_valid;
 
@@ -273,8 +268,6 @@ router.patch('/vehicles/:vin', async (req, res, next) => {
       .select({
         vin: vehicles.vin,
         model: vehicles.model,
-        variant: vehicles.variant,
-        colour: vehicles.colour,
         drive_type: vehicles.drive_type,
         vin_valid: vehicles.vin_valid,
         current_status: vehicleStatus.current_status,
@@ -373,11 +366,11 @@ router.post('/import/vehicles', async (req, res, next) => {
       }
 
       const vinValidCheck = isValidVin(vin);
-      const modelValue = v.model ?? detectModel(vin);
+      const modelValue = v.model?.trim() || null;
 
       const [vehicle] = await db
         .insert(vehicles)
-        .values({ vin, model: modelValue, vin_valid: vinValidCheck })
+        .values({ vin, model: modelValue, vin_valid: vinValidCheck, variant: null, colour: null })
         .returning({ id: vehicles.id });
 
       await db

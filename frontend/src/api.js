@@ -169,6 +169,7 @@ export async function bulkSync(scans) {
     damage_remark: s.damageRemark || undefined,
     damage_image: s.damageImage || undefined,
     drive_type: s.driveType || undefined,
+    ...(s.type === 'in' && s.model ? { model: s.model } : {}),
     ...(s.type === 'out' ? {
       out_remark: s.outRemark,
       transfer_destination_yard_id: s.transferDestinationYardId || undefined,
@@ -266,6 +267,18 @@ export async function uploadTransitListApi(vehicles) {
   });
 }
 
+export async function getIncomingVehicles() {
+  const response = await apiFetch("/api/vehicles/incoming");
+  return response.data || [];
+}
+
+export async function receiveIncomingVehicle(vin, fields = {}) {
+  return apiFetch(`/api/vehicles/receive/${encodeURIComponent(vin)}`, {
+    method: "POST",
+    body: JSON.stringify(fields),
+  });
+}
+
 export async function createAdminBranch(name) {
   return apiFetch("/api/admin/branches", {
     method: "POST",
@@ -289,6 +302,14 @@ export async function assignBranchYards(id, yardIds) {
 
 export async function getBranchStock(branchId) {
   return apiFetch(`/api/branches/${branchId}/stock`);
+}
+
+export async function getRequestTargetYards() {
+  return apiFetch("/api/yards/request-targets");
+}
+
+export async function getYardStock(yardId) {
+  return apiFetch(`/api/yards/${encodeURIComponent(yardId)}/stock`);
 }
 
 export async function getBranchOverview(branchId) {

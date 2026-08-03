@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { decodeVinDetails, flagLabel, findYardById } from "./stockyardLogic.js";
+import { flagLabel, findYardById } from "./stockyardLogic.js";
 
 function driveLabel(value) {
   if (!value) return "";
@@ -18,23 +18,12 @@ function formatDate(value) {
 }
 
 export function vehicleToExportRow(vehicle, yard, flags = []) {
-  const decoded = decodeVinDetails(vehicle.vin);
-  const model =
-    vehicle.model && vehicle.model !== "Unknown" && vehicle.model !== "Toyota Vehicle"
-      ? vehicle.model
-      : decoded.model || "";
-  const variant =
-    vehicle.variant && vehicle.variant !== "Standard" ? vehicle.variant : decoded.variant || "";
-  const colour =
-    vehicle.colour && vehicle.colour !== "Not set" ? vehicle.colour : decoded.colour || "";
   const openFlag = flags.find((f) => f.vin === vehicle.vin && !f.resolved);
   const yardMeta = yard || findYardById(vehicle.currentYardId);
 
   return {
     VIN: vehicle.vin,
-    Model: model,
-    Variant: variant,
-    Colour: colour,
+    Model: vehicle.model || "",
     "Drive Type": driveLabel(vehicle.driveType),
     "Key No": vehicle.keyNo || "",
     Status: (vehicle.currentStatus || "").toUpperCase(),

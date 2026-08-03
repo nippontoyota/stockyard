@@ -89,16 +89,23 @@ router.get('/:id/overview', async (req, res, next) => {
   }
 });
 
-// Used by delivery_incharge to browse stock at a specific branch
+// Used by delivery_incharge to browse stock at a specific branch (for requisitions)
 // Returns vehicles currently marked as 'in' at any yard belonging to the branch
 router.get('/:id/stock', async (req, res, next) => {
   try {
     const branchId = req.params.id;
 
-    if (req.user!.role === 'delivery_incharge' && req.user!.branch_id !== branchId) {
-      res.status(403).json({ error: 'Access denied to this branch' });
-      return;
+    // Stockyard users may only view their own mapped branch
+    if (req.user!.role === 'stockyard') {
+      const { resolveBranchId } = await import('../lib/branch.js');
+      const ownBranchId = await resolveBranchId(req.user!);
+      if (ownBranchId !== branchId) {
+        res.status(403).json({ error: 'Access denied to this branch' });
+        return;
+      }
     }
+
+    // Admin + delivery_incharge may browse any branch (needed to request vehicles)
 
     const branchYardRecords = await db
       .select({ yard_id: branchYards.yard_id })

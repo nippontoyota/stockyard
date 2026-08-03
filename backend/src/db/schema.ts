@@ -87,7 +87,7 @@ export const vehicleStatus = pgTable(
     vehicle_id: uuid('vehicle_id')
       .primaryKey()
       .references(() => vehicles.id),
-    current_status: text('current_status').notNull(), // 'in' | 'out'
+    current_status: text('current_status').notNull(), // 'in' | 'out' | 'transit'
     current_yard_id: text('current_yard_id').references(() => yards.id),
     last_in_scan_id: uuid('last_in_scan_id').references(() => scans.id),
     last_out_scan_id: uuid('last_out_scan_id').references(() => scans.id),

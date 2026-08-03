@@ -3,7 +3,6 @@ import { eq, and, desc, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { vehicles, vehicleStatus, scans, flags, yards } from '../db/schema.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
-import { detectModel } from '../lib/vin.js';
 
 const router = Router();
 router.use(authenticate);
@@ -62,7 +61,7 @@ router.get('/stock', async (req, res, next) => {
     for (const r of rows) {
       res.write(csvRow([
         r.vin,
-        r.model && r.model !== 'Unknown' ? r.model : detectModel(r.vin),
+        r.model || '',
         r.current_status,
         r.current_yard_id,
         r.last_changed_at?.toISOString(),

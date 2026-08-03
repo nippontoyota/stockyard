@@ -2,19 +2,27 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { eq, and, count, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { scans, vehicles, vehicleStatus, devices, flags, yards, requisitions, notifications } from '../db/schema.js';
-import { isValidVin, detectModel, resolveVehicleMetadata } from '../lib/vin.js';
+import { scans, vehicles, vehicleStatus, devices, flags, yards, requisitions, notifications, branchYards } from '../db/schema.js';
+import { isValidVin } from '../lib/vin.js';
+import { CAR_MODELS, isCarModel } from '../shared/carModels.js';
 import { authenticate } from '../middleware/auth.js';
 import { emitScanEvent, emitFlagEvent, emitRequisitionEvent } from '../lib/socket.js';
 import { uploadBase64Image } from '../lib/supabase.js';
-import { notifyRoleAtBranch } from '../lib/webPush.js';
+import { notifyRoleAtBranch, notifyStockyardAtYard } from '../lib/webPush.js';
 
 const router = Router();
 router.use(authenticate);
 
+const carModelSchema = z
+  .string()
+  .trim()
+  .refine((value) => isCarModel(value), {
+    message: `model must be one of: ${CAR_MODELS.join(', ')}`,
+  });
+
 // ─── Zod schemas ─────────────────────────────────────────────────────
 
-const scanInBase = z.object({
+const scanCommon = z.object({
   vin: z.string().min(1),
   scanned_at: z.string().datetime(),
   yard_id: z.string().optional(),
@@ -27,12 +35,16 @@ const scanInBase = z.object({
   drive_type: z.enum(['neo_drive', 'hybrid', 'petrol', 'diesel']).optional(),
 });
 
+const scanInBase = scanCommon.extend({
+  model: carModelSchema,
+});
+
 const scanInBody = scanInBase.refine((d) => !d.damaged || (d.damage_remark && d.damage_remark.length > 0), {
   message: 'damage_remark is required when damaged is true',
   path: ['damage_remark'],
 });
 
-const scanOutBase = scanInBase.extend({
+const scanOutBase = scanCommon.extend({
   out_remark: z.enum(['customer_acquisition', 'stockyard_transfer']),
   transfer_destination_yard_id: z.string().optional(),
   transfer_requested_by: z.string().optional(),
@@ -77,17 +89,35 @@ async function findOrCreateDevice(fingerprint: string, txOrDb: any = db): Promis
   return result[0].id;
 }
 
-async function findOrCreateVehicle(vinRaw: string, driveType?: string, txOrDb: any = db): Promise<{ id: string; vinValid: boolean }> {
+async function findOrCreateVehicle(
+  vinRaw: string,
+  opts: { driveType?: string; model?: string } = {},
+  txOrDb: any = db,
+): Promise<{ id: string; vinValid: boolean }> {
   const vin = vinRaw.toUpperCase().trim();
   const vinValid = isValidVin(vin);
-  const model = await resolveVehicleMetadata(vin);
+  const model = opts.model?.trim() || undefined;
 
   const result = await txOrDb
     .insert(vehicles)
-    .values({ vin, model, drive_type: driveType, vin_valid: vinValid })
+    .values({
+      vin,
+      model: model ?? null,
+      drive_type: opts.driveType,
+      vin_valid: vinValid,
+      variant: null,
+      colour: null,
+    })
     .onConflictDoUpdate({
       target: vehicles.vin,
-      set: { updated_at: new Date(), ...(model ? { model } : {}), ...(driveType ? { drive_type: driveType } : {}), vin_valid: vinValid },
+      set: {
+        updated_at: new Date(),
+        ...(model ? { model } : {}),
+        ...(opts.driveType ? { drive_type: opts.driveType } : {}),
+        vin_valid: vinValid,
+        variant: null,
+        colour: null,
+      },
     })
     .returning({ id: vehicles.id });
   return { id: result[0].id, vinValid };
@@ -113,7 +143,11 @@ async function processScanIn(body: ScanIn, yardId: string) {
   }
 
   return db.transaction(async (tx) => {
-    const { id: vehicleId, vinValid } = await findOrCreateVehicle(body.vin, body.drive_type, tx);
+    const { id: vehicleId, vinValid } = await findOrCreateVehicle(
+      body.vin,
+      { driveType: body.drive_type, model: body.model },
+      tx,
+    );
     const deviceId = await findOrCreateDevice(body.device_fingerprint, tx);
     const [currentStatus] = await tx.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
@@ -172,7 +206,11 @@ async function processScanOut(body: ScanOut, yardId: string) {
   }
 
   return db.transaction(async (tx) => {
-    const { id: vehicleId, vinValid } = await findOrCreateVehicle(body.vin, body.drive_type, tx);
+    const { id: vehicleId, vinValid } = await findOrCreateVehicle(
+      body.vin,
+      { driveType: body.drive_type },
+      tx,
+    );
     const deviceId = await findOrCreateDevice(body.device_fingerprint, tx);
     const [currentStatus] = await tx.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
@@ -181,11 +219,28 @@ async function processScanOut(body: ScanOut, yardId: string) {
     }).returning();
 
     const scanTime = new Date(body.scanned_at);
+    const isTransfer = body.out_remark === 'stockyard_transfer';
+    const nextStatus = isTransfer ? 'transit' : 'out';
+    const nextYardId = isTransfer ? body.transfer_destination_yard_id! : yardId;
+
     if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
       await tx.insert(vehicleStatus).values({
-        vehicle_id: vehicleId, current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no,
+        vehicle_id: vehicleId,
+        current_status: nextStatus,
+        current_yard_id: nextYardId,
+        last_out_scan_id: scan.id,
+        last_changed_at: scanTime,
+        key_no: body.key_no,
       }).onConflictDoUpdate({
-        target: vehicleStatus.vehicle_id, set: { current_status: 'out', current_yard_id: yardId, last_out_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null },
+        target: vehicleStatus.vehicle_id,
+        set: {
+          current_status: nextStatus,
+          current_yard_id: nextYardId,
+          last_out_scan_id: scan.id,
+          last_changed_at: scanTime,
+          ...(body.key_no ? { key_no: body.key_no } : {}),
+          override_reason: null,
+        },
       });
     }
 
@@ -195,7 +250,14 @@ async function processScanOut(body: ScanOut, yardId: string) {
     if (body.damaged) { await createFlag(vehicleId, scan.id, 'damage_reported', body.damage_remark ?? 'Damage reported', body.vin, tx); flagsList.push('damage_reported'); }
     if (body.damage_image && !damageImageUrl) { await createFlag(vehicleId, scan.id, 'photo_upload_failed', 'Damage photo upload failed — image not saved', body.vin, tx); flagsList.push('photo_upload_failed'); }
 
-    if (body.out_remark === 'stockyard_transfer') {
+    if (isTransfer) {
+      const destYardId = body.transfer_destination_yard_id!;
+      const [destBranch] = await tx
+        .select({ branch_id: branchYards.branch_id })
+        .from(branchYards)
+        .where(eq(branchYards.yard_id, destYardId))
+        .limit(1);
+
       const [reqRecord] = await tx
         .update(requisitions)
         .set({ status: 'fulfilled', fulfilled_at: scanTime })
@@ -211,16 +273,42 @@ async function processScanOut(body: ScanOut, yardId: string) {
         await tx.insert(notifications).values({
           user_role: 'delivery_incharge',
           branch_id: reqRecord.requesting_branch_id,
-          message: 'Vehicle transfer initiated. Requisition fulfilled.',
+          message: 'Vehicle is in transit to your branch. Open Incoming to receive it.',
           type: 'requisition_fulfilled',
           related_req_id: reqRecord.id,
         });
         notifyRoleAtBranch('delivery_incharge', reqRecord.requesting_branch_id, {
-          title: 'Requisition Fulfilled',
-          body: 'Vehicle transfer initiated for requisition.',
-          url: '/requisitions',
+          title: 'Vehicle In Transit',
+          body: 'Transfer started — open Incoming to receive the vehicle.',
+          url: '/incoming',
+        }).catch(() => {});
+      } else if (destBranch) {
+        await tx.insert(notifications).values({
+          user_role: 'delivery_incharge',
+          branch_id: destBranch.branch_id,
+          message: `Vehicle ${body.vin.toUpperCase()} is in transit to your yard.`,
+          type: 'vehicle_inbound',
+        });
+        notifyRoleAtBranch('delivery_incharge', destBranch.branch_id, {
+          title: 'Vehicle In Transit',
+          body: 'A vehicle is on the way — open Incoming to receive it.',
+          url: '/incoming',
         }).catch(() => {});
       }
+
+      if (destBranch) {
+        await tx.insert(notifications).values({
+          user_role: 'stockyard',
+          branch_id: destBranch.branch_id,
+          message: `Vehicle ${body.vin.toUpperCase()} is in transit to yard ${destYardId}. Open Incoming to receive it.`,
+          type: 'vehicle_inbound',
+        });
+      }
+      notifyStockyardAtYard(destYardId, {
+        title: 'Incoming Vehicle',
+        body: 'A transfer is on the way — open Incoming to receive it.',
+        url: '/incoming',
+      }).catch(() => {});
     } else {
       await tx
         .update(requisitions)

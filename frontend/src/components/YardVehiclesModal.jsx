@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { decodeVinDetails, flagLabel, createScan, applyScan, yardsByRegion, findYardById, findApprovedTransferReq } from "../stockyardLogic.js";
+import { flagLabel, createScan, applyScan, yardsByRegion, findYardById, findApprovedTransferReq } from "../stockyardLogic.js";
 import { bulkSync } from "../api.js";
 import { exportYardVehiclesExcel } from "../exportStockExcel.js";
 import { VehicleTimeline } from "./VehicleTimeline.jsx";
@@ -31,11 +31,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
     if (destYard) setTransferDestinationYardId(destYard);
   }, [vin, requisitions]);
 
-  const decoded = decodeVinDetails(vin);
-  const displayModel =
-    vehicle?.model && vehicle.model !== "Unknown" && vehicle.model !== "Toyota Vehicle"
-      ? vehicle.model
-      : decoded.model;
+  const displayModel = vehicle?.model || "Model not set";
 
   async function submitOut() {
     setError("");
@@ -275,10 +271,7 @@ export function YardVehiclesModal({ yard, state, setState, onClose, readOnly = f
 
   const filteredVehicles = yardVehicles.filter((v) => {
     const matchesStatus = statusFilter === "all" || v.currentStatus === statusFilter;
-    const decoded = decodeVinDetails(v.vin);
-    const displayModel = v.model && v.model !== "Unknown" && v.model !== "Toyota Vehicle" ? v.model : decoded.model;
-    const displayVariant = v.variant && v.variant !== "Standard" ? v.variant : decoded.variant;
-    const searchString = `${v.vin} ${displayModel} ${displayVariant} ${v.colour || ""}`.toLowerCase();
+    const searchString = `${v.vin} ${v.model || ""}`.toLowerCase();
     const matchesSearch = searchString.includes(searchQuery.toLowerCase());
     return matchesStatus && matchesSearch;
   });
@@ -356,9 +349,7 @@ export function YardVehiclesModal({ yard, state, setState, onClose, readOnly = f
             ) : (
               filteredVehicles.map((vehicle) => {
                 const activeFlag = state?.flags?.find((f) => f.vin === vehicle.vin && !f.resolved);
-                const decoded = decodeVinDetails(vehicle.vin);
-                const displayModel = vehicle.model && vehicle.model !== "Unknown" && vehicle.model !== "Toyota Vehicle" ? vehicle.model : decoded.model;
-                const displayVariant = vehicle.variant && vehicle.variant !== "Standard" ? vehicle.variant : decoded.variant;
+                const displayModel = vehicle.model || "Model not set";
 
                 return (
                   <div key={vehicle.vin} className={`vehicle-row-card ${vehicle.currentStatus} ${activeFlag ? "flagged" : ""}`} onClick={() => setSelectedVin(vehicle.vin)} style={{ cursor: "pointer" }}>
@@ -374,7 +365,7 @@ export function YardVehiclesModal({ yard, state, setState, onClose, readOnly = f
                           <span className="badge bad">{flagLabel(activeFlag.type)}</span>
                         )}
                       </div>
-                      <small>{displayModel} · {displayVariant}{vehicle.keyNo ? ` · Key No: ${vehicle.keyNo}` : ""}</small>
+                      <small>{displayModel}{vehicle.keyNo ? ` · Key No: ${vehicle.keyNo}` : ""}</small>
                     </div>
                     <div className="v-row-status">
                       <span className={`status-tag ${vehicle.currentStatus}`}>
