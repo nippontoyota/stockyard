@@ -46,6 +46,10 @@ export function findApprovedTransferReq(requisitions, vin) {
   ) ?? null;
 }
 
+export function requisitionDestinationYardId(req) {
+  return req?.destination_yard_id || req?.destination_yard?.id || req?.requesting_branch?.yards?.[0]?.id || "";
+}
+
 export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }

@@ -140,6 +140,7 @@ export const requisitions = pgTable('requisitions', {
   id: uuid('id').defaultRandom().primaryKey(),
   requesting_branch_id: uuid('requesting_branch_id').notNull().references(() => branches.id),
   source_branch_id: uuid('source_branch_id').notNull().references(() => branches.id),
+  destination_yard_id: text('destination_yard_id').references(() => yards.id),
   vehicle_id: uuid('vehicle_id').notNull().references(() => vehicles.id),
   status: text('status').default('pending').notNull(), // 'pending' | 'approved' | 'rejected' | 'fulfilled'
   requested_by: text('requested_by').notNull(),
@@ -235,6 +236,7 @@ export const branchYardsRelations = relations(branchYards, ({ one }) => ({
 export const requisitionsRelations = relations(requisitions, ({ one, many }) => ({
   requestingBranch: one(branches, { fields: [requisitions.requesting_branch_id], references: [branches.id], relationName: 'outgoingRequisitions' }),
   sourceBranch: one(branches, { fields: [requisitions.source_branch_id], references: [branches.id], relationName: 'incomingRequisitions' }),
+  destinationYard: one(yards, { fields: [requisitions.destination_yard_id], references: [yards.id] }),
   vehicle: one(vehicles, { fields: [requisitions.vehicle_id], references: [vehicles.id] }),
   notifications: many(notifications),
 }));

@@ -27,7 +27,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
     if (!req) return;
     setOutRemark("stockyard_transfer");
     setTransferRequestedBy(req.requested_by || "");
-    const destYard = req.requesting_branch?.yards?.[0]?.id;
+    const destYard = req.destination_yard_id || req.destination_yard?.id || req.requesting_branch?.yards?.[0]?.id;
     if (destYard) setTransferDestinationYardId(destYard);
   }, [vin, requisitions]);
 

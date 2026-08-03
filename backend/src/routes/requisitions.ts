@@ -38,15 +38,22 @@ router.get('/', async (req, res, next) => {
         rejection_reason: requisitions.rejection_reason,
         requesting_branch_id: requisitions.requesting_branch_id,
         source_branch_id: requisitions.source_branch_id,
+        destination_yard_id: requisitions.destination_yard_id,
         vehicle: {
           vin: vehicles.vin,
           model: vehicles.model,
         },
         source_branch: { name: branches.name },
+        destination_yard: {
+          id: yards.id,
+          code: yards.code,
+          name: yards.name,
+        },
       })
       .from(requisitions)
       .innerJoin(vehicles, eq(requisitions.vehicle_id, vehicles.id))
       .innerJoin(branches, eq(requisitions.source_branch_id, branches.id))
+      .leftJoin(yards, eq(requisitions.destination_yard_id, yards.id))
       .where(
         or(
           eq(requisitions.requesting_branch_id, branchId),
@@ -72,12 +79,18 @@ router.get('/', async (req, res, next) => {
       .filter((r) => r.source_branch_id === branchId)
       .map((r) => ({
         ...r,
+        destination_yard: r.destination_yard?.id ? r.destination_yard : null,
         requesting_branch: {
           name: branchNameById.get(r.requesting_branch_id),
           yards: yardsByBranch.get(r.requesting_branch_id) ?? [],
         },
       }));
-    const outgoing = reqs.filter((r) => r.requesting_branch_id === branchId);
+    const outgoing = reqs
+      .filter((r) => r.requesting_branch_id === branchId)
+      .map((r) => ({
+        ...r,
+        destination_yard: r.destination_yard?.id ? r.destination_yard : null,
+      }));
 
     res.json({ incoming, outgoing });
   } catch (err) {
@@ -92,10 +105,28 @@ router.post('/', async (req, res, next) => {
       return res.status(403).json({ error: 'Only delivery incharge can create requisitions' });
     }
 
-    const { source_branch_id, vehicle_id } = req.body;
+    const { source_branch_id, vehicle_id, destination_yard_id } = req.body;
+
+    if (!destination_yard_id) {
+      return res.status(400).json({ error: 'destination_yard_id is required' });
+    }
 
     if (requestingBranchId === source_branch_id) {
       return res.status(400).json({ error: 'Cannot request from your own branch' });
+    }
+
+    const [destMapped] = await db
+      .select({ yard_id: branchYards.yard_id })
+      .from(branchYards)
+      .where(
+        and(
+          eq(branchYards.branch_id, requestingBranchId),
+          eq(branchYards.yard_id, destination_yard_id),
+        ),
+      );
+
+    if (!destMapped) {
+      return res.status(400).json({ error: 'Destination yard is not under your branch' });
     }
 
     const sourceBranchYards = await db
@@ -146,6 +177,7 @@ router.post('/', async (req, res, next) => {
     const [reqRecord] = await db.insert(requisitions).values({
       requesting_branch_id: requestingBranchId,
       source_branch_id,
+      destination_yard_id,
       vehicle_id,
       status: 'pending',
       requested_by: req.user!.id,
