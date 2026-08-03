@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://stockyard-00s6.onrender.com';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://stockyard-api-xvaa.onrender.com';
 
 export function useSocket(onDataChange, enabled = true) {
   const heartbeatRef = useRef(null);
