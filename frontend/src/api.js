@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || "https://stockyard-00s6.onrender.com";
+const API_BASE = import.meta.env.VITE_API_URL || "https://stockyard-api-xvaa.onrender.com";
 
 const FETCH_TIMEOUT_MS = 8000;
 
