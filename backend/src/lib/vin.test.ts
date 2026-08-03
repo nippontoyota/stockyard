@@ -25,8 +25,8 @@ describe('isValidVin', () => {
 });
 
 describe('CAR_MODELS', () => {
-  it('lists 13 Nippon Toyota models', () => {
-    expect(CAR_MODELS).toHaveLength(13);
+  it('lists 12 Nippon Toyota models', () => {
+    expect(CAR_MODELS).toHaveLength(12);
     expect(CAR_MODELS).toContain('Urban Cruiser HyRyder');
     expect(CAR_MODELS).toContain('Innova HyCross');
   });

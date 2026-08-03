@@ -16,7 +16,6 @@ export const CAR_MODELS = Object.freeze([
   "Legender",
   "Land Cruiser 300",
   "Vellfire",
-  "Land Cruiser Prado",
 ]);
 
 const MODEL_SET = new Set(CAR_MODELS);
