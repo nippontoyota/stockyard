@@ -13,9 +13,14 @@ globalThis.localStorage = {
 
 assert.ok(yards.some((y) => y.id === "CO01B-1"));
 assert.ok(yards.some((y) => y.id === "CO01A-1"));
-assert.ok(yards.some((y) => y.id === "KL01A-3")); // Thazhuthla
+assert.ok(yards.some((y) => y.id === "KL01A-3")); // Thazhuthla (KL01A BP adjacent)
 assert.ok(yards.some((y) => y.code === "TI01C")); // Chavakkad
-assert.equal(yards.some((y) => y.code === "KL01B"), false);
+assert.ok(yards.some((y) => y.id === "KY01A-7")); // Kayamkulam showroom adjacent area
+assert.ok(yards.some((y) => y.id === "TR01B-1")); // Kochuveli BP facility
+assert.ok(yards.some((y) => y.id === "KL01B-1")); // Thazhuthla BP facility
+assert.equal(yards.find((y) => y.id === "KY01A-7")?.capacity, 110);
+assert.equal(yards.find((y) => y.id === "TR01B-1")?.capacity, 5);
+assert.equal(yards.find((y) => y.id === "KL01B-1")?.capacity, 5);
 
 const baseScan = {
   id: "scan-1",

@@ -12,6 +12,7 @@
   { "code": "KY01A", "area": "Kayamkulam", "district": "Cochin", "site": "Showroom adjacent-Evoor", "capacity": 104 },
   { "code": "KY01A", "area": "Mavelikkara", "district": "Cochin", "site": "T-Sparsh, Mavelikkara", "capacity": 3 },
   { "code": "KY01A", "area": "Kunnathur", "district": "Cochin", "site": "T-Sparsh, Sasthamkotta", "capacity": 3 },
+  { "code": "KY01A", "area": "Kayamkulam", "district": "Cochin", "site": "Showroom adjacent area", "capacity": 110 },
   { "code": "TI01A", "area": "Thrissur", "district": "Thrissur", "site": "Showroom", "capacity": 20 },
   { "code": "TI01A", "area": "Thrissur", "district": "Thrissur", "site": "Peramangalam, Mundur", "capacity": 200 },
   { "code": "TI01A", "area": "Wadakkanchery", "district": "Thrissur", "site": "T-Sparsh, Wadakkanchery", "capacity": 3 },
@@ -51,6 +52,7 @@
   { "code": "TR01A", "area": "Kazhakkuttam", "district": "Trivandrum", "site": "Yard-2, Luxon yard", "capacity": 55 },
   { "code": "TR01A", "area": "Kazhakkuttam", "district": "Trivandrum", "site": "Yard-3, Kushamuttom", "capacity": 125 },
   { "code": "TR01A", "area": "Varkkala", "district": "Trivandrum", "site": "T-Sparsh, Varkkala", "capacity": 3 },
+  { "code": "TR01B", "area": "Kochuveli", "district": "Trivandrum", "site": "BP facility", "capacity": 5 },
   { "code": "TR01C", "area": "Enchakkal", "district": "Trivandrum", "site": "Showroom", "capacity": 15 },
   { "code": "TR01C", "area": "Enchakkal", "district": "Trivandrum", "site": "Showroom adjacent area", "capacity": 55 },
   { "code": "TR01C", "area": "Neyyattinkara", "district": "Trivandrum", "site": "T-Sparsh, Neyyattinkara", "capacity": 3 },
@@ -62,5 +64,6 @@
   { "code": "KL01A", "area": "Punalur", "district": "Trivandrum", "site": "T-Sparsh, Punalur", "capacity": 3 },
   { "code": "KL01A", "area": "Karunagappally", "district": "Trivandrum", "site": "T-Sparsh, Karunagappally", "capacity": 3 },
   { "code": "KL01A", "area": "Nilamel", "district": "Trivandrum", "site": "T-Sparsh, Nilamel", "capacity": 3 },
-  { "code": "KL01A", "area": "Pathanapuram", "district": "Trivandrum", "site": "T-Sparsh, Pathanapuram", "capacity": 3 }
+  { "code": "KL01A", "area": "Pathanapuram", "district": "Trivandrum", "site": "T-Sparsh, Pathanapuram", "capacity": 3 },
+  { "code": "KL01B", "area": "Thazhuthla", "district": "Trivandrum", "site": "BP facility", "capacity": 5 }
 ]
