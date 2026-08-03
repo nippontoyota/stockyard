@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   getRequestTargetYards,
   getYardStock,
+  getBranchOverview,
   createRequisition,
   approveRequisition,
   rejectRequisition,
@@ -156,6 +157,10 @@ function RequisitionRow({ req, type, onRefresh }) {
     ? (req.requesting_branch?.name || "Unknown")
     : (req.source_branch?.name || "Unknown");
 
+  const deliverTo = req.destination_yard?.id
+    ? `${req.destination_yard.code} · ${req.destination_yard.name}`
+    : null;
+
   return (
     <article className="req-row">
       <div className="req-row-main">
@@ -165,6 +170,7 @@ function RequisitionRow({ req, type, onRefresh }) {
         </div>
         <div className="req-col-meta">
           <span>{type === "incoming" ? "From" : "To"} {branchName}</span>
+          {deliverTo && <span className="req-deliver-to">Deliver to {deliverTo}</span>}
           <small>
             {new Date(req.requested_at).toLocaleDateString(undefined, {
               month: "short",
@@ -240,8 +246,10 @@ function RequisitionRow({ req, type, onRefresh }) {
 
 function CreateRequisitionModal({ session, onClose, onRefresh }) {
   const [targets, setTargets] = useState([]);
+  const [myYards, setMyYards] = useState([]);
   const [region, setRegion] = useState("");
   const [yardId, setYardId] = useState("");
+  const [deliverToYardId, setDeliverToYardId] = useState("");
   const [stock, setStock] = useState([]);
   const [loadingTargets, setLoadingTargets] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -263,18 +271,26 @@ function CreateRequisitionModal({ session, onClose, onRefresh }) {
 
   useEffect(() => {
     setLoadingTargets(true);
-    getRequestTargetYards()
-      .then((res) => {
-        const list = Array.isArray(res) ? res : [];
+    Promise.all([
+      getRequestTargetYards(),
+      session.branchId ? getBranchOverview(session.branchId) : Promise.resolve(null),
+    ])
+      .then(([targetRes, overview]) => {
+        const list = Array.isArray(targetRes) ? targetRes : [];
         setTargets(list);
         const firstRegion = [...new Set(list.map((y) => y.city).filter(Boolean))].sort()[0] || "";
         setRegion(firstRegion);
         const firstYard = list.find((y) => y.city === firstRegion) || list[0];
         setYardId(firstYard?.id || "");
+
+        const mine = Array.isArray(overview?.yards) ? overview.yards : [];
+        setMyYards(mine);
+        setDeliverToYardId(mine[0]?.id || "");
       })
       .catch((e) => {
         setError(e.message || "Could not load yards.");
         setTargets([]);
+        setMyYards([]);
       })
       .finally(() => setLoadingTargets(false));
   }, [session.branchId]);
@@ -284,6 +300,12 @@ function CreateRequisitionModal({ session, onClose, onRefresh }) {
       setYardId(regionYards[0]?.id || "");
     }
   }, [region, regionYards, yardId]);
+
+  useEffect(() => {
+    if (!myYards.some((y) => y.id === deliverToYardId)) {
+      setDeliverToYardId(myYards[0]?.id || "");
+    }
+  }, [myYards, deliverToYardId]);
 
   useEffect(() => {
     if (!yardId) {
@@ -307,13 +329,13 @@ function CreateRequisitionModal({ session, onClose, onRefresh }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!selectedYard?.branch_id || !selectedVin) return;
+    if (!selectedYard?.branch_id || !selectedVin || !deliverToYardId) return;
 
     setSubmitting(true);
     setError("");
     try {
       const v = stock.find((s) => s.vin === selectedVin);
-      await createRequisition(selectedYard.branch_id, v.vehicle_id);
+      await createRequisition(selectedYard.branch_id, v.vehicle_id, deliverToYardId);
       onRefresh?.();
       onClose();
     } catch (err) {
@@ -346,9 +368,28 @@ function CreateRequisitionModal({ session, onClose, onRefresh }) {
               <span className="material-symbols-outlined">warehouse</span>
               <span>No other yards are available to request from.</span>
             </div>
+          ) : myYards.length === 0 ? (
+            <div className="notice warn req-empty-stock">
+              <span className="material-symbols-outlined">warehouse</span>
+              <span>Your branch has no yards mapped for delivery.</span>
+            </div>
           ) : (
             <>
-              <label htmlFor="req-region">Region</label>
+              <label htmlFor="req-deliver-to">Deliver to</label>
+              <select
+                id="req-deliver-to"
+                value={deliverToYardId}
+                onChange={(e) => setDeliverToYardId(e.target.value)}
+                required
+              >
+                {myYards.map((y) => (
+                  <option key={y.id} value={y.id}>
+                    {y.code} · {y.name}
+                  </option>
+                ))}
+              </select>
+
+              <label htmlFor="req-region">From region</label>
               <select
                 id="req-region"
                 value={region}
@@ -360,7 +401,7 @@ function CreateRequisitionModal({ session, onClose, onRefresh }) {
                 ))}
               </select>
 
-              <label htmlFor="req-yard">Yard</label>
+              <label htmlFor="req-yard">From yard</label>
               <select
                 id="req-yard"
                 value={yardId}
@@ -421,7 +462,11 @@ function CreateRequisitionModal({ session, onClose, onRefresh }) {
 
           <div className="req-create-actions">
             <button type="button" className="ghost" onClick={onClose}>Cancel</button>
-            <button type="submit" className="primary" disabled={submitting || !selectedVin || !selectedYard}>
+            <button
+              type="submit"
+              className="primary"
+              disabled={submitting || !selectedVin || !selectedYard || !deliverToYardId}
+            >
               {submitting ? "Requesting…" : "Submit request"}
             </button>
           </div>
