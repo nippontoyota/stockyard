@@ -25,10 +25,13 @@ describe('isValidVin', () => {
 });
 
 describe('CAR_MODELS', () => {
-  it('lists 12 Nippon Toyota models', () => {
-    expect(CAR_MODELS).toHaveLength(12);
+  it('lists Nippon Toyota + Lexus India models', () => {
+    expect(CAR_MODELS).toHaveLength(18);
     expect(CAR_MODELS).toContain('Urban Cruiser HyRyder');
     expect(CAR_MODELS).toContain('Innova HyCross');
+    expect(CAR_MODELS).toContain('Rumion');
+    expect(CAR_MODELS).toContain('Lexus ES');
+    expect(CAR_MODELS).toContain('Lexus LM');
   });
 
   it('accepts catalogue names', () => {
