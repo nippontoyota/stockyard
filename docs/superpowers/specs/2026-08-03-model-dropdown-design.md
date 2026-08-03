@@ -32,9 +32,8 @@ Exact names (from `nippon-luckydraw/prisma/seed.ts`):
 8. Urban Cruiser HyRyder  
 9. Urban Cruiser Ebella  
 10. Legender  
-11. Land Cruiser 300  
-12. Vellfire  
-13. Land Cruiser Prado  
+11. Land Cruiser 300
+12. Vellfire
 
 Shared constant (e.g. `CAR_MODELS`) used by frontend dropdown and backend validation. No DB models table.
 
