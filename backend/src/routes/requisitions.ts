@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/client.js';
-import { requisitions, notifications, vehicleStatus, vehicles, branches, branchYards, yards } from '../db/schema.js';
+import { requisitions, notifications, vehicleStatus, vehicles, branches, branchYards, yards, credentials } from '../db/schema.js';
 import { eq, or, and, desc, inArray } from 'drizzle-orm';
 import { authenticate } from '../middleware/auth.js';
 import { notifyRoleAtBranch } from '../lib/webPush.js';
@@ -65,6 +65,9 @@ router.get('/', async (req, res, next) => {
     const allBranches = await db.select().from(branches);
     const branchNameById = new Map(allBranches.map((b) => [b.id, b.name]));
 
+    const credRows = await db.select({ id: credentials.id, username: credentials.username }).from(credentials);
+    const usernameById = new Map(credRows.map((c) => [c.id, c.username]));
+
     const requestingBranchIds = [...new Set(
       reqs.filter((r) => r.source_branch_id === branchId).map((r) => r.requesting_branch_id),
     )];
@@ -75,11 +78,16 @@ router.get('/', async (req, res, next) => {
       }),
     );
 
+    const withRequester = (r: (typeof reqs)[number]) => ({
+      ...r,
+      requested_by_username: usernameById.get(r.requested_by) ?? null,
+      destination_yard: r.destination_yard?.id ? r.destination_yard : null,
+    });
+
     const incoming = reqs
       .filter((r) => r.source_branch_id === branchId)
       .map((r) => ({
-        ...r,
-        destination_yard: r.destination_yard?.id ? r.destination_yard : null,
+        ...withRequester(r),
         requesting_branch: {
           name: branchNameById.get(r.requesting_branch_id),
           yards: yardsByBranch.get(r.requesting_branch_id) ?? [],
@@ -87,10 +95,7 @@ router.get('/', async (req, res, next) => {
       }));
     const outgoing = reqs
       .filter((r) => r.requesting_branch_id === branchId)
-      .map((r) => ({
-        ...r,
-        destination_yard: r.destination_yard?.id ? r.destination_yard : null,
-      }));
+      .map(withRequester);
 
     res.json({ incoming, outgoing });
   } catch (err) {

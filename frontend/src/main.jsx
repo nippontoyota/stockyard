@@ -15,6 +15,8 @@ import {
   fallbackBranches,
   setConfig,
   findApprovedTransferReq,
+  requisitionDestinationYardId,
+  requisitionRequesterLabel,
   findYardById,
   yardsByRegion,
 } from "./stockyardLogic.js";
@@ -804,14 +806,21 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const isFlagged = Boolean(activeFlag);
 
   useEffect(() => {
-    if (!pendingVin || scanType !== "out") return;
+    if (!pendingVin) return;
+    const vehicle = state.vehicles[pendingVin];
+    if (vehicle?.driveType) {
+      setDriveType((prev) => prev || vehicle.driveType);
+    }
+
+    const outMode = scanType === "out" || manualScanType === "out";
+    if (!outMode) return;
     const req = findApprovedTransferReq(state.requisitions, pendingVin);
     if (!req) return;
     setOutRemark("stockyard_transfer");
-    setTransferRequestedBy(req.requested_by || "");
-    const destYard = req.destination_yard_id || req.destination_yard?.id || req.requesting_branch?.yards?.[0]?.id;
+    setTransferRequestedBy(requisitionRequesterLabel(req));
+    const destYard = requisitionDestinationYardId(req);
     if (destYard) setTransferDestinationYardId(destYard);
-  }, [pendingVin, scanType, state.requisitions]);
+  }, [pendingVin, scanType, manualScanType, state.requisitions, state.vehicles]);
 
   useEffect(() => {
     getPendingCount().then(setPendingCount);
@@ -1363,7 +1372,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                       setTransferRequestedBy(event.target.value);
                       setMessage(null);
                     }}
-                    placeholder="Requested by (person name)"
+                    placeholder="DI account who requested"
                   />
                 </>
               )}
@@ -1536,7 +1545,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                       id="transfer-requester"
                       value={transferRequestedBy}
                       onChange={(event) => setTransferRequestedBy(event.target.value)}
-                      placeholder="Person name who requested transfer"
+                      placeholder="DI account who requested"
                     />
                   </>
                 )}
