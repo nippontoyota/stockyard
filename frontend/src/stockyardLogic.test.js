@@ -1,5 +1,17 @@
 import assert from "node:assert/strict";
-import { applyScan, CAR_MODELS, createInitialState, dashboard, isCarModel, normalizeVin, parseDeliveredVins, yards } from "./stockyardLogic.js";
+import {
+  applyScan,
+  CAR_MODELS,
+  createInitialState,
+  dashboard,
+  findApprovedTransferReq,
+  isCarModel,
+  normalizeVin,
+  parseDeliveredVins,
+  requisitionDestinationYardId,
+  requisitionRequesterLabel,
+  yards,
+} from "./stockyardLogic.js";
 
 assert.equal(CAR_MODELS.length, 18);
 assert.equal(isCarModel("Rumion"), true);
@@ -116,5 +128,20 @@ const damageFlag = damagedInScan.state.flags.find((f) => f.type === "damage_repo
 assert.ok(damageFlag);
 assert.equal(damageFlag.damageRemark, "Scratched side door panel");
 assert.equal(damageFlag.damageImage, "data:image/png;base64,sampleImageData");
+
+// OUT transfer prefill helpers
+const approvedReq = {
+  status: "approved",
+  requested_by: "uuid-not-for-display",
+  requested_by_username: "chavakkad_di",
+  destination_yard_id: "TI01C-1",
+  requesting_branch: { yards: [{ id: "fallback-yard" }] },
+  vehicle: { vin: "jtmba38v70d123456" },
+};
+assert.equal(findApprovedTransferReq({ incoming: [approvedReq] }, "JTMBA38V70D123456")?.requested_by_username, "chavakkad_di");
+assert.equal(requisitionDestinationYardId(approvedReq), "TI01C-1");
+assert.equal(requisitionDestinationYardId({ requesting_branch: { yards: [{ id: "legacy-1" }] } }), "legacy-1");
+assert.equal(requisitionRequesterLabel(approvedReq), "chavakkad_di");
+assert.equal(requisitionRequesterLabel({ requested_by: "uuid-not-for-display" }), "");
 
 console.log("stockyard logic ok");

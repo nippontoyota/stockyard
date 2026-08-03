@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { flagLabel, createScan, applyScan, yardsByRegion, findYardById, findApprovedTransferReq } from "../stockyardLogic.js";
+import { flagLabel, createScan, applyScan, yardsByRegion, findYardById, findApprovedTransferReq, requisitionDestinationYardId, requisitionRequesterLabel } from "../stockyardLogic.js";
 import { bulkSync } from "../api.js";
 import { exportYardVehiclesExcel } from "../exportStockExcel.js";
 import { VehicleTimeline } from "./VehicleTimeline.jsx";
@@ -26,8 +26,8 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
     const req = findApprovedTransferReq(requisitions, vin);
     if (!req) return;
     setOutRemark("stockyard_transfer");
-    setTransferRequestedBy(req.requested_by || "");
-    const destYard = req.destination_yard_id || req.destination_yard?.id || req.requesting_branch?.yards?.[0]?.id;
+    setTransferRequestedBy(requisitionRequesterLabel(req));
+    const destYard = requisitionDestinationYardId(req);
     if (destYard) setTransferDestinationYardId(destYard);
   }, [vin, requisitions]);
 
@@ -188,7 +188,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
               setTransferRequestedBy(e.target.value);
               setError("");
             }}
-            placeholder="Person who requested transfer"
+            placeholder="DI account who requested"
             required
           />
         </>

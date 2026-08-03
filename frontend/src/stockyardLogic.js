@@ -41,13 +41,20 @@ export function createInitialState(now = new Date().toISOString()) {
 }
 
 export function findApprovedTransferReq(requisitions, vin) {
+  const want = normalizeVin(vin);
+  if (!want) return null;
   return requisitions?.incoming?.find(
-    (r) => r.status === "approved" && r.vehicle?.vin === vin
+    (r) => r.status === "approved" && normalizeVin(r.vehicle?.vin) === want
   ) ?? null;
 }
 
 export function requisitionDestinationYardId(req) {
   return req?.destination_yard_id || req?.destination_yard?.id || req?.requesting_branch?.yards?.[0]?.id || "";
+}
+
+/** DI login for OUT "Requested by" — never fall back to raw user id. */
+export function requisitionRequesterLabel(req) {
+  return req?.requested_by_username || "";
 }
 
 export function createClientScanId() {
