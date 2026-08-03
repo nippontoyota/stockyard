@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { applyScan, CAR_MODELS, createInitialState, dashboard, isCarModel, normalizeVin, parseDeliveredVins, yards } from "./stockyardLogic.js";
 
-assert.equal(CAR_MODELS.length, 12);
+assert.equal(CAR_MODELS.length, 18);
+assert.equal(isCarModel("Rumion"), true);
+assert.equal(isCarModel("Lexus ES"), true);
 assert.equal(isCarModel("Urban Cruiser HyRyder"), true);
 assert.equal(isCarModel("Toyota Vehicle"), false);
 

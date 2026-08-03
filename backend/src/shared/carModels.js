@@ -10,12 +10,18 @@ export const CAR_MODELS = Object.freeze([
   "Camry",
   "Hilux",
   "Glanza",
+  "Rumion",
   "Urban Cruiser Taisor",
   "Urban Cruiser HyRyder",
   "Urban Cruiser Ebella",
   "Legender",
   "Land Cruiser 300",
   "Vellfire",
+  "Lexus ES",
+  "Lexus NX",
+  "Lexus RX",
+  "Lexus LX",
+  "Lexus LM",
 ]);
 
 const MODEL_SET = new Set(CAR_MODELS);

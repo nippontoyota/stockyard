@@ -20,7 +20,7 @@ Stop deriving vehicle details from VIN. On scan IN, require the operator to pick
 
 ## Model catalogue
 
-Exact names (from `nippon-luckydraw/prisma/seed.ts`):
+Exact names (Nippon Toyota + Lexus India; Lexus series from [lexusindia.co.in](https://www.lexusindia.co.in/price-and-model-tools/price-list/)):
 
 1. Fortuner  
 2. Innova Crysta  
@@ -28,12 +28,18 @@ Exact names (from `nippon-luckydraw/prisma/seed.ts`):
 4. Camry  
 5. Hilux  
 6. Glanza  
-7. Urban Cruiser Taisor  
-8. Urban Cruiser HyRyder  
-9. Urban Cruiser Ebella  
-10. Legender  
-11. Land Cruiser 300
-12. Vellfire
+7. Rumion  
+8. Urban Cruiser Taisor  
+9. Urban Cruiser HyRyder  
+10. Urban Cruiser Ebella  
+11. Legender  
+12. Land Cruiser 300  
+13. Vellfire  
+14. Lexus ES  
+15. Lexus NX  
+16. Lexus RX  
+17. Lexus LX  
+18. Lexus LM  
 
 Shared constant (e.g. `CAR_MODELS`) used by frontend dropdown and backend validation. No DB models table.
 
