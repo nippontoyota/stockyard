@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { decodeVinDetails, updateVehicleDetails, findYardById, yardsByRegion } from "../stockyardLogic.js";
+import { updateVehicleDetails, findYardById, yardsByRegion } from "../stockyardLogic.js";
 import { adminUpdateVehicle } from "../api.js";
 import { AdminVehicleDeleteButton } from "./AdminVehicleDeleteButton.jsx";
 
@@ -28,13 +28,8 @@ function getYardName(yardId) {
 }
 
 function buildForm(vehicle) {
-  const decoded = decodeVinDetails(vehicle.vin);
   return {
-    model: vehicle.model && vehicle.model !== "Unknown" && vehicle.model !== "Toyota Vehicle"
-      ? vehicle.model
-      : decoded.model || "",
-    variant: vehicle.variant && vehicle.variant !== "Standard" ? vehicle.variant : decoded.variant || "",
-    colour: vehicle.colour && vehicle.colour !== "Not set" ? vehicle.colour : decoded.colour || "",
+    model: vehicle.model || "",
     driveType: vehicle.driveType || "",
     keyNo: vehicle.keyNo || "",
     status: vehicle.currentStatus === "transit" ? "transit" : vehicle.currentStatus === "in" ? "in" : "out",
@@ -88,9 +83,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
   const filteredVehicles = allVehicles.filter((v) => {
     const derivedStatus = getDerivedStatus(v);
     const matchesStatus = statusFilter === "all" || derivedStatus.label === statusFilter;
-    const decoded = decodeVinDetails(v.vin);
-    const displayModel = v.model && v.model !== "Unknown" && v.model !== "Toyota Vehicle" ? v.model : decoded.model;
-    const searchString = `${v.vin} ${displayModel} ${v.variant || ""} ${v.colour || ""} ${derivedStatus.label}`.toLowerCase();
+    const searchString = `${v.vin} ${v.model || ""} ${derivedStatus.label}`.toLowerCase();
     return matchesStatus && searchString.includes(searchQuery.toLowerCase());
   });
 
@@ -116,8 +109,6 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
     try {
       const updated = await adminUpdateVehicle(editingVin, {
         model: form.model.trim(),
-        variant: form.variant.trim() || null,
-        colour: form.colour.trim() || null,
         drive_type: form.driveType || null,
         key_no: form.keyNo.trim() || null,
         status: form.status,
@@ -129,8 +120,6 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
         setState(
           updateVehicleDetails(state, editingVin, {
             model: updated.model || form.model.trim(),
-            variant: updated.variant || form.variant.trim() || "",
-            colour: updated.colour || form.colour.trim() || "",
             driveType: updated.drive_type || form.driveType || "",
             keyNo: updated.key_no || form.keyNo.trim() || "",
             currentStatus: updated.current_status || form.status,
@@ -210,25 +199,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
                 value={form.model}
                 onChange={(e) => updateField("model", e.target.value)}
                 required
-                placeholder="e.g. Toyota Hyryder"
-              />
-            </label>
-
-            <label className="vehicle-edit-field">
-              <span>Variant</span>
-              <input
-                value={form.variant}
-                onChange={(e) => updateField("variant", e.target.value)}
-                placeholder="e.g. Hybrid · 2026 MY"
-              />
-            </label>
-
-            <label className="vehicle-edit-field">
-              <span>Colour</span>
-              <input
-                value={form.colour}
-                onChange={(e) => updateField("colour", e.target.value)}
-                placeholder="Colour or plant note"
+                placeholder="e.g. Innova HyCross"
               />
             </label>
 

@@ -3,13 +3,14 @@ import { createRoot } from "react-dom/client";
 import * as XLSX from "xlsx";
 import {
   applyScan,
+  CAR_MODELS,
   createClientScanId,
   createInitialState,
   createScan,
   dashboard,
-  decodeVinDetails,
   normalizeVin,
   flagLabel,
+  isCarModel,
   yards,
   fallbackBranches,
   setConfig,
@@ -30,6 +31,7 @@ import {
   AUTH_EXPIRED_EVENT,
   getNotifications, getRequisitions,
   getVehicleStatus,
+  getIncomingVehicles,
   isNetworkError,
   isAuthError,
   humanizeApiError,
@@ -49,6 +51,7 @@ import { YARD_REGIONS } from "./yardData.js";
 import { AdminHome } from "./components/AdminDashboard.jsx";
 import { YardVehiclesModal } from "./components/YardVehiclesModal.jsx";
 import { DeliveryBranchStock } from "./components/DeliveryBranchStock.jsx";
+import { IncomingTab } from "./components/IncomingTab.jsx";
 import { exportVehiclesExcel } from "./exportStockExcel.js";
 import { AdminVehicleDeleteButton } from "./components/AdminVehicleDeleteButton.jsx";
 
@@ -60,12 +63,14 @@ function getRoutePath(viewName, role) {
   if (role === "delivery_incharge") {
     if (viewName === "dashboard") return "/dash";
     if (viewName === "stock") return "/stock";
+    if (viewName === "incoming") return "/incoming";
     if (viewName === "requisitions") return "/requisitions";
     return "/requisitions";
   }
   // stockyard
   if (viewName === "dashboard") return "/dash";
   if (viewName === "stock") return "/stock";
+  if (viewName === "incoming") return "/incoming";
   if (viewName === "requisitions") return "/requisitions";
   return "/scan";
 }
@@ -80,12 +85,14 @@ function getViewFromPath(pathname, role) {
   if (role === "delivery_incharge") {
     if (path === "/stock") return "stock";
     if (path === "/dash" || path === "/dashboard") return "dashboard";
+    if (path === "/incoming") return "incoming";
     if (path === "/requisitions") return "requisitions";
     return "requisitions";
   }
   // stockyard
   if (path === "/stock") return "stock";
   if (path === "/dash" || path === "/dashboard") return "dashboard";
+  if (path === "/incoming") return "incoming";
   if (path === "/requisitions") return "requisitions";
   return "scan";
 }
@@ -122,12 +129,9 @@ function getStoredSession() {
 function mapServerResponse(vehiclesData, flagsData, scansData, notifsData, reqsData) {
   const mappedVehicles = {};
   vehiclesData.forEach((v) => {
-    const decoded = decodeVinDetails(v.vin);
     mappedVehicles[v.vin] = {
       vin: v.vin,
-      model: v.model && v.model !== "Unknown" && v.model !== "Toyota Vehicle" ? v.model : decoded.model,
-      variant: v.variant && v.variant !== "Standard" ? v.variant : decoded.variant,
-      colour: v.colour && v.colour !== "Not set" ? v.colour : decoded.colour,
+      model: v.model || "",
       driveType: v.drive_type,
       vinValid: v.vin_valid,
       currentStatus: v.current_status,
@@ -212,6 +216,7 @@ export default function App() {
   const [staleSnapshotAt, setStaleSnapshotAt] = useState(() => loadSnapshot(getStoredSession())?.syncedAt || null);
   const [loadWarning, setLoadWarning] = useState("");
   const [authExpiredMessage, setAuthExpiredMessage] = useState("");
+  const [incomingCount, setIncomingCount] = useState(0);
 
   useEffect(() => {
     const onAuthExpired = () => {
@@ -354,6 +359,22 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (!session || (session.role !== "stockyard" && session.role !== "delivery_incharge")) {
+      setIncomingCount(0);
+      return;
+    }
+    let cancelled = false;
+    getIncomingVehicles()
+      .then((data) => {
+        if (!cancelled) setIncomingCount(Array.isArray(data) ? data.length : 0);
+      })
+      .catch(() => {
+        if (!cancelled) setIncomingCount(0);
+      });
+    return () => { cancelled = true; };
+  }, [session, view, lastSyncedAt]);
+
   if (!session) return <Login onLogin={(nextSession) => {
     setAuthExpiredMessage("");
     setDataReady(false);
@@ -407,6 +428,9 @@ export default function App() {
       <main className="content">
         {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} onRefresh={fetchServerData} lastSyncedAt={lastSyncedAt} />}
         {view === "stock" && <StockView state={state} setState={setState} session={session} />}
+        {view === "incoming" && (session.role === "stockyard" || session.role === "delivery_incharge") && (
+          <IncomingTab session={session} onRefresh={fetchServerData} />
+        )}
         {view === "dashboard" && !dataReady && (
           <div className="dashboard-loading" style={{ padding: '1rem' }}>
             <div className="skeleton skeleton-kpi" style={{ height: 80, marginBottom: 12 }} />
@@ -423,6 +447,9 @@ export default function App() {
       <nav className={`bottom-nav ${isAdmin ? "bottom-nav-admin" : ""}`}>
         {session.role === "stockyard" && <NavButton icon="barcode_scanner" label="Scan" active={view === "scan"} onClick={() => navigateTo("scan")} />}
         <NavButton icon="inventory_2" label="Stock" active={view === "stock"} onClick={() => navigateTo("stock")} />
+        {(session.role === "stockyard" || session.role === "delivery_incharge") && (
+          <NavButton icon="local_shipping" label="Incoming" badge={incomingCount} active={view === "incoming"} onClick={() => navigateTo("incoming")} />
+        )}
         {!isAdmin && <NavButton icon="dashboard" label="Dash" active={view === "dashboard"} onClick={() => navigateTo("dashboard")} />}
         {(session.role === "stockyard" || session.role === "delivery_incharge") && (
           <NavButton icon="swap_horiz" label="Requests" badge={pendingReqCount} active={view === "requisitions"} onClick={() => navigateTo("requisitions")} />
@@ -752,6 +779,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const [damageRemark, setDamageRemark] = useState("");
   const [damageImage, setDamageImage] = useState("");
   const [driveType, setDriveType] = useState("");
+  const [carModel, setCarModel] = useState("");
   const [manualScanType, setManualScanType] = useState("in"); // ponytail: manual toggle always wins; QR still uses auto scanType
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
@@ -774,8 +802,6 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const scanType = isCarInCurrentYard ? "out" : "in";
   const activeFlag = state.flags?.find((f) => f.vin === pendingVin && !f.resolved);
   const isFlagged = Boolean(activeFlag);
-  // Item 7: Decoded VIN info for verification
-  const decodedVin = useMemo(() => pendingVin.length >= 5 ? decodeVinDetails(pendingVin) : null, [pendingVin]);
 
   useEffect(() => {
     if (!pendingVin || scanType !== "out") return;
@@ -831,6 +857,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     setTransferRequestedBy("");
     setKeyNo("");
     setDriveType("");
+    setCarModel("");
     setDamaged(false);
     setDamageRemark("");
     setDamageImage("");
@@ -1053,18 +1080,34 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   async function doSubmit(confirmedScanType) {
     const finalScanType = confirmedScanType || scanType;
 
-    const scan = createScan({ vin, type: finalScanType, yardId: yard.id, outRemark, transferDestinationYardId, transferRequestedBy, keyNo, damaged, damageRemark, damageImage, driveType });
+    const scan = createScan({
+      vin,
+      type: finalScanType,
+      yardId: yard.id,
+      outRemark,
+      transferDestinationYardId,
+      transferRequestedBy,
+      keyNo,
+      damaged,
+      damageRemark,
+      damageImage,
+      driveType,
+      model: finalScanType === "in" ? carModel : "",
+    });
     const result = applyScan(state, scan);
 
     if (!result.accepted) return setOverlayResult({ type: "error", message: result.message });
 
     const newFlags = result.state.flags.filter(f => f.vin === scan.vin && !f.resolved);
     const resultType = newFlags.length ? "flagged" : "success";
+    const overlayModel = finalScanType === "in"
+      ? carModel
+      : (state.vehicles[normalizeVin(vin)]?.model || "");
 
         try {
       if (!online) throw Object.assign(new Error("Offline"), { offline: true });
       await bulkSync([scan]);
-      finishSubmit(result.state, resultType, result.message, newFlags.map(f => flagLabel(f.type)));
+      finishSubmit(result.state, resultType, result.message, newFlags.map(f => flagLabel(f.type)), overlayModel);
     } catch (err) {
       if (err.rejected) {
         return setOverlayResult({ type: "error", message: err.message });
@@ -1075,7 +1118,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       if (isNetworkError(err)) {
         await enqueueScan(scan);
         setPendingCount(c => c + 1);
-        finishSubmit(result.state, resultType, result.message + " (Saved offline)", newFlags.map(f => flagLabel(f.type)));
+        finishSubmit(result.state, resultType, result.message + " (Saved offline)", newFlags.map(f => flagLabel(f.type)), overlayModel);
         return;
       }
       setOverlayResult({ type: "error", message: humanizeApiError(err) });
@@ -1116,8 +1159,17 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       }
     }
 
+    if (effectiveType === "in" && !isCarModel(carModel)) {
+      return setOverlayResult({ type: "error", message: "Select the car model." });
+    }
+
     if (effectiveType === "out" && !confirmOutData) {
-      setConfirmOutData({ vin: pendingVin, scanType: effectiveType, outRemark, model: decodedVin?.model || "Unknown" });
+      setConfirmOutData({
+        vin: pendingVin,
+        scanType: effectiveType,
+        outRemark,
+        model: state.vehicles[pendingVin]?.model || "Unknown",
+      });
       return;
     }
 
@@ -1125,7 +1177,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     await doSubmit(effectiveType);
   }
 
-  function finishSubmit(newState, type, msg, flags) {
+  function finishSubmit(newState, type, msg, flags, submittedModel = "") {
     setState(newState);
     saveSnapshot(session, {
       vehicles: newState.vehicles,
@@ -1134,13 +1186,14 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       notifications: newState.notifications,
       requisitions: newState.requisitions,
     });
-    setOverlayResult({ type, vin, message: msg, flags });
+    setOverlayResult({ type, vin, message: msg, flags, model: submittedModel || undefined });
     setVin("");
     setOutRemark("");
     setTransferDestinationYardId("");
     setTransferRequestedBy("");
     setKeyNo("");
     setDriveType("");
+    setCarModel("");
     setDamaged(false);
     setDamageRemark("");
     setDamageImage("");
@@ -1250,11 +1303,25 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
               <span className="material-symbols-outlined">check_circle</span>
               <div>
                 <b>VIN {scanSuccess} scanned.</b>
-                {decodedVin && <div style={{fontSize: '0.85rem', color: 'var(--text-dim)', margin: '4px 0'}}>
-                  {decodedVin.model} {decodedVin.engine ? `(${decodedVin.engine})` : ''} Â· {decodedVin.plant || 'Unknown Plant'}
-                </div>}
                 <small>Ready for vehicle {scanType.toUpperCase()}.</small>
               </div>
+              {scanType === "in" && (
+                <select
+                  value={carModel}
+                  onChange={(event) => {
+                    setCarModel(event.target.value);
+                    setMessage(null);
+                    setOverlayResult(null);
+                  }}
+                  aria-label="Car model"
+                  required
+                >
+                  <option value="">Select model</option>
+                  {CAR_MODELS.map((modelName) => (
+                    <option key={modelName} value={modelName}>{modelName}</option>
+                  ))}
+                </select>
+              )}
               {scanType === "out" && (
                 <select value={outRemark} onChange={(event) => {
                   setOutRemark(event.target.value);
@@ -1474,6 +1541,22 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                 )}
               </>
             )}
+            {manualScanType === "in" && (
+              <>
+                <label htmlFor="carModel">Model</label>
+                <select
+                  id="carModel"
+                  value={carModel}
+                  onChange={(event) => setCarModel(event.target.value)}
+                  required
+                >
+                  <option value="">Select model</option>
+                  {CAR_MODELS.map((modelName) => (
+                    <option key={modelName} value={modelName}>{modelName}</option>
+                  ))}
+                </select>
+              </>
+            )}
             <label htmlFor="keyNo">Key No.</label>
             <input
               id="keyNo"
@@ -1551,8 +1634,6 @@ function StockInventoryView({ state, setState, session }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [model, setModel] = useState("all");
-  const [variant, setVariant] = useState("all");
-  const [colour, setColour] = useState("all");
   const [yardId, setYardId] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -1566,14 +1647,12 @@ function StockInventoryView({ state, setState, session }) {
   const capacity = yards.filter((yard) => visibleYardIds.includes(yard.id)).reduce((sum, yard) => sum + yard.capacity, 0);
   const utilisation = capacity ? Math.round((stockIn / capacity) * 100) : 0;
 
-  const activeFilterCount = [status, model, variant, colour, yardId].filter((v) => v !== "all").length + (query.trim() ? 1 : 0);
+  const activeFilterCount = [status, model, yardId].filter((v) => v !== "all").length + (query.trim() ? 1 : 0);
 
   const clearFilters = () => {
     setQuery("");
     setStatus("all");
     setModel("all");
-    setVariant("all");
-    setColour("all");
     setYardId("all");
   };
 
@@ -1581,10 +1660,8 @@ function StockInventoryView({ state, setState, session }) {
     .filter((vehicle) => session.role === "admin" || vehicle.currentYardId === session.yardId)
     .filter((vehicle) => status === "all" || vehicle.currentStatus === status)
     .filter((vehicle) => model === "all" || vehicle.model === model)
-    .filter((vehicle) => variant === "all" || vehicle.variant === variant)
-    .filter((vehicle) => colour === "all" || vehicle.colour === colour)
     .filter((vehicle) => yardId === "all" || vehicle.currentYardId === yardId)
-    .filter((vehicle) => `${vehicle.vin} ${vehicle.model} ${vehicle.variant || ""} ${vehicle.colour || ""}`.toLowerCase().includes(query.toLowerCase()))
+    .filter((vehicle) => `${vehicle.vin} ${vehicle.model || ""}`.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => String(b.lastChangedAt || "").localeCompare(String(a.lastChangedAt || "")));
 
   function handleExport() {
@@ -1644,7 +1721,7 @@ function StockInventoryView({ state, setState, session }) {
             className="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search VIN, model, variant or colour"
+            placeholder="Search VIN or model"
           />
         </div>
 
@@ -1672,20 +1749,6 @@ function StockInventoryView({ state, setState, session }) {
                 <select value={model} onChange={(event) => setModel(event.target.value)} aria-label="Model filter">
                   <option value="all">All models</option>
                   {options("model").map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
-              </label>
-              <label className="filter-field">
-                <span>Variant</span>
-                <select value={variant} onChange={(event) => setVariant(event.target.value)} aria-label="Variant filter">
-                  <option value="all">All variants</option>
-                  {options("variant").map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
-              </label>
-              <label className="filter-field">
-                <span>Colour</span>
-                <select value={colour} onChange={(event) => setColour(event.target.value)} aria-label="Colour filter">
-                  <option value="all">All colours</option>
-                  {options("colour").map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
               </label>
               <label className="filter-field">
@@ -1743,15 +1806,21 @@ function StockStat({ icon, label, value, tone = "" }) {
 
 function VehicleCard({ vehicle, flags, isAdmin = false, setState }) {
   const yard = findYardById(vehicle.currentYardId);
-  const statusText = flags.length ? "Flagged" : vehicle.currentStatus === "in" ? "In yard" : "Out";
+  const statusText = flags.length
+    ? "Flagged"
+    : vehicle.currentStatus === "in"
+      ? "In yard"
+      : vehicle.currentStatus === "transit"
+        ? "In transit"
+        : "Out";
   return (
     <article className={`vehicle ${vehicle.currentStatus} ${flags.length ? "flagged" : ""}`}>
       <div className="vehicle-main">
         <span className="vehicle-mark">{vehicle.model?.slice(0, 1) || "V"}</span>
         <div>
           <strong>{vehicle.vin}</strong>
-          <span>{vehicle.model}</span>
-          <small>{vehicle.variant || "Standard"} · {vehicle.colour || "Not set"}{vehicle.keyNo ? ` · Key No: ${vehicle.keyNo}` : ""}</small>
+          <span>{vehicle.model || "Model not set"}</span>
+          <small>{vehicle.keyNo ? `Key No: ${vehicle.keyNo}` : "No key number"}</small>
         </div>
       </div>
       <div className="vehicle-yard">
@@ -1779,10 +1848,27 @@ function VehicleCard({ vehicle, flags, isAdmin = false, setState }) {
 
 function DashboardView({ state, stats, session, setState }) {
   const [tab, setTab] = useState("charts");
-  const activeFlags = state.flags.filter((flag) => !flag.resolved && state.vehicles[flag.vin]?.currentYardId === session.yardId);
+  const isDelivery = session.role === "delivery_incharge";
+  const activeFlags = state.flags.filter((flag) => {
+    if (flag.resolved) return false;
+    if (isDelivery) return true;
+    return state.vehicles[flag.vin]?.currentYardId === session.yardId;
+  });
 
   return (
     <section className="stack">
+      <div className="stock-header-bar di-dash-header">
+        <div>
+          <span className="eyebrow">{isDelivery ? "Branch overview" : "Yard overview"}</span>
+          <h2>Dashboard</h2>
+          <p className="delivery-stock-subtitle">
+            {isDelivery
+              ? "Live stock signals for your branch transfers and inventory."
+              : "Operational pulse for your stockyard."}
+          </p>
+        </div>
+      </div>
+
       <ExecutiveKpiCards stats={stats} />
 
       {stats.dwellAlertCount > 0 && (
@@ -1802,13 +1888,15 @@ function DashboardView({ state, stats, session, setState }) {
 
       {tab === "charts" && (
         <div className="stack">
-          <section className="panel chart-panel">
-            <div className="chart-panel-header">
-              <h2>Yard Capacity Breakdown</h2>
-              <span className="pill info">Utilization Rate</span>
-            </div>
-            <YardCapacityBarChart yards={stats.yards} />
-          </section>
+          {!isDelivery && (
+            <section className="panel chart-panel">
+              <div className="chart-panel-header">
+                <h2>Yard Capacity Breakdown</h2>
+                <span className="pill info">Utilization Rate</span>
+              </div>
+              <YardCapacityBarChart yards={stats.yards} />
+            </section>
+          )}
 
           <section className="panel chart-panel">
             <div className="chart-panel-header">
