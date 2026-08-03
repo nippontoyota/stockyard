@@ -1,4 +1,4 @@
-import { detectModel, yards } from "../../stockyardLogic.js";
+import { yards } from "../../stockyardLogic.js";
 
 export function loadDismissedDamageScanIds() {
   try {
@@ -27,7 +27,7 @@ export function getDamagedExtras(state, activeFlagsList, dismissedScanIds = load
       return {
         id: scan.id || scan.clientScanId,
         vin: scan.vin,
-        model: vehicle?.model || detectModel(scan.vin),
+        model: vehicle?.model || "",
         yardName: yardObj?.name || scan.yardId || "Stockyard",
         damageRemark: scan.damageRemark || "Damage reported",
         damageImage: scan.damageImage || null,

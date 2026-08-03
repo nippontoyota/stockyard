@@ -1,7 +1,7 @@
 # Design: Inbound transit receive for branch transfers
 
 Date: 2026-08-03  
-Status: draft (pending user review)
+Status: implemented
 
 ## Goal
 

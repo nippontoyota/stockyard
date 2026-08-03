@@ -1,4 +1,4 @@
-import { detectModel, flagLabel, resolveFlag } from "../../stockyardLogic.js";
+import { flagLabel, resolveFlag } from "../../stockyardLogic.js";
 import { resolveFlag as apiResolveFlag, adminOverrideVehicle } from "../../api.js";
 
 export const FLAG_PRIORITY = {
@@ -68,7 +68,7 @@ export function enrichFlag(flag, state) {
     ...flag,
     damageRemark: flag.damageRemark || scan?.damageRemark || flag.message,
     damageImage: flag.damageImage || scan?.damageImage || null,
-    model: state?.vehicles?.[flag.vin]?.model || detectModel(flag.vin),
+    model: state?.vehicles?.[flag.vin]?.model || "",
   };
 }
 

@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { eq, and, count } from 'drizzle-orm';
+import { eq, and, count, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { yards, vehicles, vehicleStatus } from '../db/schema.js';
+import { yards, vehicles, vehicleStatus, branchYards, requisitions } from '../db/schema.js';
 import { authenticate, optionalAuthenticate } from '../middleware/auth.js';
+import { resolveBranchId } from '../lib/branch.js';
 
 const router = Router();
 
@@ -36,6 +37,78 @@ router.get('/', optionalAuthenticate, async (req, res, next) => {
   }
 });
 
+/**
+ * Yards a delivery incharge can request vehicles from.
+ * Excludes their own branch yards. Includes live IN counts.
+ */
+router.get('/request-targets', authenticate, async (req, res, next) => {
+  try {
+    if (req.user!.role !== 'delivery_incharge') {
+      res.status(403).json({ error: 'Only delivery incharge can browse request targets' });
+      return;
+    }
+
+    const ownBranchId = await resolveBranchId(req.user!);
+    const ownYardIds = ownBranchId
+      ? (
+          await db
+            .select({ yard_id: branchYards.yard_id })
+            .from(branchYards)
+            .where(eq(branchYards.branch_id, ownBranchId))
+        ).map((r) => r.yard_id)
+      : [];
+
+    const rows = await db
+      .select({
+        id: yards.id,
+        code: yards.code,
+        name: yards.name,
+        city: yards.city,
+        capacity: yards.capacity,
+        branch_id: branchYards.branch_id,
+      })
+      .from(yards)
+      .innerJoin(branchYards, eq(branchYards.yard_id, yards.id))
+      .where(eq(yards.active, true))
+      .orderBy(yards.city, yards.code, yards.name);
+
+    const filtered = ownYardIds.length
+      ? rows.filter((r) => !ownYardIds.includes(r.id))
+      : rows;
+
+    const yardIds = filtered.map((r) => r.id);
+    const inCounts = new Map<string, number>();
+    if (yardIds.length > 0) {
+      const counts = await db
+        .select({
+          yard_id: vehicleStatus.current_yard_id,
+          value: count(),
+        })
+        .from(vehicleStatus)
+        .where(
+          and(
+            eq(vehicleStatus.current_status, 'in'),
+            inArray(vehicleStatus.current_yard_id, yardIds),
+          ),
+        )
+        .groupBy(vehicleStatus.current_yard_id);
+
+      for (const row of counts) {
+        if (row.yard_id) inCounts.set(row.yard_id, Number(row.value));
+      }
+    }
+
+    res.json(
+      filtered.map((yard) => ({
+        ...yard,
+        in_count: inCounts.get(yard.id) ?? 0,
+      })),
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── GET /:id/stock ──────────────────────────────────────────────────
 
 router.get('/:id/stock', authenticate, async (req, res, next) => {
@@ -47,11 +120,28 @@ router.get('/:id/stock', authenticate, async (req, res, next) => {
       return;
     }
 
+    // Delivery incharge may not request from their own branch yards
+    if (req.user!.role === 'delivery_incharge') {
+      const ownBranchId = await resolveBranchId(req.user!);
+      if (ownBranchId) {
+        const [mapped] = await db
+          .select({ branch_id: branchYards.branch_id })
+          .from(branchYards)
+          .where(eq(branchYards.yard_id, yardId))
+          .limit(1);
+        if (mapped?.branch_id === ownBranchId) {
+          res.status(400).json({ error: 'Cannot request from your own branch yards' });
+          return;
+        }
+      }
+    }
+
     const rows = await db
       .select({
-        id: vehicles.id,
+        vehicle_id: vehicles.id,
         vin: vehicles.vin,
         model: vehicles.model,
+        current_yard_id: vehicleStatus.current_yard_id,
         last_changed_at: vehicleStatus.last_changed_at,
       })
       .from(vehicleStatus)
@@ -64,7 +154,19 @@ router.get('/:id/stock', authenticate, async (req, res, next) => {
       )
       .orderBy(vehicleStatus.last_changed_at);
 
-    res.json(rows);
+    const activeReqs = await db
+      .select({ vehicle_id: requisitions.vehicle_id, status: requisitions.status })
+      .from(requisitions)
+      .where(inArray(requisitions.status, ['pending', 'approved']));
+
+    const reqByVehicle = new Map(activeReqs.map((r) => [r.vehicle_id, r.status]));
+
+    res.json(
+      rows.map((v) => ({
+        ...v,
+        requisition_status: reqByVehicle.get(v.vehicle_id) ?? null,
+      })),
+    );
   } catch (err) {
     next(err);
   }

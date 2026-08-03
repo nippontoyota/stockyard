@@ -1,28 +1,235 @@
 import { Router } from 'express';
-import { eq, and, desc, ilike, sql } from 'drizzle-orm';
+import { eq, and, desc, ilike, sql, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { vehicles, vehicleStatus, scans, yards, flags } from '../db/schema.js';
-import { authenticate } from '../middleware/auth.js';
-
-import { detectModel } from '../lib/vin.js';
+import { vehicles, vehicleStatus, scans, devices, branchYards, flags } from '../db/schema.js';
+import { authenticate, type AuthUser } from '../middleware/auth.js';
+import { emitScanEvent } from '../lib/socket.js';
+import { resolveBranchId } from '../lib/branch.js';
+import { z } from 'zod';
 
 const router = Router();
 router.use(authenticate);
 
-let vehicleExtraColumnsReady = false;
-async function ensureVehicleExtraColumns() {
-  if (vehicleExtraColumnsReady) return;
-  await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS variant text`);
-  await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS colour text`);
-  vehicleExtraColumnsReady = true;
+let variantColourCleared = false;
+async function clearLegacyVariantColour() {
+  if (variantColourCleared) return;
+  await db.execute(sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`);
+  variantColourCleared = true;
 }
+
+async function findOrCreateDevice(fingerprint: string): Promise<string> {
+  const result = await db
+    .insert(devices)
+    .values({ device_fingerprint: fingerprint })
+    .onConflictDoUpdate({
+      target: devices.device_fingerprint,
+      set: { last_seen_at: new Date() },
+    })
+    .returning({ id: devices.id });
+  return result[0].id;
+}
+
+async function incomingYardIdsForUser(user: AuthUser | undefined): Promise<string[] | 'all' | null> {
+  if (!user) return null;
+  if (user.role === 'admin') return 'all';
+  if (user.role === 'stockyard' && user.yard_id) return [user.yard_id];
+  if (user.role === 'delivery_incharge') {
+    const branchId = await resolveBranchId(user);
+    if (!branchId) return [];
+    const rows = await db
+      .select({ yard_id: branchYards.yard_id })
+      .from(branchYards)
+      .where(eq(branchYards.branch_id, branchId));
+    return rows.map((r) => r.yard_id);
+  }
+  return null;
+}
+
+// ─── GET /incoming ───────────────────────────────────────────────────
+// Transit vehicles headed to this user's yard / branch yards.
+
+router.get('/incoming', async (req, res, next) => {
+  try {
+    await clearLegacyVariantColour();
+    const yardScope = await incomingYardIdsForUser(req.user);
+    if (yardScope === null) {
+      res.status(403).json({ error: 'Not allowed to view incoming vehicles' });
+      return;
+    }
+    if (Array.isArray(yardScope) && yardScope.length === 0) {
+      res.json({ data: [] });
+      return;
+    }
+
+    const conditions = [eq(vehicleStatus.current_status, 'transit')];
+    if (yardScope !== 'all') {
+      conditions.push(inArray(vehicleStatus.current_yard_id, yardScope));
+    }
+
+    const rows = await db
+      .select({
+        id: vehicles.id,
+        vin: vehicles.vin,
+        model: vehicles.model,
+        drive_type: vehicles.drive_type,
+        vin_valid: vehicles.vin_valid,
+        current_status: vehicleStatus.current_status,
+        current_yard_id: vehicleStatus.current_yard_id,
+        last_changed_at: vehicleStatus.last_changed_at,
+        key_no: vehicleStatus.key_no,
+        out_remark: scans.out_remark,
+        transfer_requested_by: scans.transfer_requested_by,
+        source_yard_id: scans.yard_id,
+      })
+      .from(vehicles)
+      .innerJoin(vehicleStatus, eq(vehicles.id, vehicleStatus.vehicle_id))
+      .leftJoin(scans, eq(vehicleStatus.last_out_scan_id, scans.id))
+      .where(and(...conditions))
+      .orderBy(desc(vehicleStatus.last_changed_at));
+
+    res.json({ data: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const receiveBody = z.object({
+  device_fingerprint: z.string().min(1).optional(),
+  key_no: z.string().optional(),
+  drive_type: z.enum(['neo_drive', 'hybrid', 'petrol', 'diesel']).optional(),
+});
+
+// ─── POST /receive/:vin ──────────────────────────────────────────────
+// Mark a transit vehicle as IN at its destination yard (list receive).
+
+router.post('/receive/:vin', async (req, res, next) => {
+  try {
+    const body = receiveBody.parse(req.body || {});
+    const vin = req.params.vin.toUpperCase().trim();
+    const yardScope = await incomingYardIdsForUser(req.user);
+    if (yardScope === null || (Array.isArray(yardScope) && yardScope.length === 0)) {
+      res.status(403).json({ error: 'Not allowed to receive vehicles' });
+      return;
+    }
+
+    const [row] = await db
+      .select({
+        id: vehicles.id,
+        vin: vehicles.vin,
+        model: vehicles.model,
+        current_status: vehicleStatus.current_status,
+        current_yard_id: vehicleStatus.current_yard_id,
+      })
+      .from(vehicles)
+      .leftJoin(vehicleStatus, eq(vehicles.id, vehicleStatus.vehicle_id))
+      .where(eq(vehicles.vin, vin));
+
+    if (!row) {
+      res.status(404).json({ error: 'Vehicle not found' });
+      return;
+    }
+
+    if (row.current_status === 'in' && row.current_yard_id) {
+      const allowed =
+        yardScope === 'all' || (row.current_yard_id && yardScope.includes(row.current_yard_id));
+      if (allowed) {
+        res.json({ status: 'already_processed', vin: row.vin, yard_id: row.current_yard_id });
+        return;
+      }
+    }
+
+    if (row.current_status !== 'transit' || !row.current_yard_id) {
+      res.status(400).json({ error: 'Vehicle is not in transit' });
+      return;
+    }
+
+    if (yardScope !== 'all' && !yardScope.includes(row.current_yard_id)) {
+      res.status(403).json({ error: 'Vehicle is not incoming to your yard' });
+      return;
+    }
+
+    const destYardId = row.current_yard_id;
+    const fingerprint =
+      body.device_fingerprint ||
+      `receive-${req.user!.id || req.user!.role}-${destYardId}`;
+    const deviceId = await findOrCreateDevice(fingerprint);
+    const scannedAt = new Date();
+    const clientScanId = `receive-${vin}-${scannedAt.getTime()}`;
+
+    const result = await db.transaction(async (tx) => {
+      if (body.drive_type) {
+        await tx
+          .update(vehicles)
+          .set({ drive_type: body.drive_type, updated_at: new Date(), variant: null, colour: null })
+          .where(eq(vehicles.id, row.id));
+      }
+
+      const [scan] = await tx
+        .insert(scans)
+        .values({
+          client_scan_id: clientScanId,
+          vehicle_id: row.id,
+          vin_raw: vin,
+          scan_type: 'in',
+          yard_id: destYardId,
+          device_id: deviceId,
+          scanned_at: scannedAt,
+          key_no: body.key_no,
+          status: 'accepted',
+        })
+        .returning();
+
+      await tx
+        .insert(vehicleStatus)
+        .values({
+          vehicle_id: row.id,
+          current_status: 'in',
+          current_yard_id: destYardId,
+          last_in_scan_id: scan.id,
+          last_changed_at: scannedAt,
+          key_no: body.key_no,
+        })
+        .onConflictDoUpdate({
+          target: vehicleStatus.vehicle_id,
+          set: {
+            current_status: 'in',
+            current_yard_id: destYardId,
+            last_in_scan_id: scan.id,
+            last_changed_at: scannedAt,
+            ...(body.key_no ? { key_no: body.key_no } : {}),
+            override_reason: null,
+          },
+        });
+
+      return scan;
+    });
+
+    emitScanEvent({
+      type: 'in',
+      vin,
+      model: row.model,
+      yardId: destYardId,
+      timestamp: scannedAt.toISOString(),
+      status: 'accepted',
+    });
+
+    res.status(201).json({
+      status: 'accepted',
+      scan_id: result.id,
+      vin,
+      yard_id: destYardId,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── GET / ───────────────────────────────────────────────────────────
 // Paginated vehicle list. Stockyard users auto-filtered to their yard.
 
 router.get('/', async (req, res, next) => {
   try {
-    await ensureVehicleExtraColumns();
+    await clearLegacyVariantColour();
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(10000, Math.max(1, Number(req.query.limit) || 50));
     const offset = (page - 1) * limit;
@@ -44,13 +251,11 @@ router.get('/', async (req, res, next) => {
       conditions.push(ilike(vehicles.model, `%${req.query.model}%`));
     }
 
-    const rawRows = await db
+    const rows = await db
       .select({
         id: vehicles.id,
         vin: vehicles.vin,
         model: vehicles.model,
-        variant: vehicles.variant,
-        colour: vehicles.colour,
         drive_type: vehicles.drive_type,
         vin_valid: vehicles.vin_valid,
         current_status: vehicleStatus.current_status,
@@ -67,11 +272,6 @@ router.get('/', async (req, res, next) => {
       .limit(limit)
       .offset(offset);
 
-    const rows = rawRows.map((v) => ({
-      ...v,
-      model: v.model && v.model !== 'Unknown' && v.model !== 'Toyota Vehicle' ? v.model : detectModel(v.vin),
-    }));
-
     res.json({ page, limit, data: rows });
   } catch (err) {
     next(err);
@@ -82,13 +282,12 @@ router.get('/', async (req, res, next) => {
 
 router.get('/:vin', async (req, res, next) => {
   try {
+    await clearLegacyVariantColour();
     const [vehicle] = await db
       .select({
         id: vehicles.id,
         vin: vehicles.vin,
         model: vehicles.model,
-        variant: vehicles.variant,
-        colour: vehicles.colour,
         drive_type: vehicles.drive_type,
         vin_valid: vehicles.vin_valid,
         created_at: vehicles.created_at,
@@ -200,12 +399,18 @@ router.post('/transit-list', async (req, res, next) => {
           .insert(vehicles)
           .values({
             vin: tv.vin,
-            model: tv.model || 'Toyota Vehicle',
+            model: tv.model || null,
             vin_valid: true,
+            variant: null,
+            colour: null,
           })
           .onConflictDoUpdate({
             target: vehicles.vin,
-            set: { model: tv.model || 'Toyota Vehicle' },
+            set: {
+              ...(tv.model ? { model: tv.model } : {}),
+              variant: null,
+              colour: null,
+            },
           })
           .returning({ id: vehicles.id });
         

@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
-import { applyScan, createInitialState, dashboard, decodeVinDetails, normalizeVin, parseDeliveredVins, removeDeliveredVehicles, yards } from "./stockyardLogic.js";
+import { applyScan, CAR_MODELS, createInitialState, dashboard, isCarModel, normalizeVin, parseDeliveredVins, yards } from "./stockyardLogic.js";
 
-// Verify Toyota Hyryder VIN decoding (from user screenshot VIN MBJUYML1STE225473)
-const hyryderDecoded = decodeVinDetails("MBJUYML1STE225473");
-assert.equal(hyryderDecoded.model, "Toyota Urban Cruiser Hyryder");
-assert.equal(hyryderDecoded.variant, "1.5L / 2.0L NeoDrive Hybrid · 2026 MY");
-assert.equal(hyryderDecoded.colour, "TKM Bidadi Plant");
+assert.equal(CAR_MODELS.length, 13);
+assert.equal(isCarModel("Urban Cruiser HyRyder"), true);
+assert.equal(isCarModel("Toyota Vehicle"), false);
 
 globalThis.localStorage = {
   data: {},
@@ -26,6 +24,7 @@ const baseScan = {
   type: "in",
   yardId: "CO01B-1",
   keyNo: "K-901",
+  model: "Hilux",
   deviceId: "device-1",
   scannedAt: new Date().toISOString(),
   syncStatus: "synced",
@@ -38,6 +37,7 @@ const firstScanResult = applyScan(createInitialState(), baseScan);
 assert.equal(firstScanResult.accepted, true);
 assert.equal(firstScanResult.state.vehicles.JTMBA38V70D123456.currentYardId, "CO01B-1");
 assert.equal(firstScanResult.state.vehicles.JTMBA38V70D123456.keyNo, "K-901");
+assert.equal(firstScanResult.state.vehicles.JTMBA38V70D123456.model, "Hilux");
 
 // Second scan at the SAME yard: should be rejected silently
 const sameYardDuplicate = applyScan(firstScanResult.state, { ...baseScan, clientScanId: "client-2" });
@@ -46,14 +46,28 @@ assert.equal(sameYardDuplicate.message, "Vehicle is already IN at this yard.");
 assert.equal(sameYardDuplicate.state.flags.some((flag) => flag.type === "duplicate_yard_status"), false);
 
 // Third scan at a DIFFERENT yard: should be accepted as IN at new yard, update location, and raise duplicate_yard_status flag
-const transferConflict = applyScan(firstScanResult.state, { ...baseScan, clientScanId: "client-3", yardId: "CO01A-1" });
+const transferConflict = applyScan(firstScanResult.state, { ...baseScan, clientScanId: "client-3", yardId: "CO01A-1", model: "Fortuner" });
 assert.equal(transferConflict.accepted, true);
 assert.equal(transferConflict.state.vehicles.JTMBA38V70D123456.currentYardId, "CO01A-1");
 assert.equal(transferConflict.state.vehicles.JTMBA38V70D123456.currentStatus, "in");
+assert.equal(transferConflict.state.vehicles.JTMBA38V70D123456.model, "Fortuner");
 assert.equal(transferConflict.state.flags.some((flag) => flag.type === "duplicate_yard_status"), true);
 
+// Branch transfer OUT moves vehicle to transit at destination yard
+const transferOut = applyScan(firstScanResult.state, {
+  ...baseScan,
+  clientScanId: "client-transfer-out",
+  type: "out",
+  outRemark: "stockyard_transfer",
+  transferDestinationYardId: "CO01A-1",
+  transferRequestedBy: "DI Test",
+});
+assert.equal(transferOut.accepted, true);
+assert.equal(transferOut.state.vehicles.JTMBA38V70D123456.currentStatus, "transit");
+assert.equal(transferOut.state.vehicles.JTMBA38V70D123456.currentYardId, "CO01A-1");
+
 // OUT scan with no prior IN (using a completely new state and VIN)
-const outNoIn = applyScan(createInitialState(), { ...baseScan, clientScanId: "client-4", vinRaw: "AAAAAAAAAAAAAAAAA", type: "out", outRemark: "customer_acquisition" });
+const outNoIn = applyScan(createInitialState(), { ...baseScan, clientScanId: "client-4", vinRaw: "AAAAAAAAAAAAAAAAA", type: "out", outRemark: "customer_acquisition", model: "" });
 assert.equal(outNoIn.accepted, true);
 assert.equal(outNoIn.state.flags.some((flag) => flag.type === "unverified_in"), true);
 
@@ -84,11 +98,13 @@ const damagedInScan = applyScan(createInitialState(), {
   clientScanId: "client-6",
   vinRaw: "MBJUYML1STE999999",
   type: "in",
+  model: "Urban Cruiser HyRyder",
   damaged: true,
   damageRemark: "Scratched side door panel",
   damageImage: "data:image/png;base64,sampleImageData",
 });
 assert.equal(damagedInScan.accepted, true);
+assert.equal(damagedInScan.state.vehicles.MBJUYML1STE999999.model, "Urban Cruiser HyRyder");
 const damageFlag = damagedInScan.state.flags.find((f) => f.type === "damage_reported");
 assert.ok(damageFlag);
 assert.equal(damageFlag.damageRemark, "Scratched side door panel");

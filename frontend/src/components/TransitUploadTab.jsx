@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import * as XLSX from "xlsx";
-import { yards, yardsByRegion, normalizeVin, isValidVin, detectModel } from "../stockyardLogic.js";
+import { yards, yardsByRegion, normalizeVin, isValidVin } from "../stockyardLogic.js";
 import { uploadTransitListApi } from "../api.js";
 import { ConfirmDialog } from "./ConfirmDialog.jsx";
 
@@ -65,11 +65,11 @@ export function TransitUploadTab({ onUploadComplete }) {
 
           const rawYard = yardCol !== -1 ? row[yardCol] : null;
           const matchedYard = findYard(rawYard);
-          const rawModel = modelCol !== -1 ? row[modelCol] : detectModel(normalizedVin);
+          const rawModel = modelCol !== -1 ? String(row[modelCol] || "").trim() : "";
 
           extracted.push({
             vin: normalizedVin,
-            model: rawModel || detectModel(normalizedVin),
+            model: rawModel || null,
             yard_id: matchedYard?.id || null,
             yardCode: matchedYard?.code || "",
             yardName: matchedYard?.name || "",

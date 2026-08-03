@@ -61,6 +61,21 @@ export async function notifyRoleAtBranch(role: string, branchId: string, payload
   }
 }
 
+/** Notify stockyard accounts scoped to a specific yard. */
+export async function notifyStockyardAtYard(yardId: string, payload: any) {
+  try {
+    const { credentials } = await import('../db/schema.js');
+    const { and } = await import('drizzle-orm');
+    const users = await db.select({ id: credentials.id })
+      .from(credentials)
+      .where(and(eq(credentials.role, 'stockyard'), eq(credentials.yard_id, yardId)));
+
+    await Promise.all(users.map((u) => sendPushNotification(u.id, payload)));
+  } catch (err) {
+    console.error('notifyStockyardAtYard failed:', err);
+  }
+}
+
 export async function notifyAdmins(payload: { title: string; body: string; url?: string }) {
   try {
     const { credentials } = await import('../db/schema.js');

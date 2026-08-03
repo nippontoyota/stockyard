@@ -1,9 +1,9 @@
 // Static yard list (mirrors backend/src/lib/yardData.ts). Not fetched — avoids
 // filtered /api/yards responses overwriting the login dropdown after logout.
 import { YARD_DATA, YARD_REGIONS } from "./yardData.js";
-import { decodeVinDetails, detectModel } from "../../backend/src/shared/decodeVinDetails.js";
+import { CAR_MODELS, isCarModel } from "../../backend/src/shared/carModels.js";
 
-export { decodeVinDetails, detectModel };
+export { CAR_MODELS, isCarModel };
 
 export let yards = [...YARD_DATA];
 export let fallbackBranches = [];
@@ -50,7 +50,7 @@ export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "" }) {
+export function createScan({ vin, type, yardId, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "", model = "" }) {
   return {
     id: crypto.randomUUID(),
     clientScanId: createClientScanId(),
@@ -65,6 +65,7 @@ export function createScan({ vin, type, yardId, outRemark = "", transferDestinat
     damageRemark,
     damageImage,
     driveType,
+    model,
     deviceId: localStorage.getItem("yardDeviceId") || "unknown-device",
     scannedAt: new Date().toISOString(),
   };
@@ -105,17 +106,26 @@ export function applyScan(state, scan) {
   if (scan.type === "out" && !existing) flags.push(flag(vin, "unverified_in", "OUT scan has no prior IN record."));
   if (scan.damaged) flags.push(flag(vin, "damage_reported", scan.damageRemark || "Damage reported.", { damageRemark: scan.damageRemark, damageImage: scan.damageImage, scanType: scan.type, yardId: scan.yardId }));
 
-  const decoded = decodeVinDetails(vin);
+  const nextModel =
+    scan.type === "in" && scan.model
+      ? scan.model
+      : existing?.model || "";
+
   const vehicle = {
     vin,
-    model: existing?.model && existing.model !== "Toyota Vehicle" ? existing.model : decoded.model,
-    variant: existing?.variant && existing.variant !== "Standard" ? existing.variant : decoded.variant,
-    colour: existing?.colour && existing.colour !== "Not set" ? existing.colour : decoded.colour,
+    model: nextModel,
     vinValid,
-    currentStatus: scan.type,
-    currentYardId: scan.type === "in" ? scan.yardId : existing?.currentYardId || scan.yardId,
+    currentStatus: scan.type === "out" && scan.outRemark === "stockyard_transfer"
+      ? "transit"
+      : scan.type,
+    currentYardId: scan.type === "in"
+      ? scan.yardId
+      : scan.type === "out" && scan.outRemark === "stockyard_transfer" && scan.transferDestinationYardId
+        ? scan.transferDestinationYardId
+        : existing?.currentYardId || scan.yardId,
     lastChangedAt: scan.scannedAt,
     keyNo: scan.keyNo || existing?.keyNo || "",
+    driveType: scan.driveType || existing?.driveType || "",
   };
   const next = {
     ...state,
@@ -230,7 +240,7 @@ export function resolveFlag(state, id) {
 
 export function updateVehicleAdmin(state, { vin, yardId, status, reason }) {
   const normalized = normalizeVin(vin);
-  const existing = state.vehicles[normalized] || { vin: normalized, model: detectModel(normalized), vinValid: isValidVin(normalized) };
+  const existing = state.vehicles[normalized] || { vin: normalized, model: "", vinValid: isValidVin(normalized) };
   return {
     ...state,
     vehicles: {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isValidVin, decodeVinDetails, detectModel } from './vin.js';
+import { isValidVin } from './vin.js';
+import { CAR_MODELS, isCarModel } from '../shared/carModels.js';
 
 describe('isValidVin', () => {
   it('accepts a valid 17-char VIN', () => {
@@ -23,48 +24,19 @@ describe('isValidVin', () => {
   });
 });
 
-describe('decodeVinDetails', () => {
-  it('returns Toyota Vehicle for short input', () => {
-    const r = decodeVinDetails('ABC');
-    expect(r.model).toContain('Toyota');
+describe('CAR_MODELS', () => {
+  it('lists 13 Nippon Toyota models', () => {
+    expect(CAR_MODELS).toHaveLength(13);
+    expect(CAR_MODELS).toContain('Urban Cruiser HyRyder');
+    expect(CAR_MODELS).toContain('Innova HyCross');
   });
 
-  it('decodes Hyryder VIN', () => {
-    const r = decodeVinDetails('MHYUR223035400146');
-    expect(r.model).toContain('Hyryder');
+  it('accepts catalogue names', () => {
+    expect(isCarModel('Fortuner')).toBe(true);
   });
 
-  it('decodes Fortuner VIN', () => {
-    const r = decodeVinDetails('MBJDTG223035400146');
-    expect(r.model).toContain('Fortuner');
-  });
-
-  it('decodes Innova Crysta VIN', () => {
-    const r = decodeVinDetails('MBJAU223035400146');
-    expect(r.model).toContain('Crysta');
-  });
-
-  it('detects Lexus from WMI', () => {
-    const r = decodeVinDetails('JTHAJ223035400146');
-    expect(r.model).toContain('Lexus');
-  });
-
-  it('returns variant with year', () => {
-    const r = decodeVinDetails('MHYRV223035400146');
-    expect(r.variant).toMatch(/MY$/);
-  });
-
-  it('returns colour with plant origin', () => {
-    const r = decodeVinDetails('MHYRV223035400146');
-    expect(r.colour).toBeTruthy();
-    expect(typeof r.colour).toBe('string');
-  });
-});
-
-describe('detectModel', () => {
-  it('returns model name string', () => {
-    const m = detectModel('MHYRV223035400146');
-    expect(typeof m).toBe('string');
-    expect(m.length).toBeGreaterThan(0);
+  it('rejects unknown models', () => {
+    expect(isCarModel('Toyota Vehicle')).toBe(false);
+    expect(isCarModel('')).toBe(false);
   });
 });
