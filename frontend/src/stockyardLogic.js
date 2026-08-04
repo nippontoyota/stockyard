@@ -2,8 +2,9 @@
 // filtered /api/yards responses overwriting the login dropdown after logout.
 import { YARD_DATA, YARD_REGIONS } from "./yardData.js";
 import { CAR_MODELS, isCarModel } from "../../backend/src/shared/carModels.js";
+import { DRIVE_TYPES, driveTypeLabel, isDriveType } from "../../backend/src/shared/driveTypes.js";
 
-export { CAR_MODELS, isCarModel };
+export { CAR_MODELS, isCarModel, DRIVE_TYPES, driveTypeLabel, isDriveType };
 
 export let yards = [...YARD_DATA];
 export let fallbackBranches = [];

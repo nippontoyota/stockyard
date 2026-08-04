@@ -5,16 +5,14 @@ import {
   findYardById,
   yardsByRegion,
   isValidVin,
+  DRIVE_TYPES,
 } from "../stockyardLogic.js";
 import { adminUpdateVehicle } from "../api.js";
 import { AdminVehicleDeleteButton } from "./AdminVehicleDeleteButton.jsx";
 
-const DRIVE_TYPES = [
+const DRIVE_TYPE_OPTIONS = [
   { value: "", label: "Not set" },
-  { value: "neo_drive", label: "Neo Drive" },
-  { value: "hybrid", label: "Hybrid" },
-  { value: "petrol", label: "Petrol" },
-  { value: "diesel", label: "Diesel" },
+  ...DRIVE_TYPES,
 ];
 
 function getDerivedStatus(v) {
@@ -326,7 +324,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
                   <label className="vehicle-edit-field">
                     <span>Drive type</span>
                     <select value={form.driveType} onChange={(e) => updateField("driveType", e.target.value)}>
-                      {DRIVE_TYPES.map((opt) => (
+                      {DRIVE_TYPE_OPTIONS.map((opt) => (
                         <option key={opt.value || "none"} value={opt.value}>{opt.label}</option>
                       ))}
                     </select>
