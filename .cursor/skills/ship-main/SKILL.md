@@ -18,10 +18,10 @@ Do this end-to-end. Do not stop after push. Do not ask whether to deploy unless 
 | Target | Detail |
 |--------|--------|
 | Deploy branch | `main` (push here; do not use `sajad` even if it is GitHub default) |
-| Backend (Render) | Auto-deploys on `git push origin main` → `https://stockyard-00s6.onrender.com` |
+| Backend (Render) | Auto-deploys on `git push origin main` → `https://stockyard-api-xvaa.onrender.com` |
 | Frontend (Cloudflare Pages) | Project `nippon-yard-scan` via Wrangler from `frontend/dist` |
 | Pages URL | `https://nippon-yard-scan.pages.dev` |
-| Health | `curl.exe -fsS https://stockyard-00s6.onrender.com/health` |
+| Health | `curl.exe -fsS https://stockyard-api-xvaa.onrender.com/ready` |
 
 ## Workflow
 
@@ -102,8 +102,9 @@ If Wrangler auth fails: tell the user to run `npx wrangler login` and stop.
 ### 5. Verify
 
 ```powershell
-curl.exe -fsS --max-time 30 https://stockyard-00s6.onrender.com/health
+curl.exe -fsS --max-time 30 https://stockyard-api-xvaa.onrender.com/ready
 curl.exe -sI --max-time 20 https://nippon-yard-scan.pages.dev
+curl.exe -sI --max-time 20 https://stockyard-phi.vercel.app
 ```
 
 Report back in 3–5 lines:

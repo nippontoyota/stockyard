@@ -1,0 +1,24 @@
+# Periodic + on-demand production smoke.
+# Job failure emails anyone watching the repo (GitHub notification settings).
+name: Production smoke
+on:
+  schedule:
+    - cron: '*/10 * * * *' # every 10 minutes
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Smoke (ready + login + Vercel)
+        env:
+          SMOKE_API_BASE: https://stockyard-api-xvaa.onrender.com
+          SMOKE_FRONTEND_URL: https://stockyard-phi.vercel.app
+          # Optional: set repo secrets SMOKE_USER / SMOKE_PASS to override defaults
+          SMOKE_USER: ${{ secrets.SMOKE_USER }}
+          SMOKE_PASS: ${{ secrets.SMOKE_PASS }}
+          SMOKE_RETRIES: '3'
+          SMOKE_RETRY_SLEEP: '10'
+        run: bash .github/scripts/smoke-prod.sh

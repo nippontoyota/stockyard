@@ -18,8 +18,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "../../../..");
 const FRONTEND = join(REPO_ROOT, "frontend");
 const CF_PROJECT = "nippon-yard-scan";
-const RENDER_HEALTH = "https://stockyard-00s6.onrender.com/health";
+const RENDER_READY = "https://stockyard-api-xvaa.onrender.com/ready";
+const VERCEL_URL = "https://stockyard-phi.vercel.app";
 const PAGES_URL = "https://nippon-yard-scan.pages.dev";
+const SMOKE_SCRIPT = join(REPO_ROOT, ".github/scripts/smoke-prod.sh");
 
 const args = new Set(process.argv.slice(2));
 const cloudflareOnly = args.has("--cloudflare-only") || args.has("--no-push");
@@ -32,7 +34,7 @@ function run(cmd, cmdArgs, opts = {}) {
     cwd,
     stdio: "inherit",
     shell: process.platform === "win32",
-    env: process.env,
+    env: opts.env || process.env,
   });
   if (r.status !== 0) {
     throw new Error(`Command failed (${r.status}): ${cmd} ${cmdArgs.join(" ")}`);
@@ -95,13 +97,32 @@ function deployCloudflare() {
 
 function verify() {
   console.log("\n--- verify ---");
+  if (existsSync(SMOKE_SCRIPT) && process.platform !== "win32") {
+    run("bash", [SMOKE_SCRIPT], {
+      env: {
+        ...process.env,
+        SMOKE_API_BASE: "https://stockyard-api-xvaa.onrender.com",
+        SMOKE_FRONTEND_URL: VERCEL_URL,
+        SMOKE_RETRIES: "4",
+        SMOKE_RETRY_SLEEP: "10",
+      },
+    });
+    return;
+  }
+  // Windows / fallback: curl the critical paths without bash
+  const curl = process.platform === "win32" ? "curl.exe" : "curl";
   try {
-    run("curl.exe", ["-fsS", "--max-time", "30", RENDER_HEALTH]);
+    run(curl, ["-fsS", "--max-time", "30", RENDER_READY]);
   } catch {
-    console.warn("Render health check failed or timed out (service may be waking).");
+    console.warn("Render /ready check failed or timed out (service may be deploying).");
   }
   try {
-    run("curl.exe", ["-sI", "--max-time", "20", PAGES_URL]);
+    run(curl, ["-sI", "--max-time", "20", VERCEL_URL]);
+  } catch {
+    console.warn("Vercel HEAD check failed.");
+  }
+  try {
+    run(curl, ["-sI", "--max-time", "20", PAGES_URL]);
   } catch {
     console.warn("Pages HEAD check failed.");
   }
@@ -117,7 +138,8 @@ function main() {
 
   const sha = runCapture("git", ["rev-parse", "--short", "HEAD"]);
   console.log(`\nDone. HEAD ${sha}`);
-  console.log(`Render health: ${RENDER_HEALTH}`);
+  console.log(`Render ready: ${RENDER_READY}`);
+  console.log(`Vercel: ${VERCEL_URL}`);
   console.log(`Cloudflare: ${PAGES_URL}`);
 }
 

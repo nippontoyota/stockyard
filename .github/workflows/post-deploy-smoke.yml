@@ -1,0 +1,23 @@
+# After main deploys, wait for Render/Vercel and verify production still works.
+name: Post-deploy smoke
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for deploy then smoke
+        env:
+          SMOKE_API_BASE: https://stockyard-api-xvaa.onrender.com
+          SMOKE_FRONTEND_URL: https://stockyard-phi.vercel.app
+          SMOKE_USER: ${{ secrets.SMOKE_USER }}
+          SMOKE_PASS: ${{ secrets.SMOKE_PASS }}
+          # Render build+deploy is usually ~1–2 min; retry until ready
+          SMOKE_RETRIES: '12'
+          SMOKE_RETRY_SLEEP: '15'
+        run: bash .github/scripts/smoke-prod.sh
