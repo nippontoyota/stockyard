@@ -1,4 +1,4 @@
-const CACHE = "yard-scan-v5";
+const CACHE = "yard-scan-v6";
 const PRECACHE = ["/", "/index.html", "/manifest.webmanifest", "/favicon.svg"];
 
 self.addEventListener("install", (event) => {
