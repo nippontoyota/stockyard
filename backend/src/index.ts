@@ -29,6 +29,9 @@ import { sql } from 'drizzle-orm';
 const app = express();
 const httpServer = createServer(app);
 
+// Render terminates TLS and sets X-Forwarded-For; required for rate-limit IP keys.
+app.set('trust proxy', 1);
+
 // §1.1 — Initialize Socket.io
 initSocket(httpServer);
 
