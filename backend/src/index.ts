@@ -44,10 +44,10 @@ app.use(express.json({ limit: '5mb' })); // bulk-sync payloads can be large
 // Request logging
 app.use(morgan('tiny'));
 
-// Rate limiting
+// Rate limiting — office NAT shares one IP across many phones; keep headroom.
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // Limit each IP to 500 requests per windowMs
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -134,7 +134,9 @@ httpServer.listen(port, '0.0.0.0', () => {
     sql`ALTER TABLE requisitions ADD COLUMN IF NOT EXISTS destination_yard_id text REFERENCES yards(id)`,
   ).catch((err) => console.error('Failed to ensure destination_yard_id column:', err));
 
-  // F6 — Run dwell check every 6 hours
-  checkDwellAlerts().catch(console.error);
-  setInterval(() => checkDwellAlerts().catch(console.error), 6 * 60 * 60 * 1000);
+  // F6 — Dwell check: delay after boot so login traffic isn't competing with scan work.
+  setTimeout(() => {
+    checkDwellAlerts().catch(console.error);
+    setInterval(() => checkDwellAlerts().catch(console.error), 6 * 60 * 60 * 1000);
+  }, 2 * 60 * 1000);
 });

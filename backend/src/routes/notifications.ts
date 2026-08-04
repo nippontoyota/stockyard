@@ -24,7 +24,8 @@ router.get('/', async (req, res, next) => {
           eq(notifications.read, false)
         )
       )
-      .orderBy(desc(notifications.created_at));
+      .orderBy(desc(notifications.created_at))
+      .limit(50);
 
     res.json(notifs);
   } catch (err) {
