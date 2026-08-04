@@ -1,3 +1,5 @@
+import { VEHICLE_PAGE_SIZE, fetchAllVehiclePages } from "./vehiclePagination.js";
+
 const API_BASE = import.meta.env.VITE_API_URL || "https://stockyard-api-xvaa.onrender.com";
 
 const FETCH_TIMEOUT_MS = 12000;
@@ -195,13 +197,36 @@ export async function bulkSync(scans) {
 }
 
 export async function getVehicles(params = {}) {
-  const { page = 1, limit = 300, yardId, status, model } = params;
-  let url = `/api/vehicles?page=${page}&limit=${limit}`;
-  if (yardId) url += `&yard_id=${yardId}`;
-  if (status) url += `&status=${status}`;
-  if (model) url += `&model=${encodeURIComponent(model)}`;
-  const response = await apiFetch(url);
-  return response.data || [];
+  const {
+    limit = VEHICLE_PAGE_SIZE,
+    yardId,
+    status,
+    model,
+    // Explicit single-page fetch (tests / rare callers). Default: load every page.
+    page: singlePage,
+    allPages = singlePage == null,
+  } = params;
+
+  const buildUrl = (page) => {
+    let url = `/api/vehicles?page=${page}&limit=${limit}`;
+    if (yardId) url += `&yard_id=${encodeURIComponent(yardId)}`;
+    if (status) url += `&status=${encodeURIComponent(status)}`;
+    if (model) url += `&model=${encodeURIComponent(model)}`;
+    return url;
+  };
+
+  const fetchPage = async (page) => {
+    const response = await apiFetch(buildUrl(page));
+    return response.data || [];
+  };
+
+  // Yard-scoped stock views and admin/global sync must both be complete.
+  // A single default page (formerly 300) left admin undercounting many yards.
+  if (!allPages) {
+    return fetchPage(singlePage || 1);
+  }
+
+  return fetchAllVehiclePages(fetchPage, { pageSize: limit });
 }
 
 export async function getFlags() {
