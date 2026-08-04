@@ -77,6 +77,9 @@ export function isAuthError(err) {
 
 export function humanizeApiError(err) {
   if (isAuthError(err)) return SESSION_EXPIRED_MESSAGE;
+  if (err?.name === "AbortError" || /aborted/i.test(String(err?.message || ""))) {
+    return "Server is taking too long. Please try again in a moment.";
+  }
   if (String(err?.message || "").startsWith("HTTP ")) {
     return "Server request failed. Please try again.";
   }
