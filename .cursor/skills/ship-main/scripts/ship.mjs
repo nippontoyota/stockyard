@@ -2,11 +2,11 @@
 /**
  * Ship helper for stockyard:
  * - push origin main (triggers Render)
- * - build frontend + wrangler pages deploy (Cloudflare)
+ * - vercel --prod (frontend)
  *
  * Usage (repo root):
  *   node .cursor/skills/ship-main/scripts/ship.mjs
- *   node .cursor/skills/ship-main/scripts/ship.mjs --cloudflare-only
+ *   node .cursor/skills/ship-main/scripts/ship.mjs --vercel-only
  *   node .cursor/skills/ship-main/scripts/ship.mjs --push-only
  */
 import { spawnSync } from "node:child_process";
@@ -16,15 +16,15 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "../../../..");
-const FRONTEND = join(REPO_ROOT, "frontend");
-const CF_PROJECT = "nippon-yard-scan";
+const RENDER_HEALTH = "https://stockyard-api-xvaa.onrender.com/health";
 const RENDER_READY = "https://stockyard-api-xvaa.onrender.com/ready";
 const VERCEL_URL = "https://stockyard-phi.vercel.app";
-const PAGES_URL = "https://nippon-yard-scan.pages.dev";
+const VERCEL_SCOPE = "nippontoyotas-projects";
+const VERCEL_PROJECT = "stockyard";
 const SMOKE_SCRIPT = join(REPO_ROOT, ".github/scripts/smoke-prod.sh");
 
 const args = new Set(process.argv.slice(2));
-const cloudflareOnly = args.has("--cloudflare-only") || args.has("--no-push");
+const vercelOnly = args.has("--vercel-only") || args.has("--no-push");
 const pushOnly = args.has("--push-only");
 
 function run(cmd, cmdArgs, opts = {}) {
@@ -76,22 +76,19 @@ function pushMain() {
   console.log("Render: push to origin/main complete (auto-deploy if connected).");
 }
 
-function deployCloudflare() {
-  if (!existsSync(join(FRONTEND, "package.json"))) {
-    throw new Error(`frontend/ not found at ${FRONTEND}`);
-  }
-  run("npm", ["run", "build"], { cwd: FRONTEND });
+function deployVercel() {
   run(
     "npx",
     [
-      "wrangler",
-      "pages",
-      "deploy",
-      "dist",
-      "--project-name=" + CF_PROJECT,
-      "--commit-dirty=true",
+      "vercel",
+      "--prod",
+      "--yes",
+      "--scope",
+      VERCEL_SCOPE,
+      "--project",
+      VERCEL_PROJECT,
     ],
-    { cwd: FRONTEND },
+    { cwd: REPO_ROOT },
   );
 }
 
@@ -109,8 +106,12 @@ function verify() {
     });
     return;
   }
-  // Windows / fallback: curl the critical paths without bash
   const curl = process.platform === "win32" ? "curl.exe" : "curl";
+  try {
+    run(curl, ["-fsS", "--max-time", "30", RENDER_HEALTH]);
+  } catch {
+    console.warn("Render /health check failed or timed out (service may be deploying).");
+  }
   try {
     run(curl, ["-fsS", "--max-time", "30", RENDER_READY]);
   } catch {
@@ -121,26 +122,21 @@ function verify() {
   } catch {
     console.warn("Vercel HEAD check failed.");
   }
-  try {
-    run(curl, ["-sI", "--max-time", "20", PAGES_URL]);
-  } catch {
-    console.warn("Pages HEAD check failed.");
-  }
 }
 
 function main() {
   process.chdir(REPO_ROOT);
   console.log(`Repo: ${REPO_ROOT}`);
 
-  if (!cloudflareOnly) pushMain();
-  if (!pushOnly) deployCloudflare();
+  if (!vercelOnly) pushMain();
+  if (!pushOnly) deployVercel();
   verify();
 
   const sha = runCapture("git", ["rev-parse", "--short", "HEAD"]);
   console.log(`\nDone. HEAD ${sha}`);
+  console.log(`Render health: ${RENDER_HEALTH}`);
   console.log(`Render ready: ${RENDER_READY}`);
   console.log(`Vercel: ${VERCEL_URL}`);
-  console.log(`Cloudflare: ${PAGES_URL}`);
 }
 
 try {
