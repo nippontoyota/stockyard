@@ -23,7 +23,7 @@ import { checkDwellAlerts } from './lib/dwellCheck.js';
 import { ensureBuckets } from './lib/supabase.js';
 import uploadRoutes from './routes/upload.js';
 import pushRoutes from './routes/pushSubscriptions.js';
-import { db } from './db/client.js';
+import { db, pingDatabase } from './db/client.js';
 import { sql } from 'drizzle-orm';
 
 const app = express();
@@ -66,23 +66,18 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Liveness — process up (Render default health path stays cheap)
+// Liveness — process up. Render healthCheckPath should point here (/health).
+// Do NOT use /ready as the platform health check: a timed-out shared-pool
+// ping can leave the query holding a connection and wedge the whole API.
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Readiness — DB reachable. Use this as Render health check so a wedged
-// pool fails the check and the instance is replaced instead of hanging forever.
+// Readiness — DB reachable via a one-shot connection (smoke / ops only).
 app.get('/ready', async (_req, res) => {
-  const started = Date.now();
   try {
-    await Promise.race([
-      db.execute(sql`select 1`),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('db ping timeout')), 5000),
-      ),
-    ]);
-    res.json({ status: 'ready', dbMs: Date.now() - started });
+    const dbMs = await pingDatabase(5000);
+    res.json({ status: 'ready', dbMs });
   } catch (err) {
     console.error('Readiness check failed:', err);
     res.status(503).json({ status: 'not_ready', error: 'database unavailable' });

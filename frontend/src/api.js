@@ -224,7 +224,7 @@ export async function adminOverrideVehicle(vin, status, reason, yardId) {
 }
 
 export async function adminUpdateVehicle(vin, fields) {
-  return apiFetch(`/api/admin/vehicles/${vin}`, {
+  return apiFetch(`/api/admin/vehicles/${encodeURIComponent(String(vin).toUpperCase())}`, {
     method: "PATCH",
     body: JSON.stringify(fields),
   });
@@ -266,6 +266,13 @@ export async function loginApi(username, password) {
       throw err;
     }
     return res.json();
+  } catch (err) {
+    if (err?.name === "AbortError" || /aborted/i.test(String(err?.message || ""))) {
+      throw Object.assign(new Error("Server is taking too long. Please try again in a moment."), {
+        name: "AbortError",
+      });
+    }
+    throw err;
   } finally {
     clearTimeout(timeout);
   }
