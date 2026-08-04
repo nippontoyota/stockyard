@@ -4,17 +4,16 @@ import postgres from 'postgres';
 import * as schema from './schema.js';
 
 // Supabase transaction pooler (port 6543) requires prepare: false.
-// Keep the pool small — hung queries + aggressive /ready pings used to exhaust
-// max:10 and wedge the whole API (browser then shows CORS / abort errors).
+// Small pool + short lifetime: hung clients must not hold slots forever.
 const client = postgres(process.env.DATABASE_URL!, {
   prepare: false,
-  max: 5,
-  idle_timeout: 20,
-  max_lifetime: 60 * 30,
-  connect_timeout: 10,
+  max: 3,
+  idle_timeout: 10,
+  max_lifetime: 60 * 5,
+  connect_timeout: 8,
   connection: {
     application_name: 'stockyard-api',
-    statement_timeout: 15000,
+    statement_timeout: 10000,
   },
 });
 export const db = drizzle(client, { schema });
