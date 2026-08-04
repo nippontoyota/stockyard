@@ -1,6 +1,5 @@
 # Production smoke — after main deploys, on a schedule, or manual.
-# Note: GitHub only runs `schedule` from the repo default branch (currently
-# `sajad`). Keep this file on that branch so the 10-minute cron stays active.
+# GitHub only runs `schedule` from the repo default branch (`main`).
 name: Production smoke
 on:
   push:
