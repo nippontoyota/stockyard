@@ -187,23 +187,10 @@ const editVehicleBody = z.object({
   vin: z.string().trim().min(1).optional(),
 });
 
-let variantColourCleared: Promise<void> | null = null;
-async function clearLegacyVariantColour() {
-  if (!variantColourCleared) {
-    variantColourCleared = db
-      .execute(sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`)
-      .then(() => undefined)
-      .catch((err) => {
-        variantColourCleared = null;
-        throw err;
-      });
-  }
-  await variantColourCleared;
-}
+
 
 router.patch('/vehicles/:vin', async (req, res, next) => {
   try {
-    await clearLegacyVariantColour();
     const body = editVehicleBody.parse(req.body);
     const vin = req.params.vin.toUpperCase();
 

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as XLSX from "xlsx";
 import {
@@ -277,7 +277,7 @@ export default function App() {
     try {
       const isDeliveryOrYard = session.role === "delivery_incharge" || session.role === "stockyard";
       const tasks = [
-        { key: "vehicles", run: () => getVehicles() },
+        { key: "vehicles", run: () => getVehicles({ yardId: session.role === "stockyard" ? session.yardId : undefined }) },
         { key: "flags", run: () => getFlags() },
         { key: "scans", run: () => getScans() },
         { key: "notifications", run: () => isDeliveryOrYard ? getNotifications() : Promise.resolve([]) },
@@ -316,9 +316,17 @@ export default function App() {
   const syncInFlightRef = useRef(null);
   const syncPendingRef = useRef(false);
   const syncDebounceRef = useRef(null);
+  const lastSyncTimeRef = useRef(0);
 
   const scheduleServerData = useCallback((opts = {}) => {
-    const { debounceMs = 0 } = opts;
+    const { debounceMs = 0, force = false } = opts;
+    
+    // Minimum 15 seconds between full syncs unless forced
+    const now = Date.now();
+    if (!force && now - lastSyncTimeRef.current < 15000) {
+      return;
+    }
+    
     const run = () => {
       if (syncInFlightRef.current) {
         syncPendingRef.current = true;
@@ -327,6 +335,7 @@ export default function App() {
       const loop = async () => {
         do {
           syncPendingRef.current = false;
+          lastSyncTimeRef.current = Date.now();
           await fetchServerData();
         } while (syncPendingRef.current);
         syncInFlightRef.current = null;

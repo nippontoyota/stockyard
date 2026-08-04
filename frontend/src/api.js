@@ -1,6 +1,6 @@
 const API_BASE = import.meta.env.VITE_API_URL || "https://stockyard-api-xvaa.onrender.com";
 
-const FETCH_TIMEOUT_MS = 8000;
+const FETCH_TIMEOUT_MS = 12000;
 
 function isRetryableError(err, status) {
   // Timeouts/aborts must not retry — under multi-device load that amplifies DB pressure.
@@ -9,7 +9,7 @@ function isRetryableError(err, status) {
   return true;
 }
 
-async function fetchWithRetry(url, options = {}, retries = 2) {
+async function fetchWithRetry(url, options = {}, retries = 1) {
   for (let i = 0; i < retries; i++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);

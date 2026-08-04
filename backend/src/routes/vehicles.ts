@@ -10,19 +10,7 @@ import { z } from 'zod';
 const router = Router();
 router.use(authenticate);
 
-let variantColourCleared: Promise<void> | null = null;
-async function clearLegacyVariantColour() {
-  if (!variantColourCleared) {
-    variantColourCleared = db
-      .execute(sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`)
-      .then(() => undefined)
-      .catch((err) => {
-        variantColourCleared = null;
-        throw err;
-      });
-  }
-  await variantColourCleared;
-}
+
 
 async function findOrCreateDevice(fingerprint: string): Promise<string> {
   const result = await db
@@ -57,7 +45,6 @@ async function incomingYardIdsForUser(user: AuthUser | undefined): Promise<strin
 
 router.get('/incoming', async (req, res, next) => {
   try {
-    await clearLegacyVariantColour();
     const yardScope = await incomingYardIdsForUser(req.user);
     if (yardScope === null) {
       res.status(403).json({ error: 'Not allowed to view incoming vehicles' });
@@ -236,7 +223,6 @@ router.post('/receive/:vin', async (req, res, next) => {
 
 router.get('/', async (req, res, next) => {
   try {
-    await clearLegacyVariantColour();
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(10000, Math.max(1, Number(req.query.limit) || 50));
     const offset = (page - 1) * limit;
@@ -289,7 +275,6 @@ router.get('/', async (req, res, next) => {
 
 router.get('/:vin', async (req, res, next) => {
   try {
-    await clearLegacyVariantColour();
     const [vehicle] = await db
       .select({
         id: vehicles.id,

@@ -87,7 +87,7 @@ Admins can view all yards, analytics, flagged records, and full scan history. Th
 
 ### Database
 
-- PostgreSQL hosted on Neon or Supabase.
+- PostgreSQL hosted on Supabase.
 - Full historical scan records retained.
 - Current vehicle status derived from scan history and admin overrides.
 
@@ -95,7 +95,7 @@ Admins can view all yards, analytics, flagged records, and full scan history. Th
 
 - Frontend: Vercel free tier.
 - Backend: Render free tier.
-- Database: Neon or Supabase free tier.
+- Database: Supabase free tier.
 
 ## 7. Data Model
 

@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://stockyard-api-xvaa.onrender.com';
 const REFRESH_DEBOUNCE_MS = 750;
-const DISCONNECT_POLL_MS = 30_000;
+const DISCONNECT_POLL_MS = 60_000;
 
 export function useSocket(onDataChange, enabled = true) {
   const heartbeatRef = useRef(null);
@@ -23,7 +23,7 @@ export function useSocket(onDataChange, enabled = true) {
 
     const socket = io(API_BASE, {
       transports: ['polling', 'websocket'],
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 10000,
       timeout: 20000,
