@@ -1,17 +1,14 @@
 ---
 name: ship-main
 description: >-
-  Rebase changes to main and make sure that render and cloudflare through
-  wrangler is redeployed. Use when the user says that phrase, or asks to ship,
-  push to main, redeploy Render, or deploy Cloudflare Pages via Wrangler for
-  this stockyard project.
+  Rebase changes to main and redeploy Render (API) plus Vercel (frontend).
+  Use when the user says that phrase, or asks to ship, push to main, or
+  redeploy Render / Vercel for this stockyard project.
 ---
 
 # Ship to main + redeploy
 
-User intent (verbatim): **rebase changes to main and make sure that render and cloudflare through wrangler is redeployed**
-
-Do this end-to-end. Do not stop after push. Do not ask whether to deploy unless blocked (auth failure, merge conflict, secrets).
+User intent: land changes on `main` and redeploy production.
 
 ## Project facts
 
@@ -19,20 +16,18 @@ Do this end-to-end. Do not stop after push. Do not ask whether to deploy unless 
 |--------|--------|
 | Deploy branch | `main` (GitHub default + Render/Vercel production branch) |
 | Backend (Render) | Auto-deploys on `git push origin main` → `https://stockyard-api-xvaa.onrender.com` |
-| Frontend (Cloudflare Pages) | Project `nippon-yard-scan` via Wrangler from `frontend/dist` |
-| Pages URL | `https://nippon-yard-scan.pages.dev` |
-| Health | `curl.exe -fsS https://stockyard-api-xvaa.onrender.com/ready` |
+| Frontend (Vercel) | Project `stockyard` (team `nippontoyotas-projects`) → `https://stockyard-phi.vercel.app` |
+| Health | `curl.exe -fsS https://stockyard-api-xvaa.onrender.com/health` |
+| Ready | `curl.exe -fsS https://stockyard-api-xvaa.onrender.com/ready` |
 
 ## Workflow
-
-Copy and track:
 
 ```
 Ship:
 - [ ] 1. Sync + land on main
 - [ ] 2. Commit if dirty
 - [ ] 3. Push main (Render)
-- [ ] 4. Build + Wrangler deploy (Cloudflare)
+- [ ] 4. Deploy Vercel production
 - [ ] 5. Verify
 ```
 
@@ -74,48 +69,33 @@ If working tree is clean and `main` is ahead of `origin/main`, skip to push.
 git push origin main
 ```
 
-That is the Render redeploy trigger. No Render CLI/API key is required.
+That is the Render redeploy trigger.
 
-If only frontend files changed, still push — Render may no-op rebuild; that is fine.
+### 4. Deploy Vercel production
 
-### 4. Build + Wrangler (Cloudflare)
-
-Prefer the helper (from repo root):
+From repo root (uses root `vercel.json`):
 
 ```powershell
-node .cursor/skills/ship-main/scripts/ship.mjs --cloudflare-only
+npx vercel --prod --yes --scope nippontoyotas-projects --project stockyard
 ```
 
-Or manually:
-
-```powershell
-cd frontend
-npm run build
-npx wrangler pages deploy dist --project-name=nippon-yard-scan --commit-dirty=true
-cd ..
-```
-
-Require a successful deploy URL in the Wrangler output (e.g. `https://<hash>.nippon-yard-scan.pages.dev`).
-
-If Wrangler auth fails: tell the user to run `npx wrangler login` and stop.
+Require alias to `https://stockyard-phi.vercel.app`.
 
 ### 5. Verify
 
 ```powershell
+curl.exe -fsS --max-time 30 https://stockyard-api-xvaa.onrender.com/health
 curl.exe -fsS --max-time 30 https://stockyard-api-xvaa.onrender.com/ready
-curl.exe -sI --max-time 20 https://nippon-yard-scan.pages.dev
 curl.exe -sI --max-time 20 https://stockyard-phi.vercel.app
 ```
 
 Report back in 3–5 lines:
 
 - Commit SHA on `main`
-- Render: push done + health body (or “warming up” if timeout)
-- Cloudflare: preview URL from Wrangler + pages.dev HTTP status
+- Render: push done + health/ready body (or “warming up” if timeout)
+- Vercel: production URL / alias status
 
 ## One-shot helper
-
-After commits are ready on `main` (or you want the script to push current `main` + deploy CF):
 
 ```powershell
 node .cursor/skills/ship-main/scripts/ship.mjs
@@ -123,15 +103,15 @@ node .cursor/skills/ship-main/scripts/ship.mjs
 
 Flags:
 
-- `--cloudflare-only` — skip git push; only build + Wrangler
-- `--push-only` — skip Cloudflare; only `git push origin main`
-- `--no-push` — build + Wrangler only (alias of `--cloudflare-only`)
+- `--vercel-only` — skip git push; only Vercel production deploy
+- `--push-only` — skip Vercel; only `git push origin main`
+- `--no-push` — alias of `--vercel-only`
 
-The agent still owns commit/rebase decisions; the script owns push + CF deploy mechanics.
+The agent still owns commit/rebase decisions; the script owns push + Vercel deploy mechanics.
 
 ## Do not
 
-- Deploy from `sajad` or open a PR instead of shipping to `main` unless the user said so
+- Force-push `main`
 - Amend already-pushed commits
-- Skip Wrangler because “Render covers frontend” (it does not)
+- Skip Vercel because “Render covers frontend” (it does not)
 - Skip push because “frontend-only” (still push `main` when asked to redeploy Render)
