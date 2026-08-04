@@ -136,7 +136,12 @@ authRouter.post('/login', async (req: Request, res: Response) => {
 
     if (found.length > 0) {
       const user = found[0];
-      if (user.password === cleanPassword) {
+      // Case-insensitive: UI treats yard codes as case-insensitive, and mobile
+      // keyboards often lowercase the password field.
+      const passwordOk =
+        user.password === cleanPassword ||
+        user.password.toLowerCase() === cleanPassword.toLowerCase();
+      if (passwordOk) {
         return res.json({
           success: true,
           token: signSessionToken({

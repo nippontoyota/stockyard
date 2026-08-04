@@ -392,7 +392,7 @@ export default function App() {
     const initialView = nextSession.role === "admin" ? "dashboard" : nextSession.role === "delivery_incharge" ? "requisitions" : "scan";
     setView(initialView);
     window.history.replaceState(null, "", getRoutePath(initialView, nextSession.role));
-  }} authExpiredMessage={authExpiredMessage} />;
+  }} authExpiredMessage={authExpiredMessage} onClearAuthExpired={() => setAuthExpiredMessage("")} />;
 
   const isAdmin = session.role === "admin";
   const stats = dashboard(state, isAdmin ? null : session.yardId);
@@ -469,7 +469,7 @@ export default function App() {
   );
 }
 
-function Login({ onLogin, authExpiredMessage = "" }) {
+function Login({ onLogin, authExpiredMessage = "", onClearAuthExpired }) {
   const [role, setRole] = useState("stockyard");
   const [region, setRegion] = useState(YARD_REGIONS[0]);
   const [yardId, setYardId] = useState(() => yards.find((y) => y.city === YARD_REGIONS[0])?.id || yards[0]?.id || "");
@@ -518,6 +518,7 @@ function Login({ onLogin, authExpiredMessage = "" }) {
   async function submit(event) {
     event.preventDefault();
     setErrorMsg("");
+    onClearAuthExpired?.();
     setIsLoading(true);
 
     const cleanPassword = passwordInput.trim();
