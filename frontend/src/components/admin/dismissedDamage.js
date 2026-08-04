@@ -1,4 +1,4 @@
-import { yards } from "../../stockyardLogic.js";
+import { formatYardLabel } from "../../stockyardLogic.js";
 
 export function loadDismissedDamageScanIds() {
   try {
@@ -23,12 +23,11 @@ export function getDamagedExtras(state, activeFlagsList, dismissedScanIds = load
     .filter((s) => s.damaged && !fromFlags.has(s.vin) && !dismissedScanIds.has(s.id || s.clientScanId))
     .map((scan) => {
       const vehicle = state?.vehicles?.[scan.vin];
-      const yardObj = yards.find((y) => y.id === scan.yardId);
       return {
         id: scan.id || scan.clientScanId,
         vin: scan.vin,
         model: vehicle?.model || "",
-        yardName: yardObj?.name || scan.yardId || "Stockyard",
+        yardName: formatYardLabel(scan.yardId, scan.yardId || "Stockyard"),
         damageRemark: scan.damageRemark || "Damage reported",
         damageImage: scan.damageImage || null,
         createdAt: scan.scannedAt || new Date().toISOString(),
