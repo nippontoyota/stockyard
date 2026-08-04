@@ -5,6 +5,7 @@ import { db } from '../db/client.js';
 import { scans, vehicles, vehicleStatus, devices, flags, yards, requisitions, notifications, branchYards } from '../db/schema.js';
 import { isValidVin } from '../lib/vin.js';
 import { CAR_MODELS, isCarModel } from '../shared/carModels.js';
+import { DRIVE_TYPE_VALUES, isDriveType } from '../shared/driveTypes.js';
 import { authenticate } from '../middleware/auth.js';
 import { emitScanEvent, emitFlagEvent, emitRequisitionEvent } from '../lib/socket.js';
 import { uploadBase64Image } from '../lib/supabase.js';
@@ -20,6 +21,13 @@ const carModelSchema = z
     message: `model must be one of: ${CAR_MODELS.join(', ')}`,
   });
 
+const driveTypeSchema = z
+  .string()
+  .trim()
+  .refine((value) => isDriveType(value), {
+    message: `drive_type must be one of: ${DRIVE_TYPE_VALUES.join(', ')}`,
+  });
+
 // ─── Zod schemas ─────────────────────────────────────────────────────
 
 const scanCommon = z.object({
@@ -32,7 +40,7 @@ const scanCommon = z.object({
   damaged: z.boolean().optional(),
   damage_remark: z.string().optional(),
   damage_image: z.string().optional(),
-  drive_type: z.enum(['neo_drive', 'hybrid', 'petrol', 'diesel']).optional(),
+  drive_type: driveTypeSchema.optional(),
 });
 
 const scanInBase = scanCommon.extend({

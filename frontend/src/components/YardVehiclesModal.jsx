@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { flagLabel, createScan, applyScan, yardsByRegion, findYardById, findApprovedTransferReq, requisitionDestinationYardId, requisitionRequesterLabel } from "../stockyardLogic.js";
+import { flagLabel, createScan, applyScan, yardsByRegion, findYardById, findApprovedTransferReq, requisitionDestinationYardId, requisitionRequesterLabel, DRIVE_TYPES, driveTypeLabel } from "../stockyardLogic.js";
 import { bulkSync } from "../api.js";
 import { exportYardVehiclesExcel } from "../exportStockExcel.js";
 import { VehicleTimeline } from "./VehicleTimeline.jsx";
 import { AdminVehicleDeleteButton } from "./AdminVehicleDeleteButton.jsx";
-
-function driveLabel(value) {
-  if (!value) return "";
-  return String(value).replace(/_/g, " ");
-}
 
 function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDone }) {
   const [outRemark, setOutRemark] = useState("");
@@ -108,7 +103,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
             </>
           )}
           {keyNo ? <div><dt>Key No</dt><dd>{keyNo}</dd></div> : null}
-          {driveType ? <div><dt>Drive</dt><dd>{driveType.replace(/_/g, " ")}</dd></div> : null}
+          {driveType ? <div><dt>Drive</dt><dd>{driveTypeLabel(driveType)}</dd></div> : null}
           {damaged ? <div><dt>Damage</dt><dd>{damageRemark}</dd></div> : null}
         </dl>
         <p className="admin-out-note">No photo required for admin OUT.</p>
@@ -209,10 +204,9 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         onChange={(e) => setDriveType(e.target.value)}
       >
         <option value="">Select drive type</option>
-        <option value="neo_drive">Neo Drive</option>
-        <option value="hybrid">Hybrid</option>
-        <option value="petrol">Petrol</option>
-        <option value="diesel">Diesel</option>
+        {DRIVE_TYPES.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
       </select>
 
       <label className="check admin-out-damage-check">

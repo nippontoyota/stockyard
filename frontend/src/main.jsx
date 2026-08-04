@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import {
   applyScan,
   CAR_MODELS,
+  DRIVE_TYPES,
   createClientScanId,
   createInitialState,
   createScan,
@@ -1430,10 +1431,9 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                 aria-label="Drive type"
               >
                 <option value="">Select Drive Type</option>
-                <option value="neo_drive">Neo Drive</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="petrol">Petrol</option>
-                <option value="diesel">Diesel</option>
+                {DRIVE_TYPES.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
               {isFlagged && (
                 <div className="notice warn">
@@ -1618,10 +1618,9 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
               onChange={(event) => setDriveType(event.target.value)}
             >
               <option value="">Select Drive Type</option>
-              <option value="neo_drive">Neo Drive</option>
-              <option value="hybrid">Hybrid</option>
-              <option value="petrol">Petrol</option>
-              <option value="diesel">Diesel</option>
+              {DRIVE_TYPES.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
             <label className="check"><input type="checkbox" checked={damaged} onChange={(event) => {
               setDamaged(event.target.checked);

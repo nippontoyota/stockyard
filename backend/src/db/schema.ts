@@ -46,7 +46,7 @@ export const vehicles = pgTable('vehicles', {
   model: text('model'),
   variant: text('variant'),
   colour: text('colour'),
-  drive_type: text('drive_type'), // 'neo_drive' | 'hybrid' | 'petrol' | 'diesel'
+  drive_type: text('drive_type'), // 'neo_drive' | 'hybrid' | 'petrol' | 'diesel' | 'cng' | 'electric'
   vin_valid: boolean('vin_valid').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
