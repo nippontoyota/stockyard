@@ -250,6 +250,18 @@ export function resolveFlag(state, id) {
   return { ...state, flags: state.flags.map((flagItem) => flagItem.id === id ? { ...flagItem, resolved: true, resolvedAt: new Date().toISOString() } : flagItem) };
 }
 
+export function resolveFlagsByVin(state, vin) {
+  const normalized = normalizeVin(vin);
+  return {
+    ...state,
+    flags: state.flags.map((f) =>
+      f.vin === normalized && !f.resolved
+        ? { ...f, resolved: true, resolvedAt: new Date().toISOString() }
+        : f
+    ),
+  };
+}
+
 export function updateVehicleAdmin(state, { vin, yardId, status, reason }) {
   const normalized = normalizeVin(vin);
   const existing = state.vehicles[normalized] || { vin: normalized, model: "", vinValid: isValidVin(normalized) };
