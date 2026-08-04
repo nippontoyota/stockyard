@@ -5,6 +5,7 @@ import { db } from '../db/client.js';
 import { vehicles, vehicleStatus, scans, flags, requisitions, notifications } from '../db/schema.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { isValidVin } from '../lib/vin.js';
+import { prepareVinRename } from '../lib/vinRename.js';
 
 const router = Router();
 router.use(authenticate);
@@ -182,6 +183,8 @@ const editVehicleBody = z.object({
   status: z.enum(['in', 'out', 'transit']).optional(),
   yard_id: z.string().optional().nullable(),
   vin_valid: z.boolean().optional(),
+  /** Optional typo correction — same vehicle row, new unique VIN */
+  vin: z.string().trim().min(1).optional(),
 });
 
 let variantColourCleared = false;
@@ -207,13 +210,44 @@ router.patch('/vehicles/:vin', async (req, res, next) => {
       return;
     }
 
+    let takenByOther = false;
+    if (body.vin !== undefined) {
+      const candidate = body.vin.trim().toUpperCase();
+      if (candidate !== vin) {
+        const [conflict] = await db
+          .select({ id: vehicles.id })
+          .from(vehicles)
+          .where(eq(vehicles.vin, candidate));
+        takenByOther = Boolean(conflict);
+      }
+    }
+
+    const rename = prepareVinRename(vin, body.vin, takenByOther);
+    if (!rename.ok) {
+      res.status(rename.status).json({ error: rename.error });
+      return;
+    }
+
     const vehiclePatch: Record<string, unknown> = { updated_at: new Date(), variant: null, colour: null };
     if (body.model !== undefined) vehiclePatch.model = body.model;
     if (body.drive_type !== undefined) vehiclePatch.drive_type = body.drive_type || null;
     if (body.vin_valid !== undefined) vehiclePatch.vin_valid = body.vin_valid;
+    if (rename.changed) {
+      vehiclePatch.vin = rename.vin;
+      vehiclePatch.vin_valid = true;
+    }
 
     if (Object.keys(vehiclePatch).length > 1) {
-      await db.update(vehicles).set(vehiclePatch).where(eq(vehicles.id, vehicle.id));
+      try {
+        await db.update(vehicles).set(vehiclePatch).where(eq(vehicles.id, vehicle.id));
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === '23505') {
+          res.status(409).json({ error: 'VIN already exists' });
+          return;
+        }
+        throw err;
+      }
     }
 
     const [existingStatus] = await db
