@@ -57,6 +57,7 @@
   { "code": "TR01C", "area": "Enchakkal", "district": "Trivandrum", "site": "Showroom adjacent area", "capacity": 25 },
   { "code": "TR01C", "area": "Neyyattinkara", "district": "Trivandrum", "site": "T-Sparsh, Neyyattinkara", "capacity": 3 },
   { "code": "TR01C", "area": "Parassala", "district": "Trivandrum", "site": "T-Sparsh, Parassala", "capacity": 3 },
+  { "code": "TR01C", "area": "Enchakkal", "district": "Trivandrum", "site": "Vallakkadavu Yard", "capacity": 55 },
   { "code": "KL01A", "area": "Kottiyam", "district": "Trivandrum", "site": "Showroom", "capacity": 5 },
   { "code": "KL01A", "area": "Kottiyam", "district": "Trivandrum", "site": "Showroom adjacent area", "capacity": 10 },
   { "code": "KL01A", "area": "Thazhuthla", "district": "Trivandrum", "site": "BP adjacent area", "capacity": 313 },
