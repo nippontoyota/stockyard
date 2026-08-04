@@ -17,7 +17,7 @@ Do this end-to-end. Do not stop after push. Do not ask whether to deploy unless 
 
 | Target | Detail |
 |--------|--------|
-| Deploy branch | `main` (push here; do not use `sajad` even if it is GitHub default) |
+| Deploy branch | `main` (GitHub default + Render/Vercel production branch) |
 | Backend (Render) | Auto-deploys on `git push origin main` → `https://stockyard-api-xvaa.onrender.com` |
 | Frontend (Cloudflare Pages) | Project `nippon-yard-scan` via Wrangler from `frontend/dist` |
 | Pages URL | `https://nippon-yard-scan.pages.dev` |
