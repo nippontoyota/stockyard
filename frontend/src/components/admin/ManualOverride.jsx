@@ -33,7 +33,7 @@ export function ManualOverride({ state, setState, onSuccess, onError }) {
       setState(updateVehicleAdmin(state, { vin: targetVin, yardId, status, reason }));
       setVin("");
       setReason("");
-      onSuccess?.(status === "out" ? `Forced OUT for ${targetVin}.` : `Set IN at ${selectedYard?.code || yardId} for ${targetVin}.`);
+      onSuccess?.(status === "out" ? `Forced OUT for ${targetVin}.` : `Set IN at ${selectedYard ? `${selectedYard.code} · ${selectedYard.name}` : yardId} for ${targetVin}.`);
       setConfirmOpen(false);
     } catch (err) {
       const msg = err.message || "Override failed.";

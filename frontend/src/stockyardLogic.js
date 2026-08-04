@@ -20,6 +20,16 @@ export function findYardById(yardId) {
   return yards.find((y) => y.id === yardId) || null;
 }
 
+/** Display label: "TR01C · Showroom, Enchakkal" (codes alone collide across sites). */
+export function formatYardLabel(yardOrId, fallback = "Unknown") {
+  const yard = typeof yardOrId === "string" ? findYardById(yardOrId) : yardOrId;
+  if (!yard) return (typeof yardOrId === "string" && yardOrId) || fallback;
+  const code = String(yard.code || "").trim();
+  const name = String(yard.name || "").trim();
+  if (code && name) return `${code} · ${name}`;
+  return code || name || yard.id || fallback;
+}
+
 /** Group yards by region for selects / assign UIs. */
 export function yardsByRegion() {
   return YARD_REGIONS.map((region) => ({
@@ -153,9 +163,7 @@ function flag(vin, type, message, meta = {}) {
 }
 
 function duplicateMessage(currentYardId, scanYardId) {
-  const currentYard = yards.find((item) => item.id === currentYardId);
-  const scanYard = yards.find((item) => item.id === scanYardId);
-  return `Vehicle was IN at ${currentYard?.code || currentYardId} (${currentYard?.name || "Unknown"}), now scanned IN at ${scanYard?.code || scanYardId} (${scanYard?.name || "Unknown"}) without prior OUT scan.`;
+  return `Vehicle was IN at ${formatYardLabel(currentYardId)}, now scanned IN at ${formatYardLabel(scanYardId)}`;
 }
 
 function groupCount(items, key) {
