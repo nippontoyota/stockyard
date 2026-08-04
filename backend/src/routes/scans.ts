@@ -370,7 +370,8 @@ router.post('/bulk-sync', async (req, res, next) => {
     const body = bulkSyncBody.parse(req.body);
     const results: Array<{ client_scan_id: string; status: string; error?: string; flags?: string[] }> = [];
 
-    // Process scans concurrently in chunks of 5 to avoid connection pool exhaustion
+    // Process scans concurrently in chunks of 5. Supabase Pro handles this easily
+    // without exhausting the connection pool.
     const chunkSize = 5;
     for (let i = 0; i < body.scans.length; i += chunkSize) {
       const chunk = body.scans.slice(i, i + chunkSize);
