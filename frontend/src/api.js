@@ -70,15 +70,20 @@ export function notifyAuthExpired() {
 
 export function isAuthError(err) {
   if (!err) return false;
-  if (err.status === 401) return true;
+  // Only treat explicit session-expiry messages as auth errors.
+  // Login also returns 401 for bad passwords — that must NOT kick the user
+  // to "Session expired".
   const msg = String(err.message || "");
-  return msg.includes("Session expired") || msg.includes("log in again");
+  return msg.includes("Session expired") || msg === SESSION_EXPIRED_MESSAGE;
 }
 
 export function humanizeApiError(err) {
   if (isAuthError(err)) return SESSION_EXPIRED_MESSAGE;
   if (err?.name === "AbortError" || /aborted/i.test(String(err?.message || ""))) {
     return "Server is taking too long. Please try again in a moment.";
+  }
+  if (err?.status === 401) {
+    return err.message || "Incorrect password or credentials. Please try again.";
   }
   if (String(err?.message || "").startsWith("HTTP ")) {
     return "Server request failed. Please try again.";
@@ -232,24 +237,38 @@ export async function deleteAdminVehicle(vin) {
 }
 
 export async function loginApi(username, password) {
-  const res = await fetchWithRetry(`${API_BASE}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  }, 2);
-  if (!res.ok) {
-    let msg = "Incorrect password or credentials. Please try again.";
-    try {
-      const b = await res.json();
-      if (b.error && !b.error.toLowerCase().includes("failed query") && !b.error.toLowerCase().includes("select ") && !b.error.toLowerCase().includes("sql")) {
-        msg = b.error;
-      }
-    } catch {}
-    const err = new Error(msg);
-    err.status = res.status;
-    throw err;
+  // Dedicated fetch so 401 bodies ("Incorrect password") are preserved.
+  // fetchWithRetry throws generic "HTTP 401" and loses the server message.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      let msg = "Incorrect password or credentials. Please try again.";
+      try {
+        const b = await res.json();
+        if (
+          b.error &&
+          !b.error.toLowerCase().includes("failed query") &&
+          !b.error.toLowerCase().includes("select ") &&
+          !b.error.toLowerCase().includes("sql")
+        ) {
+          msg = b.error;
+        }
+      } catch {}
+      const err = new Error(msg);
+      err.status = res.status;
+      throw err;
+    }
+    return res.json();
+  } finally {
+    clearTimeout(timeout);
   }
-  return res.json();
 }
 
 export async function getCredentialsApi() {
