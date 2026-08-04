@@ -27,6 +27,7 @@ import {
   YardCapacityBarChart,
   DwellDistributionChart,
 } from "./AnalyticsCharts.jsx";
+import { displayFlagMessage } from "./components/admin/flagDisplay.js";
 import {
   bulkSync, getVehicles, getFlags, getScans, loginApi,
   getAdminBranches,
@@ -1974,7 +1975,7 @@ function DashboardView({ state, stats, session, setState }) {
                   <b>{flag.vin}</b>
                   <small>
                     {flag.createdAt && <span className="flag-time">{new Date(flag.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}{" · "}
-                    <strong className="flag-kind">{flagLabel(flag.type)}</strong> {flag.message}
+                    <strong className="flag-kind">{flagLabel(flag.type)}</strong> {displayFlagMessage(flag, state)}
                   </small>
                 </span>
               </div>

@@ -107,7 +107,7 @@ export function AttentionSection({
                       </time>
                     )}
                     {flag.createdAt ? " · " : ""}
-                    {isDamage ? flag.damageRemark : flag.message}
+                    {isDamage ? flag.damageRemark : (flag.displayMessage || flag.message)}
                   </p>
                   <p className="flag-help">{decision.help}</p>
                   {isDamage && flag.damageImage && (

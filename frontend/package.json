@@ -2,7 +2,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "test": "node src/stockyardLogic.test.js && node src/api.vehiclesPagination.test.js"
+    "test": "node src/stockyardLogic.test.js && node src/api.vehiclesPagination.test.js && node src/flagDisplay.test.js"
   },
   "dependencies": {
     "@zxing/browser": "^0.2.1",

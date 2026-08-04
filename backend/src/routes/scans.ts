@@ -10,6 +10,7 @@ import { authenticate } from '../middleware/auth.js';
 import { emitScanEvent, emitFlagEvent, emitRequisitionEvent } from '../lib/socket.js';
 import { uploadBase64Image } from '../lib/supabase.js';
 import { notifyRoleAtBranch, notifyStockyardAtYard } from '../lib/webPush.js';
+import { formatYardLabel } from '../lib/yardLabel.js';
 
 const router = Router();
 router.use(authenticate);
@@ -185,16 +186,15 @@ async function processScanIn(body: ScanIn, yardId: string) {
     if (body.damage_image && !damageImageUrl) { await createFlag(vehicleId, scan.id, 'photo_upload_failed', 'Damage photo upload failed — image not saved', body.vin, tx); flagsList.push('photo_upload_failed'); }
     
     if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id !== yardId) {
-      let oldYardCode = String(currentStatus.current_yard_id);
-      if (currentStatus.current_yard_id) {
-        const [oldY] = await tx.select({ code: yards.code }).from(yards).where(eq(yards.id, currentStatus.current_yard_id));
-        if (oldY) oldYardCode = oldY.code;
-      }
-      let newYardCode = yardId;
-      const [newY] = await tx.select({ code: yards.code }).from(yards).where(eq(yards.id, yardId));
-      if (newY) newYardCode = newY.code;
+      const yardCols = { code: yards.code, name: yards.name, id: yards.id };
+      const [oldY] = currentStatus.current_yard_id
+        ? await tx.select(yardCols).from(yards).where(eq(yards.id, currentStatus.current_yard_id))
+        : [];
+      const [newY] = await tx.select(yardCols).from(yards).where(eq(yards.id, yardId));
+      const oldLabel = formatYardLabel(oldY, currentStatus.current_yard_id || 'Unknown');
+      const newLabel = formatYardLabel(newY, yardId);
 
-      await createFlag(vehicleId, scan.id, 'duplicate_yard_status', `Vehicle was IN at yard ${oldYardCode}, now scanned IN at ${newYardCode}`, body.vin, tx);
+      await createFlag(vehicleId, scan.id, 'duplicate_yard_status', `Vehicle was IN at ${oldLabel}, now scanned IN at ${newLabel}`, body.vin, tx);
       flagsList.push('duplicate_yard_status');
     }
     
@@ -305,10 +305,15 @@ async function processScanOut(body: ScanOut, yardId: string) {
       }
 
       if (destBranch) {
+        const [destYard] = await tx
+          .select({ code: yards.code, name: yards.name, id: yards.id })
+          .from(yards)
+          .where(eq(yards.id, destYardId));
+        const destLabel = formatYardLabel(destYard, destYardId);
         await tx.insert(notifications).values({
           user_role: 'stockyard',
           branch_id: destBranch.branch_id,
-          message: `Vehicle ${body.vin.toUpperCase()} is in transit to yard ${destYardId}. Open Incoming to receive it.`,
+          message: `Vehicle ${body.vin.toUpperCase()} is in transit to ${destLabel}. Open Incoming to receive it.`,
           type: 'vehicle_inbound',
         });
       }

@@ -1,5 +1,8 @@
-import { flagLabel, resolveFlag } from "../../stockyardLogic.js";
+import { resolveFlag, formatYardLabel } from "../../stockyardLogic.js";
 import { resolveFlag as apiResolveFlag, adminOverrideVehicle } from "../../api.js";
+import { displayFlagMessage } from "./flagDisplay.js";
+
+export { displayFlagMessage } from "./flagDisplay.js";
 
 export const FLAG_PRIORITY = {
   yard_capacity_exceeded: 1,
@@ -15,7 +18,7 @@ export function flagDecisionCopy(type) {
   switch (type) {
     case "duplicate_yard_status":
       return {
-        help: "Still marked IN at another yard. Confirm the new yard if that is correct, or close the flag if already fixed.",
+        help: "Still marked IN at a different site (codes can be shared). Confirm the new site if that is correct, or close the flag if already fixed.",
         resolveLabel: "Close flag only",
       };
     case "unverified_in":
@@ -63,12 +66,13 @@ export function sortFlagsByPriority(flags) {
 }
 
 export function enrichFlag(flag, state) {
-  const scan = state?.scans?.find((s) => s.vin === flag.vin || s.id === flag.scanId);
+  const scan = state?.scans?.find((s) => s.id === flag.scanId) || state?.scans?.find((s) => s.vin === flag.vin);
   return {
     ...flag,
     damageRemark: flag.damageRemark || scan?.damageRemark || flag.message,
     damageImage: flag.damageImage || scan?.damageImage || null,
     model: state?.vehicles?.[flag.vin]?.model || "",
+    displayMessage: displayFlagMessage(flag, state),
   };
 }
 
@@ -88,9 +92,10 @@ export function countFlagsByYard(activeFlags, state) {
 export async function runFlagAction(action, flag, { state, setState, toast, onError }) {
   try {
     if (action === "confirm_in") {
+      const yardLabel = formatYardLabel(resolveYardIdForFlag(flag, state));
       await apiResolveFlag(flag.id);
       setState(resolveFlag(state, flag.id));
-      toast(`Confirmed IN at new yard for ${flag.vin}.`);
+      toast(`Confirmed IN at ${yardLabel} for ${flag.vin}.`);
       return;
     }
     if (action === "reconcile_in") {
