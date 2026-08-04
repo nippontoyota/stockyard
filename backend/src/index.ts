@@ -66,9 +66,27 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Health check — no auth
+// Liveness — process up (Render default health path stays cheap)
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Readiness — DB reachable. Use this as Render health check so a wedged
+// pool fails the check and the instance is replaced instead of hanging forever.
+app.get('/ready', async (_req, res) => {
+  const started = Date.now();
+  try {
+    await Promise.race([
+      db.execute(sql`select 1`),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('db ping timeout')), 5000),
+      ),
+    ]);
+    res.json({ status: 'ready', dbMs: Date.now() - started });
+  } catch (err) {
+    console.error('Readiness check failed:', err);
+    res.status(503).json({ status: 'not_ready', error: 'database unavailable' });
+  }
 });
 
 // Auth check — returns decoded user info

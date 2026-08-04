@@ -594,7 +594,7 @@ function Login({ onLogin, authExpiredMessage = "" }) {
         }
         return;
       }
-      setErrorMsg(apiErr.message || "Invalid credentials. Please try again.");
+      setErrorMsg(humanizeApiError(apiErr) || "Invalid credentials. Please try again.");
     }
 
     setIsLoading(false);
