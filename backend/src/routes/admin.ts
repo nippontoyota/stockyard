@@ -6,6 +6,7 @@ import { vehicles, vehicleStatus, scans, flags, requisitions, notifications } fr
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { isValidVin } from '../lib/vin.js';
 import { prepareVinRename } from '../lib/vinRename.js';
+import { DRIVE_TYPE_VALUES, isDriveType } from '../shared/driveTypes.js';
 
 const router = Router();
 router.use(authenticate);
@@ -13,6 +14,13 @@ router.use((req, res, next) => {
   if (req.path === '/flags' && req.method === 'GET') return next();
   return requireRole('admin')(req, res, next);
 });
+
+const driveTypeSchema = z
+  .string()
+  .trim()
+  .refine((value) => isDriveType(value), {
+    message: `drive_type must be one of: ${DRIVE_TYPE_VALUES.join(', ')}`,
+  });
 
 // ─── GET /flags ──────────────────────────────────────────────────────
 
@@ -178,7 +186,7 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
 
 const editVehicleBody = z.object({
   model: z.string().trim().min(1).max(120).optional(),
-  drive_type: z.enum(['neo_drive', 'hybrid', 'petrol', 'diesel', '']).optional().nullable(),
+  drive_type: z.union([driveTypeSchema, z.literal('')]).optional().nullable(),
   key_no: z.string().trim().max(40).optional().nullable(),
   status: z.enum(['in', 'out', 'transit']).optional(),
   yard_id: z.string().optional().nullable(),

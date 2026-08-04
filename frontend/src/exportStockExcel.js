@@ -1,10 +1,5 @@
 import * as XLSX from "xlsx";
-import { flagLabel, findYardById } from "./stockyardLogic.js";
-
-function driveLabel(value) {
-  if (!value) return "";
-  return String(value).replace(/_/g, " ");
-}
+import { flagLabel, findYardById, driveTypeLabel } from "./stockyardLogic.js";
 
 function formatDate(value) {
   if (!value) return "";
@@ -24,7 +19,7 @@ export function vehicleToExportRow(vehicle, yard, flags = []) {
   return {
     VIN: vehicle.vin,
     Model: vehicle.model || "",
-    "Drive Type": driveLabel(vehicle.driveType),
+    "Drive Type": driveTypeLabel(vehicle.driveType),
     "Key No": vehicle.keyNo || "",
     Status: (vehicle.currentStatus || "").toUpperCase(),
     "Yard Code": yardMeta?.code || "",

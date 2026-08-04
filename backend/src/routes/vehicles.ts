@@ -5,10 +5,18 @@ import { vehicles, vehicleStatus, scans, devices, branchYards, flags } from '../
 import { authenticate, type AuthUser } from '../middleware/auth.js';
 import { emitScanEvent } from '../lib/socket.js';
 import { resolveBranchId } from '../lib/branch.js';
+import { DRIVE_TYPE_VALUES, isDriveType } from '../shared/driveTypes.js';
 import { z } from 'zod';
 
 const router = Router();
 router.use(authenticate);
+
+const driveTypeSchema = z
+  .string()
+  .trim()
+  .refine((value) => isDriveType(value), {
+    message: `drive_type must be one of: ${DRIVE_TYPE_VALUES.join(', ')}`,
+  });
 
 
 
@@ -90,7 +98,7 @@ router.get('/incoming', async (req, res, next) => {
 const receiveBody = z.object({
   device_fingerprint: z.string().min(1).optional(),
   key_no: z.string().optional(),
-  drive_type: z.enum(['neo_drive', 'hybrid', 'petrol', 'diesel']).optional(),
+  drive_type: driveTypeSchema.optional(),
 });
 
 // ─── POST /receive/:vin ──────────────────────────────────────────────
