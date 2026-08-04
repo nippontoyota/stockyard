@@ -67,12 +67,19 @@ export function sortFlagsByPriority(flags) {
 
 export function enrichFlag(flag, state) {
   const scan = state?.scans?.find((s) => s.id === flag.scanId) || state?.scans?.find((s) => s.vin === flag.vin);
-  return {
+  const yardId = flag.yardId || scan?.yardId || null;
+  const damageRemark = flag.damageRemark || scan?.damageRemark || flag.message;
+  const enriched = {
     ...flag,
-    damageRemark: flag.damageRemark || scan?.damageRemark || flag.message,
+    yardId,
+    damageRemark,
     damageImage: flag.damageImage || scan?.damageImage || null,
     model: state?.vehicles?.[flag.vin]?.model || "",
-    displayMessage: displayFlagMessage(flag, state),
+    yardLabel: yardId ? formatYardLabel(yardId) : "",
+  };
+  return {
+    ...enriched,
+    displayMessage: displayFlagMessage(enriched, state),
   };
 }
 

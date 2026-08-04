@@ -107,7 +107,7 @@ export function AttentionSection({
                       </time>
                     )}
                     {flag.createdAt ? " · " : ""}
-                    {isDamage ? flag.damageRemark : (flag.displayMessage || flag.message)}
+                    {isDamage ? (flag.displayMessage || flag.damageRemark) : (flag.displayMessage || flag.message)}
                   </p>
                   <p className="flag-help">{decision.help}</p>
                   {isDamage && flag.damageImage && (
@@ -118,7 +118,7 @@ export function AttentionSection({
                         onShowPhoto({
                           vin: flag.vin,
                           model: flag.model,
-                          yardName: "",
+                          yardName: flag.yardLabel || "",
                           src: flag.damageImage,
                           remark: flag.damageRemark,
                         })

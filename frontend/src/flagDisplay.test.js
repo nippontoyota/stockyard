@@ -57,4 +57,18 @@ assert.match(
   /TR01C · Showroom/
 );
 
+// Damage report: scan yard before remark
+assert.equal(
+  displayFlagMessage(
+    {
+      type: "damage_reported",
+      yardId: "TR01C-1",
+      damageRemark: "Front leftside fender damaged",
+      message: "Front leftside fender damaged",
+    },
+    {}
+  ),
+  "TR01C · Showroom, Enchakkal · Front leftside fender damaged"
+);
+
 console.log("yard label / flag display tests passed");

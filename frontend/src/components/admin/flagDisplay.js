@@ -22,9 +22,26 @@ function resolvePriorYardId(flag, state, newYardId) {
   return prior[0]?.yardId || null;
 }
 
+function resolveScanYardId(flag, state) {
+  if (flag.yardId) return flag.yardId;
+  const byScanId = flag.scanId && state?.scans?.find((s) => s.id === flag.scanId);
+  if (byScanId?.yardId) return byScanId.yardId;
+  const byVin = state?.scans?.find((s) => s.vin === flag.vin && s.yardId);
+  return byVin?.yardId || null;
+}
+
 /** Display-only: never writes to DB. Enriches bare yard codes with code · name. */
 export function displayFlagMessage(flag, state) {
   const message = flag?.message || "";
+
+  if (flag.type === "damage_reported") {
+    const remark = String(flag.damageRemark || message || "Damage reported").trim();
+    const yardId = resolveScanYardId(flag, state);
+    if (!yardId) return remark;
+    const label = formatYardLabel(yardId);
+    if (remark.startsWith(label)) return remark;
+    return `${label} · ${remark}`;
+  }
 
   if (flag.type === "duplicate_yard_status") {
     const newYardId = flag.yardId || null;
