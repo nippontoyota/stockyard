@@ -134,6 +134,11 @@ httpServer.listen(port, '0.0.0.0', () => {
     sql`ALTER TABLE requisitions ADD COLUMN IF NOT EXISTS destination_yard_id text REFERENCES yards(id)`,
   ).catch((err) => console.error('Failed to ensure destination_yard_id column:', err));
 
+  // Run legacy variant/colour migration exactly once at startup
+  db.execute(
+    sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`
+  ).catch((err) => console.error('Failed to clear legacy variant/colour:', err));
+
   // F6 — Dwell check: delay after boot so login traffic isn't competing with scan work.
   setTimeout(() => {
     checkDwellAlerts().catch(console.error);

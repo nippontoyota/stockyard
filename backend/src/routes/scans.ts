@@ -370,18 +370,32 @@ router.post('/bulk-sync', async (req, res, next) => {
     const body = bulkSyncBody.parse(req.body);
     const results: Array<{ client_scan_id: string; status: string; error?: string; flags?: string[] }> = [];
 
-    for (const scanData of body.scans) {
-      const targetYardId = scanData.yard_id || req.user!.yard_id;
-      if (!targetYardId) {
-        results.push({ client_scan_id: scanData.client_scan_id, status: 'rejected', error: 'Yard ID is required for scan' });
-        continue;
-      }
-      if (scanData.scan_type === 'in') {
-        results.push({ client_scan_id: scanData.client_scan_id, ...await processScanIn(scanData, targetYardId) });
-      } else {
-        results.push({ client_scan_id: scanData.client_scan_id, ...await processScanOut(scanData, targetYardId) });
-      }
+    // Process scans concurrently in chunks of 5 to avoid connection pool exhaustion
+    const chunkSize = 5;
+    for (let i = 0; i < body.scans.length; i += chunkSize) {
+      const chunk = body.scans.slice(i, i + chunkSize);
+      
+      const chunkPromises = chunk.map(async (scanData) => {
+        const targetYardId = scanData.yard_id || req.user!.yard_id;
+        if (!targetYardId) {
+          return { client_scan_id: scanData.client_scan_id, status: 'rejected', error: 'Yard ID is required for scan' };
+        }
+        
+        try {
+          if (scanData.scan_type === 'in') {
+            return { client_scan_id: scanData.client_scan_id, ...await processScanIn(scanData, targetYardId) };
+          } else {
+            return { client_scan_id: scanData.client_scan_id, ...await processScanOut(scanData, targetYardId) };
+          }
+        } catch (error: any) {
+          return { client_scan_id: scanData.client_scan_id, status: 'rejected', error: error.message || 'Server error processing scan' };
+        }
+      });
+
+      const chunkResults = await Promise.all(chunkPromises);
+      results.push(...chunkResults);
     }
+    
     res.json({ results });
   } catch (err) { next(err); }
 });
