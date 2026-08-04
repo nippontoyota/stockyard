@@ -6,7 +6,6 @@ import {
   ADMIN_USERNAME,
   ADMIN_DEFAULT_PASSWORD,
   DELIVERY_DEFAULT_PASSWORD,
-  LEGACY_ADMIN_USERNAME,
   yardUsername,
   deliveryUsername,
   defaultPasswordForRole,
@@ -18,57 +17,11 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 
 export const authRouter = Router();
 
-async function migrateLegacyCredentials() {
-  try {
-    const rows = await db.select().from(credentials);
-    const yardList = await db.select().from(yards);
-    const yardMap = new Map(yardList.map((y) => [y.id, y]));
-
-    for (const row of rows) {
-      const normalizedUsername = normalizeUsername(row.username);
-      const yard = row.yard_id ? yardMap.get(row.yard_id) : yardMap.get(normalizedUsername);
-      const targetPassword = defaultPasswordForRole(row.role, yard?.code);
-
-      const usernameChanged = normalizedUsername !== row.username;
-      const passwordLooksLegacy =
-        row.password.includes('@nippon.com') ||
-        row.password === row.username ||
-        row.password === LEGACY_ADMIN_USERNAME;
-
-      if (!usernameChanged && !passwordLooksLegacy) continue;
-
-      const nextPassword = passwordLooksLegacy ? targetPassword : row.password;
-
-      if (usernameChanged) {
-        const [existing] = await db
-          .select()
-          .from(credentials)
-          .where(eq(credentials.username, normalizedUsername));
-        if (existing && existing.id !== row.id) {
-          await db.delete(credentials).where(eq(credentials.id, row.id));
-          continue;
-        }
-      }
-
-      await db
-        .update(credentials)
-        .set({
-          username: normalizedUsername,
-          password: nextPassword,
-          updated_at: new Date(),
-        })
-        .where(eq(credentials.id, row.id));
-    }
-  } catch (err) {
-    console.error('Credentials migration warning:', err);
-  }
-}
-
 async function seedDefaultCredentials() {
   try {
-    await migrateLegacyCredentials();
-
-    const existing = await db.select().from(credentials);
+    // One-time legacy username/password cleanup — safe to skip on every boot.
+    // Production credentials already exist; this only fills gaps on empty DBs.
+    const existing = await db.select({ username: credentials.username }).from(credentials);
     const existingUsernames = new Set(existing.map((row) => row.username));
 
     const allYards = await db.select().from(yards).where(eq(yards.active, true));
@@ -106,7 +59,7 @@ async function seedDefaultCredentials() {
   }
 }
 
-/** Run heavy credential seed/migrate once per process — never on every login. */
+/** Fill missing default credentials once per process (admin path only). */
 let credentialsReady: Promise<void> | null = null;
 function ensureCredentialsReady() {
   if (!credentialsReady) {
@@ -117,8 +70,6 @@ function ensureCredentialsReady() {
   }
   return credentialsReady;
 }
-
-void ensureCredentialsReady();
 
 function resolveLoginUsername(rawUsername: string) {
   const normalized = normalizeUsername(rawUsername);
@@ -138,8 +89,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     const cleanPassword = String(password).trim();
     const usernameCandidates = resolveLoginUsername(String(username));
 
-    // Do not await seed here — login must stay a single credential lookup.
-    // Seed runs once at boot via ensureCredentialsReady().
+    // Login is a single indexed credentials lookup — never seed/migrate here.
 
     let found: (typeof credentials.$inferSelect)[] = [];
     for (const candidate of usernameCandidates) {
