@@ -2,16 +2,24 @@ import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://stockyard-api-xvaa.onrender.com';
+const REFRESH_DEBOUNCE_MS = 750;
+const DISCONNECT_POLL_MS = 30_000;
 
 export function useSocket(onDataChange, enabled = true) {
   const heartbeatRef = useRef(null);
+  const debounceRef = useRef(null);
   const onDataChangeRef = useRef(onDataChange);
   onDataChangeRef.current = onDataChange;
 
   useEffect(() => {
     if (!enabled || !onDataChange) return;
 
-    const refresh = () => onDataChangeRef.current?.();
+    const refresh = () => {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        onDataChangeRef.current?.();
+      }, REFRESH_DEBOUNCE_MS);
+    };
 
     const socket = io(API_BASE, {
       transports: ['polling', 'websocket'],
@@ -26,7 +34,8 @@ export function useSocket(onDataChange, enabled = true) {
 
     socket.on('disconnect', () => {
       clearInterval(heartbeatRef.current);
-      heartbeatRef.current = setInterval(refresh, 10000);
+      // Slow poll while offline from socket — avoid a full sync storm every 10s.
+      heartbeatRef.current = setInterval(refresh, DISCONNECT_POLL_MS);
     });
 
     socket.on('connect', () => {
@@ -37,7 +46,7 @@ export function useSocket(onDataChange, enabled = true) {
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
         if (!socket.connected) socket.connect();
-        refresh();
+        // Parent already refreshes on visibility; only reconnect here.
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
@@ -47,6 +56,7 @@ export function useSocket(onDataChange, enabled = true) {
       socket.removeAllListeners();
       socket.disconnect();
       clearInterval(heartbeatRef.current);
+      clearTimeout(debounceRef.current);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [enabled, !!onDataChange]);

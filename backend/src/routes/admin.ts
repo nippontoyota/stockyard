@@ -19,7 +19,7 @@ router.use((req, res, next) => {
 router.get('/flags', async (req, res, next) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 1000));
+    const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 200));
     const offset = (page - 1) * limit;
 
     const conditions: ReturnType<typeof eq>[] = [];
@@ -187,11 +187,18 @@ const editVehicleBody = z.object({
   vin: z.string().trim().min(1).optional(),
 });
 
-let variantColourCleared = false;
+let variantColourCleared: Promise<void> | null = null;
 async function clearLegacyVariantColour() {
-  if (variantColourCleared) return;
-  await db.execute(sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`);
-  variantColourCleared = true;
+  if (!variantColourCleared) {
+    variantColourCleared = db
+      .execute(sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`)
+      .then(() => undefined)
+      .catch((err) => {
+        variantColourCleared = null;
+        throw err;
+      });
+  }
+  await variantColourCleared;
 }
 
 router.patch('/vehicles/:vin', async (req, res, next) => {

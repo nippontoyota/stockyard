@@ -312,12 +312,43 @@ export default function App() {
     }
   }, [session, online, setState]);
 
-  useEffect(() => {
-    fetchServerData();
+  // Coalesce overlapping refreshes so multi-device + focus/socket storms share one in-flight sync.
+  const syncInFlightRef = useRef(null);
+  const syncPendingRef = useRef(false);
+  const syncDebounceRef = useRef(null);
 
-    const onFocus = () => fetchServerData();
+  const scheduleServerData = useCallback((opts = {}) => {
+    const { debounceMs = 0 } = opts;
+    const run = () => {
+      if (syncInFlightRef.current) {
+        syncPendingRef.current = true;
+        return syncInFlightRef.current;
+      }
+      const loop = async () => {
+        do {
+          syncPendingRef.current = false;
+          await fetchServerData();
+        } while (syncPendingRef.current);
+        syncInFlightRef.current = null;
+      };
+      syncInFlightRef.current = loop();
+      return syncInFlightRef.current;
+    };
+
+    if (debounceMs > 0) {
+      clearTimeout(syncDebounceRef.current);
+      syncDebounceRef.current = setTimeout(run, debounceMs);
+      return;
+    }
+    return run();
+  }, [fetchServerData]);
+
+  useEffect(() => {
+    scheduleServerData();
+
+    const onFocus = () => scheduleServerData({ debounceMs: 400 });
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") fetchServerData();
+      if (document.visibilityState === "visible") scheduleServerData({ debounceMs: 400 });
     };
 
     window.addEventListener("focus", onFocus);
@@ -326,16 +357,12 @@ export default function App() {
     return () => {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("visibilitychange", onVisibilityChange);
+      clearTimeout(syncDebounceRef.current);
     };
-  }, [fetchServerData]);
+  }, [scheduleServerData]);
 
   // §1.1 — Socket.io event-driven updates (only when logged in)
-  useSocket(fetchServerData, Boolean(session));
-
-  useEffect(() => {
-    if (!session) return;
-    fetchServerData();
-  }, [view, session, fetchServerData]);
+  useSocket(scheduleServerData, Boolean(session));
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -428,10 +455,10 @@ export default function App() {
         </div>
       )}
       <main className="content">
-        {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} onRefresh={fetchServerData} lastSyncedAt={lastSyncedAt} />}
+        {view === "scan" && <ScanView state={state} setState={setState} session={session} online={online} onRefresh={scheduleServerData} lastSyncedAt={lastSyncedAt} />}
         {view === "stock" && <StockView state={state} setState={setState} session={session} />}
         {view === "incoming" && (session.role === "stockyard" || session.role === "delivery_incharge") && (
-          <IncomingTab session={session} onRefresh={fetchServerData} />
+          <IncomingTab session={session} onRefresh={scheduleServerData} />
         )}
         {view === "dashboard" && !dataReady && (
           <div className="dashboard-loading" style={{ padding: '1rem' }}>
@@ -441,10 +468,10 @@ export default function App() {
         )}
         {view === "dashboard" && dataReady && (
           isAdmin
-            ? <AdminHome stats={stats} state={state} setState={setState} onRefresh={fetchServerData} />
+            ? <AdminHome stats={stats} state={state} setState={setState} onRefresh={scheduleServerData} />
             : <DashboardView state={state} stats={stats} session={session} setState={setState} />
         )}
-        {view === "requisitions" && <RequisitionsTab state={state} session={session} onRefresh={fetchServerData} />}
+        {view === "requisitions" && <RequisitionsTab state={state} session={session} onRefresh={scheduleServerData} />}
       </main>
       <nav className={`bottom-nav ${isAdmin ? "bottom-nav-admin" : ""}`}>
         {session.role === "stockyard" && <NavButton icon="barcode_scanner" label="Scan" active={view === "scan"} onClick={() => navigateTo("scan")} />}

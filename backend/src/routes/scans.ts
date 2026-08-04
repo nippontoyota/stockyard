@@ -391,7 +391,7 @@ router.post('/bulk-sync', async (req, res, next) => {
 
 router.get('/', async (req, res, next) => {
   try {
-    const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 1000));
+    const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 200));
     const rows = await db
       .select({
         id: scans.id,

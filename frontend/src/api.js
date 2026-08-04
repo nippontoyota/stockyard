@@ -3,11 +3,13 @@ const API_BASE = import.meta.env.VITE_API_URL || "https://stockyard-api-xvaa.onr
 const FETCH_TIMEOUT_MS = 8000;
 
 function isRetryableError(err, status) {
+  // Timeouts/aborts must not retry — under multi-device load that amplifies DB pressure.
+  if (err?.name === "AbortError") return false;
   if (status && status >= 400 && status < 500) return false;
   return true;
 }
 
-async function fetchWithRetry(url, options = {}, retries = 3) {
+async function fetchWithRetry(url, options = {}, retries = 2) {
   for (let i = 0; i < retries; i++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -193,7 +195,7 @@ export async function bulkSync(scans) {
 }
 
 export async function getVehicles(params = {}) {
-  const { page = 1, limit = 1000, yardId, status, model } = params;
+  const { page = 1, limit = 300, yardId, status, model } = params;
   let url = `/api/vehicles?page=${page}&limit=${limit}`;
   if (yardId) url += `&yard_id=${yardId}`;
   if (status) url += `&status=${status}`;
@@ -203,12 +205,13 @@ export async function getVehicles(params = {}) {
 }
 
 export async function getFlags() {
-  const response = await apiFetch("/api/admin/flags?limit=1000");
+  // Active exceptions only — resolved history is not needed for live sync.
+  const response = await apiFetch("/api/admin/flags?resolved=false&limit=200");
   return response.data || [];
 }
 
 export async function getScans() {
-  const response = await apiFetch("/api/scans?limit=1000");
+  const response = await apiFetch("/api/scans?limit=200");
   return response.data || [];
 }
 
