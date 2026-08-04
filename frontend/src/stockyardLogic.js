@@ -279,6 +279,34 @@ export function updateVehicleDetails(state, vin, patch) {
   };
 }
 
+/** Re-key a vehicle after admin VIN typo correction. Remaps client flags/scans vin fields. */
+export function renameVehicleVin(state, oldVin, newVin, patch = {}) {
+  const from = normalizeVin(oldVin);
+  const to = normalizeVin(newVin);
+  if (!from || !to) return state;
+  if (from === to) return updateVehicleDetails(state, from, patch);
+
+  const existing = state.vehicles[from];
+  if (!existing) return state;
+
+  const vehicles = { ...state.vehicles };
+  delete vehicles[from];
+  vehicles[to] = {
+    ...existing,
+    ...patch,
+    vin: to,
+    vinValid: patch.vinValid !== undefined ? patch.vinValid : true,
+    lastChangedAt: patch.lastChangedAt || new Date().toISOString(),
+  };
+
+  return {
+    ...state,
+    vehicles,
+    flags: (state.flags || []).map((f) => (f.vin === from ? { ...f, vin: to } : f)),
+    scans: (state.scans || []).map((s) => (s.vin === from ? { ...s, vin: to } : s)),
+  };
+}
+
 export function parseDeliveredVins(text) {
   return [...new Set(String(text || "").split(/\s|,|;|\t|\n|\r/).map(normalizeVin).filter(isValidVin))];
 }

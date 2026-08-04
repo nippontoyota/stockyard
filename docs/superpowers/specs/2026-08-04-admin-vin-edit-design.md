@@ -1,7 +1,7 @@
 # Design: Admin VIN typo correction
 
 Date: 2026-08-04  
-Status: approved (pending implementation)
+Status: implemented (local verified; not shipped)
 
 ## Goal
 

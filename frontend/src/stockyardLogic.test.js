@@ -8,6 +8,7 @@ import {
   isCarModel,
   normalizeVin,
   parseDeliveredVins,
+  renameVehicleVin,
   requisitionDestinationYardId,
   requisitionRequesterLabel,
   yards,
@@ -143,5 +144,30 @@ assert.equal(requisitionDestinationYardId(approvedReq), "TI01C-1");
 assert.equal(requisitionDestinationYardId({ requesting_branch: { yards: [{ id: "legacy-1" }] } }), "legacy-1");
 assert.equal(requisitionRequesterLabel(approvedReq), "chavakkad_di");
 assert.equal(requisitionRequesterLabel({ requested_by: "uuid-not-for-display" }), "");
+
+// Admin VIN typo correction re-keys client state
+const renameFrom = "JTMBA38V70D123456";
+const renameTo = "JTMBA38V70D654321";
+const renameBase = {
+  ...firstScanResult.state,
+  flags: [
+    ...(firstScanResult.state.flags || []),
+    { id: "f1", vin: renameFrom, type: "manual_admin_override", message: "note" },
+  ],
+  scans: [
+    ...(firstScanResult.state.scans || []),
+    { id: "s1", vin: renameFrom, type: "in" },
+  ],
+};
+const renamed = renameVehicleVin(renameBase, renameFrom, renameTo, { model: "Hilux", vinValid: true });
+assert.equal(renamed.vehicles[renameFrom], undefined);
+assert.equal(renamed.vehicles[renameTo].vin, renameTo);
+assert.equal(renamed.vehicles[renameTo].model, "Hilux");
+assert.equal(renamed.vehicles[renameTo].currentYardId, "CO01B-1");
+assert.ok(renamed.flags.every((f) => f.vin !== renameFrom));
+assert.ok(renamed.flags.some((f) => f.vin === renameTo));
+assert.ok(renamed.scans.every((s) => s.vin !== renameFrom));
+assert.equal(renameVehicleVin(renameBase, renameFrom, renameFrom, { model: "X" }).vehicles[renameFrom].model, "X");
+assert.equal(renameVehicleVin(createInitialState(), renameFrom, renameTo).vehicles[renameTo], undefined);
 
 console.log("stockyard logic ok");
