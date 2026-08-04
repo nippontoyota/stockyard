@@ -10,11 +10,18 @@ import { z } from 'zod';
 const router = Router();
 router.use(authenticate);
 
-let variantColourCleared = false;
+let variantColourCleared: Promise<void> | null = null;
 async function clearLegacyVariantColour() {
-  if (variantColourCleared) return;
-  await db.execute(sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`);
-  variantColourCleared = true;
+  if (!variantColourCleared) {
+    variantColourCleared = db
+      .execute(sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`)
+      .then(() => undefined)
+      .catch((err) => {
+        variantColourCleared = null;
+        throw err;
+      });
+  }
+  await variantColourCleared;
 }
 
 async function findOrCreateDevice(fingerprint: string): Promise<string> {
