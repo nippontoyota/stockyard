@@ -1,0 +1,28 @@
+# Production smoke — after main deploys, on a schedule, or manual.
+# Note: GitHub only runs `schedule` from the repo default branch (currently
+# `sajad`). Keep this file on that branch so the 10-minute cron stays active.
+name: Production smoke
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '*/10 * * * *' # every 10 minutes
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Smoke (ready + login + Vercel)
+        env:
+          SMOKE_API_BASE: https://stockyard-api-xvaa.onrender.com
+          SMOKE_FRONTEND_URL: https://stockyard-phi.vercel.app
+          # Optional: repo secrets SMOKE_USER / SMOKE_PASS override defaults
+          SMOKE_USER: ${{ secrets.SMOKE_USER }}
+          SMOKE_PASS: ${{ secrets.SMOKE_PASS }}
+          # Longer retries on push (Render/Vercel may still be deploying)
+          SMOKE_RETRIES: ${{ github.event_name == 'push' && '12' || '3' }}
+          SMOKE_RETRY_SLEEP: ${{ github.event_name == 'push' && '15' || '10' }}
+        run: bash .github/scripts/smoke-prod.sh
