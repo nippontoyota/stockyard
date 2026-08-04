@@ -106,7 +106,19 @@ async function seedDefaultCredentials() {
   }
 }
 
-seedDefaultCredentials();
+/** Run heavy credential seed/migrate once per process — never on every login. */
+let credentialsReady: Promise<void> | null = null;
+function ensureCredentialsReady() {
+  if (!credentialsReady) {
+    credentialsReady = seedDefaultCredentials().catch((err) => {
+      credentialsReady = null;
+      throw err;
+    });
+  }
+  return credentialsReady;
+}
+
+void ensureCredentialsReady();
 
 function resolveLoginUsername(rawUsername: string) {
   const normalized = normalizeUsername(rawUsername);
@@ -126,7 +138,8 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     const cleanPassword = String(password).trim();
     const usernameCandidates = resolveLoginUsername(String(username));
 
-    await seedDefaultCredentials();
+    // Do not await seed here — login must stay a single credential lookup.
+    // Seed runs once at boot via ensureCredentialsReady().
 
     let found: (typeof credentials.$inferSelect)[] = [];
     for (const candidate of usernameCandidates) {
@@ -173,7 +186,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
  */
 authRouter.get('/credentials', authenticate, requireRole('admin'), async (req: Request, res: Response) => {
   try {
-    await seedDefaultCredentials();
+    await ensureCredentialsReady();
     const rows = await db.select().from(credentials);
     const yardList = await db.select().from(yards);
     const branchList = await db.select().from(branches);
