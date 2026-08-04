@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { updateVehicleDetails, findYardById, yardsByRegion } from "../stockyardLogic.js";
+import {
+  updateVehicleDetails,
+  renameVehicleVin,
+  findYardById,
+  yardsByRegion,
+  isValidVin,
+} from "../stockyardLogic.js";
 import { adminUpdateVehicle } from "../api.js";
 import { AdminVehicleDeleteButton } from "./AdminVehicleDeleteButton.jsx";
 
@@ -27,8 +33,13 @@ function getYardName(yardId) {
   return yardObj ? `${yardObj.code} · ${yardObj.name}` : yardId;
 }
 
+function normalizeFormVin(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
 function buildForm(vehicle) {
   return {
+    vin: vehicle.vin || "",
     model: vehicle.model || "",
     driveType: vehicle.driveType || "",
     keyNo: vehicle.keyNo || "",
@@ -36,6 +47,12 @@ function buildForm(vehicle) {
     yardId: vehicle.currentYardId || "",
     vinValid: vehicle.vinValid !== false,
   };
+}
+
+function saveErrorMessage(err) {
+  if (err?.status === 409) return "That VIN already exists on another vehicle.";
+  if (err?.status === 400) return "Invalid VIN format.";
+  return err?.message || "Could not save vehicle.";
 }
 
 export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditConsumed }) {
@@ -46,6 +63,8 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [confirmVin, setConfirmVin] = useState(null);
+  const [confirmRetype, setConfirmRetype] = useState("");
 
   const allVehicles = state ? Object.values(state.vehicles) : [];
   const editingVehicle = editingVin ? state?.vehicles?.[editingVin] : null;
@@ -64,6 +83,8 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
     setForm(buildForm(editingVehicle));
     setError("");
     setSuccess("");
+    setConfirmVin(null);
+    setConfirmRetype("");
   }, [editingVin, editingVehicle]);
 
   useEffect(() => {
@@ -71,14 +92,21 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (e) => {
-      if (e.key === "Escape") closeEditor();
+      if (e.key === "Escape") {
+        if (confirmVin) {
+          setConfirmVin(null);
+          setConfirmRetype("");
+          return;
+        }
+        closeEditor();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [editingVin]);
+  }, [editingVin, confirmVin]);
 
   const filteredVehicles = allVehicles.filter((v) => {
     const derivedStatus = getDerivedStatus(v);
@@ -93,7 +121,62 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
     setSuccess("");
   }
 
-  async function handleSave(event) {
+  async function persistVehicle(nextVin) {
+    if (!editingVin || !form) return;
+
+    setSaving(true);
+    setError("");
+    setSuccess("");
+
+    const vinChanged = nextVin !== editingVin;
+    const payload = {
+      model: form.model.trim(),
+      drive_type: form.driveType || null,
+      key_no: form.keyNo.trim() || null,
+      status: form.status,
+      yard_id: form.status === "in" || form.status === "transit" ? form.yardId || null : form.yardId || null,
+      vin_valid: vinChanged ? true : form.vinValid,
+    };
+    if (vinChanged) payload.vin = nextVin;
+
+    try {
+      const updated = await adminUpdateVehicle(editingVin, payload);
+      const savedVin = normalizeFormVin(updated.vin || nextVin);
+      const detailsPatch = {
+        model: updated.model || form.model.trim(),
+        driveType: updated.drive_type || form.driveType || "",
+        keyNo: updated.key_no || form.keyNo.trim() || "",
+        currentStatus: updated.current_status || form.status,
+        currentYardId: updated.current_yard_id || form.yardId || null,
+        vinValid: updated.vin_valid ?? (vinChanged ? true : form.vinValid),
+        lastChangedAt: updated.last_changed_at || new Date().toISOString(),
+      };
+
+      if (setState) {
+        setState(
+          vinChanged
+            ? renameVehicleVin(state, editingVin, savedVin, detailsPatch)
+            : updateVehicleDetails(state, editingVin, detailsPatch)
+        );
+      }
+
+      if (vinChanged) {
+        setEditingVin(savedVin);
+        setForm((prev) => (prev ? { ...prev, vin: savedVin, vinValid: true } : prev));
+        setSuccess(`VIN updated to ${savedVin}.`);
+      } else {
+        setSuccess("Vehicle saved.");
+      }
+      setConfirmVin(null);
+      setConfirmRetype("");
+    } catch (err) {
+      setError(saveErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleSave(event) {
     event.preventDefault();
     if (!editingVin || !form) return;
 
@@ -102,40 +185,31 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
       return;
     }
 
-    setSaving(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      const updated = await adminUpdateVehicle(editingVin, {
-        model: form.model.trim(),
-        drive_type: form.driveType || null,
-        key_no: form.keyNo.trim() || null,
-        status: form.status,
-        yard_id: form.status === "in" || form.status === "transit" ? form.yardId || null : form.yardId || null,
-        vin_valid: form.vinValid,
-      });
-
-      if (setState) {
-        setState(
-          updateVehicleDetails(state, editingVin, {
-            model: updated.model || form.model.trim(),
-            driveType: updated.drive_type || form.driveType || "",
-            keyNo: updated.key_no || form.keyNo.trim() || "",
-            currentStatus: updated.current_status || form.status,
-            currentYardId: updated.current_yard_id || form.yardId || null,
-            vinValid: updated.vin_valid ?? form.vinValid,
-            lastChangedAt: updated.last_changed_at || new Date().toISOString(),
-          })
-        );
-      }
-
-      setSuccess("Vehicle saved.");
-    } catch (err) {
-      setError(err.message || "Could not save vehicle.");
-    } finally {
-      setSaving(false);
+    const nextVin = normalizeFormVin(form.vin);
+    if (!isValidVin(nextVin)) {
+      setError("VIN must be 17 characters (letters/numbers, no I, O, or Q).");
+      return;
     }
+
+    if (nextVin !== editingVin) {
+      setConfirmVin(nextVin);
+      setConfirmRetype("");
+      setError("");
+      setSuccess("");
+      return;
+    }
+
+    void persistVehicle(nextVin);
+  }
+
+  function handleConfirmRename(event) {
+    event.preventDefault();
+    if (!confirmVin) return;
+    if (normalizeFormVin(confirmRetype) !== confirmVin) {
+      setError("Retyped VIN does not match. Please type the new VIN exactly.");
+      return;
+    }
+    void persistVehicle(confirmVin);
   }
 
   function closeEditor() {
@@ -143,7 +217,11 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
     setForm(null);
     setError("");
     setSuccess("");
+    setConfirmVin(null);
+    setConfirmRetype("");
   }
+
+  const confirmMatches = confirmVin && normalizeFormVin(confirmRetype) === confirmVin;
 
   return (
     <div className="tab-pane vehicle-edit-workspace">
@@ -178,12 +256,12 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
         <div className="modal-overlay" onClick={closeEditor} aria-modal="true" role="dialog" aria-labelledby="vehicle-edit-title">
           <form
             className="modal-content vehicle-edit-modal-card"
-            onSubmit={handleSave}
+            onSubmit={confirmVin ? handleConfirmRename : handleSave}
             onClick={(e) => e.stopPropagation()}
           >
             <header className="vehicle-edit-panel-header">
               <div>
-                <p className="vehicle-edit-kicker">Editing vehicle</p>
+                <p className="vehicle-edit-kicker">{confirmVin ? "Confirm VIN change" : "Editing vehicle"}</p>
                 <h3 id="vehicle-edit-title" className="vehicle-edit-vin">{editingVin}</h3>
               </div>
               <button type="button" className="close-modal-btn" onClick={closeEditor} aria-label="Close editor">
@@ -192,80 +270,123 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
             </header>
 
             <div className="vehicle-edit-modal-body">
-              <div className="vehicle-edit-grid">
-            <label className="vehicle-edit-field">
-              <span>Model</span>
-              <input
-                value={form.model}
-                onChange={(e) => updateField("model", e.target.value)}
-                required
-                placeholder="e.g. Innova HyCross"
-              />
-            </label>
+              {confirmVin ? (
+                <div className="vehicle-vin-confirm">
+                  <p className="vehicle-vin-confirm-copy">
+                    Change VIN from <span className="mono">{editingVin}</span> to{" "}
+                    <span className="mono">{confirmVin}</span>?
+                  </p>
+                  <p className="vehicle-vin-confirm-hint">
+                    History stays on this vehicle. Retype the new VIN to confirm.
+                  </p>
+                  <label className="vehicle-edit-field vehicle-edit-field-wide">
+                    <span>Retype new VIN</span>
+                    <input
+                      value={confirmRetype}
+                      onChange={(e) => {
+                        setConfirmRetype(e.target.value);
+                        setError("");
+                      }}
+                      autoFocus
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                      placeholder={confirmVin}
+                      aria-label="Retype new VIN to confirm"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div className="vehicle-edit-grid">
+                  <label className="vehicle-edit-field vehicle-edit-field-wide">
+                    <span>VIN</span>
+                    <input
+                      value={form.vin}
+                      onChange={(e) => updateField("vin", e.target.value.toUpperCase())}
+                      required
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                      placeholder="17-character VIN"
+                      aria-label="Vehicle VIN"
+                    />
+                    {normalizeFormVin(form.vin) !== editingVin && (
+                      <span className="vehicle-edit-vin-original">Original: {editingVin}</span>
+                    )}
+                  </label>
 
-            <label className="vehicle-edit-field">
-              <span>Drive type</span>
-              <select value={form.driveType} onChange={(e) => updateField("driveType", e.target.value)}>
-                {DRIVE_TYPES.map((opt) => (
-                  <option key={opt.value || "none"} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </label>
+                  <label className="vehicle-edit-field">
+                    <span>Model</span>
+                    <input
+                      value={form.model}
+                      onChange={(e) => updateField("model", e.target.value)}
+                      required
+                      placeholder="e.g. Innova HyCross"
+                    />
+                  </label>
 
-            <label className="vehicle-edit-field">
-              <span>Key No.</span>
-              <input
-                value={form.keyNo}
-                onChange={(e) => updateField("keyNo", e.target.value)}
-                placeholder="Optional, e.g. K-101"
-              />
-            </label>
+                  <label className="vehicle-edit-field">
+                    <span>Drive type</span>
+                    <select value={form.driveType} onChange={(e) => updateField("driveType", e.target.value)}>
+                      {DRIVE_TYPES.map((opt) => (
+                        <option key={opt.value || "none"} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </label>
 
-            <label className="vehicle-edit-field">
-              <span>Status</span>
-              <select value={form.status} onChange={(e) => updateField("status", e.target.value)}>
-                <option value="in">IN</option>
-                <option value="out">OUT</option>
-                <option value="transit">In transit</option>
-              </select>
-            </label>
+                  <label className="vehicle-edit-field">
+                    <span>Key No.</span>
+                    <input
+                      value={form.keyNo}
+                      onChange={(e) => updateField("keyNo", e.target.value)}
+                      placeholder="Optional, e.g. K-101"
+                    />
+                  </label>
 
-            <label className="vehicle-edit-field vehicle-edit-field-wide">
-              <span>Yard</span>
-              <select
-                value={form.yardId}
-                onChange={(e) => updateField("yardId", e.target.value)}
-                required={form.status === "in"}
-              >
-                <option value="">No yard / clear</option>
-                {yardsByRegion().map(({ region, yards: regionYards }) => (
-                  <optgroup key={region} label={region}>
-                    {regionYards.map((y) => (
-                      <option key={y.id} value={y.id}>
-                        {y.code} · {y.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
+                  <label className="vehicle-edit-field">
+                    <span>Status</span>
+                    <select value={form.status} onChange={(e) => updateField("status", e.target.value)}>
+                      <option value="in">IN</option>
+                      <option value="out">OUT</option>
+                      <option value="transit">In transit</option>
+                    </select>
+                  </label>
 
-            <label className="vehicle-edit-check">
-              <input
-                type="checkbox"
-                checked={form.vinValid}
-                onChange={(e) => updateField("vinValid", e.target.checked)}
-              />
-              <span>VIN marked valid</span>
-            </label>
-              </div>
+                  <label className="vehicle-edit-field vehicle-edit-field-wide">
+                    <span>Yard</span>
+                    <select
+                      value={form.yardId}
+                      onChange={(e) => updateField("yardId", e.target.value)}
+                      required={form.status === "in"}
+                    >
+                      <option value="">No yard / clear</option>
+                      {yardsByRegion().map(({ region, yards: regionYards }) => (
+                        <optgroup key={region} label={region}>
+                          {regionYards.map((y) => (
+                            <option key={y.id} value={y.id}>
+                              {y.code} · {y.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="vehicle-edit-check">
+                    <input
+                      type="checkbox"
+                      checked={form.vinValid}
+                      onChange={(e) => updateField("vinValid", e.target.checked)}
+                    />
+                    <span>VIN marked valid</span>
+                  </label>
+                </div>
+              )}
 
               {error && <p className="notice bad">{error}</p>}
               {success && <p className="notice ok">{success}</p>}
             </div>
 
             <footer className="vehicle-edit-actions">
-              {setState && (
+              {!confirmVin && setState && (
                 <AdminVehicleDeleteButton
                   vin={editingVin}
                   setState={setState}
@@ -273,12 +394,34 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
                 />
               )}
               <div className="vehicle-edit-actions-main">
-                <button type="button" className="cred-modal-cancel" onClick={closeEditor}>
-                  Cancel
-                </button>
-                <button type="submit" className="primary" disabled={saving || !form.model.trim()}>
-                  {saving ? "Saving…" : "Save vehicle"}
-                </button>
+                {confirmVin ? (
+                  <>
+                    <button
+                      type="button"
+                      className="cred-modal-cancel"
+                      onClick={() => {
+                        setConfirmVin(null);
+                        setConfirmRetype("");
+                        setError("");
+                      }}
+                      disabled={saving}
+                    >
+                      Back
+                    </button>
+                    <button type="submit" className="primary" disabled={saving || !confirmMatches}>
+                      {saving ? "Saving…" : "Confirm VIN change"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="cred-modal-cancel" onClick={closeEditor}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="primary" disabled={saving || !form.model.trim()}>
+                      {saving ? "Saving…" : "Save vehicle"}
+                    </button>
+                  </>
+                )}
               </div>
             </footer>
           </form>
