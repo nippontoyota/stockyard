@@ -4,12 +4,11 @@ import postgres from 'postgres';
 import * as schema from './schema.js';
 
 // Supabase transaction pooler (port 6543) requires prepare: false.
-// Small pool + short lifetime: hung clients must not hold slots forever.
 const client = postgres(process.env.DATABASE_URL!, {
   prepare: false,
-  max: 3,
-  idle_timeout: 10,
-  max_lifetime: 60 * 5,
+  max: 8,
+  idle_timeout: 20,
+  max_lifetime: 60 * 10,
   connect_timeout: 8,
   connection: {
     application_name: 'stockyard-api',
