@@ -6,7 +6,7 @@ import * as schema from './schema.js';
 // Supabase transaction pooler (port 6543) requires prepare: false.
 const client = postgres(process.env.DATABASE_URL!, {
   prepare: false,
-  max: 15,
+  max: 40, // Increased for Supabase Pro tier
   idle_timeout: 10,
   max_lifetime: 60 * 10,
   connect_timeout: 8,
