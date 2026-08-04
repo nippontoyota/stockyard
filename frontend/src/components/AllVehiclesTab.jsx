@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   updateVehicleDetails,
   renameVehicleVin,
+  resolveFlagsByVin,
   findYardById,
   yardsByRegion,
   isValidVin,
@@ -53,7 +54,7 @@ function saveErrorMessage(err) {
   return err?.message || "Could not save vehicle.";
 }
 
-export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditConsumed }) {
+export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditConsumed, toast }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingVin, setEditingVin] = useState(null);
@@ -151,11 +152,12 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
       };
 
       if (setState) {
-        setState(
-          vinChanged
-            ? renameVehicleVin(state, editingVin, savedVin, detailsPatch)
-            : updateVehicleDetails(state, editingVin, detailsPatch)
-        );
+        let nextState = vinChanged
+          ? renameVehicleVin(state, editingVin, savedVin, detailsPatch)
+          : updateVehicleDetails(state, editingVin, detailsPatch);
+        // Auto-resolve all open flags for this vehicle (backend does the same)
+        nextState = resolveFlagsByVin(nextState, savedVin);
+        setState(nextState);
       }
 
       if (vinChanged) {
@@ -167,6 +169,10 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
       }
       setConfirmVin(null);
       setConfirmRetype("");
+
+      // Show success toast and auto-close editor
+      if (toast) toast("Vehicle reviewed successfully!");
+      setTimeout(() => closeEditor(), 1200);
     } catch (err) {
       setError(saveErrorMessage(err));
     } finally {

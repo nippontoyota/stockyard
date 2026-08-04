@@ -300,6 +300,15 @@ router.patch('/vehicles/:vin', async (req, res, next) => {
       resolved_at: new Date(),
     });
 
+    // Auto-resolve any active flags since admin has reviewed/edited this vehicle
+    await db.update(flags)
+      .set({
+        resolved: true,
+        resolved_by: req.user!.id,
+        resolved_at: new Date(),
+      })
+      .where(and(eq(flags.vehicle_id, vehicle.id), eq(flags.resolved, false)));
+
     const [updated] = await db
       .select({
         vin: vehicles.vin,

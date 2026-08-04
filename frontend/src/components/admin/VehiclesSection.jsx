@@ -113,6 +113,7 @@ export function VehiclesSection({
         setState={setState}
         initialEditVin={editVinRequest?.vin}
         onInitialEditConsumed={onEditVinConsumed}
+        toast={toast}
       />
 
       <div className="admin-vehicle-tools">
