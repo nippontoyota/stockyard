@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { eq, and, count, desc, inArray, isNull } from 'drizzle-orm';
+import { eq, and, count, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { scans, vehicles, vehicleStatus, devices, flags, yards, requisitions, notifications, branchYards } from '../db/schema.js';
 import { isValidVin } from '../lib/vin.js';
@@ -126,6 +126,8 @@ async function findOrCreateVehicle(
         updated_at: new Date(),
         ...(model ? { model } : {}),
         ...(opts.driveType ? { drive_type: opts.driveType } : {}),
+        // Last tagged activity wins (sticker signal); omit when payload has no method
+        ...(opts.entryMethod ? { entry_method: opts.entryMethod } : {}),
         vin_valid: vinValid,
         variant: null,
         colour: null,
@@ -133,17 +135,7 @@ async function findOrCreateVehicle(
     })
     .returning({ id: vehicles.id });
 
-  const vehicleId = result[0].id;
-
-  // First tagged activity only — never overwrite an existing label; never touch unlabeled rows at migrate time
-  if (opts.entryMethod) {
-    await txOrDb
-      .update(vehicles)
-      .set({ entry_method: opts.entryMethod, updated_at: new Date() })
-      .where(and(eq(vehicles.id, vehicleId), isNull(vehicles.entry_method)));
-  }
-
-  return { id: vehicleId, vinValid };
+  return { id: result[0].id, vinValid };
 }
 
 async function createFlag(vehicleId: string, scanId: string | null, flagType: string, message: string, vin?: string, txOrDb: any = db) {

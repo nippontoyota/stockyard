@@ -149,7 +149,10 @@ export function applyScan(state, scan) {
     lastChangedAt: scan.scannedAt,
     keyNo: scan.keyNo || existing?.keyNo || "",
     driveType: scan.driveType || existing?.driveType || "",
-    entryMethod: existing?.entryMethod || scan.entryMethod || null,
+    entryMethod:
+      scan.entryMethod === "qr" || scan.entryMethod === "manual"
+        ? scan.entryMethod
+        : existing?.entryMethod || null,
   };
   const next = {
     ...state,
