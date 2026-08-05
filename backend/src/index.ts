@@ -125,29 +125,35 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 
 const port = Number(process.env.PORT) || 3000;
-httpServer.listen(port, '0.0.0.0', () => {
-  console.log(`Stockyard API listening on port ${port}`);
 
-  ensureBuckets();
+async function start() {
+  // Ensure new columns exist before serving traffic (additive NULL only — no backfill)
+  await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS entry_method text`);
+  await db.execute(sql`ALTER TABLE scans ADD COLUMN IF NOT EXISTS entry_method text`);
 
-  db.execute(
-    sql`ALTER TABLE requisitions ADD COLUMN IF NOT EXISTS destination_yard_id text REFERENCES yards(id)`,
-  ).catch((err) => console.error('Failed to ensure destination_yard_id column:', err));
+  httpServer.listen(port, '0.0.0.0', () => {
+    console.log(`Stockyard API listening on port ${port}`);
 
-  // Additive only — existing rows stay NULL; no backfill
-  db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS entry_method text`)
-    .catch((err) => console.error('Failed to ensure vehicles.entry_method column:', err));
-  db.execute(sql`ALTER TABLE scans ADD COLUMN IF NOT EXISTS entry_method text`)
-    .catch((err) => console.error('Failed to ensure scans.entry_method column:', err));
+    ensureBuckets();
 
-  // Run legacy variant/colour migration exactly once at startup
-  db.execute(
-    sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`
-  ).catch((err) => console.error('Failed to clear legacy variant/colour:', err));
+    db.execute(
+      sql`ALTER TABLE requisitions ADD COLUMN IF NOT EXISTS destination_yard_id text REFERENCES yards(id)`,
+    ).catch((err) => console.error('Failed to ensure destination_yard_id column:', err));
 
-  // F6 — Dwell check: delay after boot so login traffic isn't competing with scan work.
-  setTimeout(() => {
-    checkDwellAlerts().catch(console.error);
-    setInterval(() => checkDwellAlerts().catch(console.error), 6 * 60 * 60 * 1000);
-  }, 2 * 60 * 1000);
+    // Run legacy variant/colour migration exactly once at startup
+    db.execute(
+      sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`
+    ).catch((err) => console.error('Failed to clear legacy variant/colour:', err));
+
+    // F6 — Dwell check: delay after boot so login traffic isn't competing with scan work.
+    setTimeout(() => {
+      checkDwellAlerts().catch(console.error);
+      setInterval(() => checkDwellAlerts().catch(console.error), 6 * 60 * 60 * 1000);
+    }, 2 * 60 * 1000);
+  });
+}
+
+start().catch((err) => {
+  console.error('Failed to start API:', err);
+  process.exit(1);
 });
