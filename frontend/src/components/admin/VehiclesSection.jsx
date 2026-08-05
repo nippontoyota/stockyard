@@ -59,6 +59,8 @@ export function VehiclesSection({
 
   const allVehicles = Object.values(state.vehicles || {});
   const inVehicles = allVehicles.filter((v) => v.currentStatus === "in");
+  const qrVehicles = allVehicles.filter((v) => v.entryMethod === "qr");
+  const manualVehicles = allVehicles.filter((v) => v.entryMethod === "manual");
 
   return (
     <div className="admin-section stack">
@@ -96,6 +98,24 @@ export function VehiclesSection({
           >
             <span className="material-symbols-outlined">download</span>
             <span>{exporting === "In transit" ? "Exporting…" : "In transit"}</span>
+          </button>
+          <button
+            type="button"
+            className="yard-export-btn"
+            disabled={!!exporting || !qrVehicles.length}
+            onClick={() => handleExcelExport(qrVehicles, "QR entry", "qr_entry")}
+          >
+            <span className="material-symbols-outlined">download</span>
+            <span>{exporting === "QR entry" ? "Exporting…" : `QR entry (${qrVehicles.length})`}</span>
+          </button>
+          <button
+            type="button"
+            className="yard-export-btn"
+            disabled={!!exporting || !manualVehicles.length}
+            onClick={() => handleExcelExport(manualVehicles, "Manual entry", "manual_entry")}
+          >
+            <span className="material-symbols-outlined">download</span>
+            <span>{exporting === "Manual entry" ? "Exporting…" : `Manual entry (${manualVehicles.length})`}</span>
           </button>
           <button
             type="button"

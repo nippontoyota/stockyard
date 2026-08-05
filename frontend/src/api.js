@@ -185,6 +185,7 @@ export async function bulkSync(scans) {
     damage_remark: s.damageRemark || undefined,
     damage_image: s.damageImage || undefined,
     drive_type: s.driveType || undefined,
+    ...(s.entryMethod === "qr" || s.entryMethod === "manual" ? { entry_method: s.entryMethod } : {}),
     ...(s.type === 'in' && s.model ? { model: s.model } : {}),
     ...(s.type === 'out' ? {
       out_remark: s.outRemark,

@@ -48,6 +48,8 @@ export const vehicles = pgTable('vehicles', {
   colour: text('colour'),
   drive_type: text('drive_type'), // 'neo_drive' | 'hybrid' | 'petrol' | 'diesel' | 'cng' | 'electric'
   vin_valid: boolean('vin_valid').notNull(),
+  // null = pre-tracking / unlabeled; set only on first tagged yard scan going forward
+  entry_method: text('entry_method'), // 'qr' | 'manual' | null
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -73,6 +75,8 @@ export const scans = pgTable(
     damage_remark: text('damage_remark'),
     damage_image: text('damage_image'),
     status: text('status').notNull(), // 'accepted' | 'rejected' | 'flagged'
+    // null = legacy scans before tracking; optional on API so old clients keep working
+    entry_method: text('entry_method'), // 'qr' | 'manual' | null
   },
   (t) => [
     index('scans_vehicle_id_idx').on(t.vehicle_id),

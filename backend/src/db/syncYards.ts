@@ -17,6 +17,8 @@ async function syncYards() {
   await db.execute(
     sql`ALTER TABLE requisitions ADD COLUMN IF NOT EXISTS destination_yard_id text REFERENCES yards(id)`,
   );
+  await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS entry_method text`);
+  await db.execute(sql`ALTER TABLE scans ADD COLUMN IF NOT EXISTS entry_method text`);
 
   const ids = YARD_DATA.map((y) => y.id);
   console.log(`Syncing ${ids.length} yards...`);
