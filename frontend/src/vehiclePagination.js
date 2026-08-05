@@ -1,7 +1,7 @@
-/** Page size for vehicle sync. Backend allows up to 10000 per page. */
-export const VEHICLE_PAGE_SIZE = 500;
-/** Hard stop so a runaway loop cannot hammer the API (500 × 200 = 100k rows). */
-export const VEHICLE_MAX_PAGES = 200;
+/** Page size for vehicle sync. Backend max is 10000 — use it so admin gets the full fleet in one request. */
+export const VEHICLE_PAGE_SIZE = 10000;
+/** Hard stop if fleet ever exceeds page size × max pages (10000 × 50 = 500k). */
+export const VEHICLE_MAX_PAGES = 50;
 
 /**
  * Keep requesting pages until a short/empty page arrives (or maxPages).

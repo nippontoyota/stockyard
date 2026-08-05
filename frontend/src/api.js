@@ -3,6 +3,8 @@ import { VEHICLE_PAGE_SIZE, fetchAllVehiclePages } from "./vehiclePagination.js"
 const API_BASE = import.meta.env.VITE_API_URL || "https://stockyard-api-xvaa.onrender.com";
 
 const FETCH_TIMEOUT_MS = 12000;
+/** Vehicle list can be thousands of rows; allow a longer budget than default API calls. */
+const VEHICLE_FETCH_TIMEOUT_MS = 60000;
 
 function isRetryableError(err, status) {
   // Timeouts/aborts must not retry — under multi-device load that amplifies DB pressure.
@@ -12,11 +14,13 @@ function isRetryableError(err, status) {
 }
 
 async function fetchWithRetry(url, options = {}, retries = 1) {
+  const timeoutMs = options.timeoutMs ?? FETCH_TIMEOUT_MS;
+  const { timeoutMs: _ignored, ...fetchOptions } = options;
   for (let i = 0; i < retries; i++) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
+      const res = await fetch(url, { ...fetchOptions, signal: controller.signal });
       clearTimeout(timeout);
       if (!res.ok) {
         const err = new Error(`HTTP ${res.status}`);
@@ -216,7 +220,7 @@ export async function getVehicles(params = {}) {
   };
 
   const fetchPage = async (page) => {
-    const response = await apiFetch(buildUrl(page));
+    const response = await apiFetch(buildUrl(page), { timeoutMs: VEHICLE_FETCH_TIMEOUT_MS });
     return response.data || [];
   };
 
