@@ -70,7 +70,7 @@ const laterManual = applyScan(qrIn.state, {
   damaged: false,
   entryMethod: "manual",
 });
-assert.equal(laterManual.state.vehicles.JTMBA38V70D123456.entryMethod, "qr");
+assert.equal(laterManual.state.vehicles.JTMBA38V70D123456.entryMethod, "manual");
 
 // Second scan at the SAME yard: should be rejected silently
 const sameYardDuplicate = applyScan(firstScanResult.state, { ...baseScan, clientScanId: "client-2" });

@@ -44,7 +44,6 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         damageRemark,
         damageImage: "",
         driveType,
-        entryMethod: "manual",
       });
       const result = applyScan(state, scan);
       if (!result.accepted) {
