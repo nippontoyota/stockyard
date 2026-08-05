@@ -56,9 +56,11 @@ const scanInBody = scanInBase.refine((d) => !d.damaged || (d.damage_remark && d.
 });
 
 const scanOutBase = scanCommon.extend({
-  out_remark: z.enum(['customer_acquisition', 'stockyard_transfer']),
+  out_remark: z.enum(['customer_acquisition', 'stockyard_transfer', 'display']),
   transfer_destination_yard_id: z.string().optional(),
   transfer_requested_by: z.string().optional(),
+  display_taken_by: z.string().trim().optional(),
+  display_location: z.string().trim().optional(),
   damaged: z.boolean(),
   damage_remark: z.string().optional(),
   damage_image: z.string().optional(),
@@ -72,6 +74,14 @@ const scanOutBody = scanOutBase
   .refine((d) => d.out_remark !== 'stockyard_transfer' || (d.transfer_destination_yard_id && d.transfer_requested_by), {
     message: 'transfer_destination_yard_id and transfer_requested_by are required for stockyard_transfer',
     path: ['transfer_destination_yard_id'],
+  })
+  .refine((d) => d.out_remark !== 'display' || Boolean(d.display_taken_by), {
+    message: 'display_taken_by is required for display',
+    path: ['display_taken_by'],
+  })
+  .refine((d) => d.out_remark !== 'display' || Boolean(d.display_location), {
+    message: 'display_location is required for display',
+    path: ['display_location'],
   });
 
 const bulkSyncBody = z.object({
@@ -81,6 +91,24 @@ const bulkSyncBody = z.object({
       z.object({ scan_type: z.literal('out') }).merge(scanOutBase),
     ]),
   ),
+}).superRefine((body, ctx) => {
+  body.scans.forEach((scan, index) => {
+    if (scan.scan_type !== 'out' || scan.out_remark !== 'display') return;
+    if (!scan.display_taken_by) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'display_taken_by is required for display',
+        path: ['scans', index, 'display_taken_by'],
+      });
+    }
+    if (!scan.display_location) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'display_location is required for display',
+        path: ['scans', index, 'display_location'],
+      });
+    }
+  });
 });
 
 type ScanIn = z.infer<typeof scanInBody>;
@@ -165,8 +193,16 @@ async function processScanIn(body: ScanIn, yardId: string) {
     );
     const deviceId = await findOrCreateDevice(body.device_fingerprint, tx);
     const [currentStatus] = await tx.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
+    const isDisplayReturn =
+      currentStatus?.current_status === 'in' &&
+      currentStatus.current_yard_id === yardId &&
+      currentStatus.on_display === true;
 
-    if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id === yardId) {
+    if (
+      currentStatus?.current_status === 'in' &&
+      currentStatus.current_yard_id === yardId &&
+      !isDisplayReturn
+    ) {
       const [scan] = await tx.insert(scans).values({
         client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, status: 'rejected', entry_method: body.entry_method ?? null,
       }).returning();
@@ -178,11 +214,11 @@ async function processScanIn(body: ScanIn, yardId: string) {
     }).returning();
 
     const scanTime = new Date(body.scanned_at);
-    if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
+    if (isDisplayReturn || !currentStatus || currentStatus.last_changed_at <= scanTime) {
       await tx.insert(vehicleStatus).values({
-        vehicle_id: vehicleId, current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no,
+        vehicle_id: vehicleId, current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no, on_display: false, display_taken_by: null, display_location: null,
       }).onConflictDoUpdate({
-        target: vehicleStatus.vehicle_id, set: { current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null },
+        target: vehicleStatus.vehicle_id, set: { current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null, on_display: false, display_taken_by: null, display_location: null },
       });
     }
 
@@ -228,14 +264,24 @@ async function processScanOut(body: ScanOut, yardId: string) {
     const deviceId = await findOrCreateDevice(body.device_fingerprint, tx);
     const [currentStatus] = await tx.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
+    if (currentStatus?.on_display === true) {
+      const [scan] = await tx.insert(scans).values({
+        client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, display_taken_by: body.display_taken_by, display_location: body.display_location, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'rejected', entry_method: body.entry_method ?? null,
+      }).returning();
+      return { scan_id: scan.id, status: 'rejected' as const, error: 'Return vehicle from display first.' };
+    }
+
     const [scan] = await tx.insert(scans).values({
-      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted', entry_method: body.entry_method ?? null,
+      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, display_taken_by: body.display_taken_by, display_location: body.display_location, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted', entry_method: body.entry_method ?? null,
     }).returning();
 
     const scanTime = new Date(body.scanned_at);
     const isTransfer = body.out_remark === 'stockyard_transfer';
-    const nextStatus = isTransfer ? 'transit' : 'out';
-    const nextYardId = isTransfer ? body.transfer_destination_yard_id! : yardId;
+    const isDisplay = body.out_remark === 'display';
+    const nextStatus = isDisplay ? 'in' : isTransfer ? 'transit' : 'out';
+    const nextYardId = isDisplay
+      ? currentStatus?.current_yard_id ?? yardId
+      : isTransfer ? body.transfer_destination_yard_id! : yardId;
 
     if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
       await tx.insert(vehicleStatus).values({
@@ -245,6 +291,9 @@ async function processScanOut(body: ScanOut, yardId: string) {
         last_out_scan_id: scan.id,
         last_changed_at: scanTime,
         key_no: body.key_no,
+        on_display: isDisplay ? true : null,
+        display_taken_by: isDisplay ? body.display_taken_by : null,
+        display_location: isDisplay ? body.display_location : null,
       }).onConflictDoUpdate({
         target: vehicleStatus.vehicle_id,
         set: {
@@ -254,6 +303,13 @@ async function processScanOut(body: ScanOut, yardId: string) {
           last_changed_at: scanTime,
           ...(body.key_no ? { key_no: body.key_no } : {}),
           override_reason: null,
+          ...(isDisplay
+            ? {
+                on_display: true,
+                display_taken_by: body.display_taken_by,
+                display_location: body.display_location,
+              }
+            : {}),
         },
       });
     }
@@ -378,7 +434,8 @@ router.post('/out', async (req, res, next) => {
       emitScanEvent({ type: 'out', vin: parsed.vin, model: null, yardId, timestamp: parsed.scanned_at, status: 'accepted', flagType: result.flags?.[0] });
       emitRequisitionEvent();
     }
-    res.status(result.status === 'already_processed' ? 200 : 201).json(result);
+    if (result.status === 'rejected') res.status(409).json(result);
+    else res.status(result.status === 'already_processed' ? 200 : 201).json(result);
   } catch (err) { next(err); }
 });
 
@@ -439,6 +496,8 @@ router.get('/', async (req, res, next) => {
         damageRemark: scans.damage_remark,
         damageImage: scans.damage_image,
         outRemark: scans.out_remark,
+        displayTakenBy: scans.display_taken_by,
+        displayLocation: scans.display_location,
         transferDestinationYardId: scans.transfer_destination_yard_id,
         transferRequestedBy: scans.transfer_requested_by,
         keyNo: scans.key_no,

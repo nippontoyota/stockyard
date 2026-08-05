@@ -131,13 +131,20 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
 
     // Read existing status to preserve yard on force-OUT
     const [existingStatus] = await db
-      .select({ current_yard_id: vehicleStatus.current_yard_id })
+      .select({
+        current_status: vehicleStatus.current_status,
+        current_yard_id: vehicleStatus.current_yard_id,
+        on_display: vehicleStatus.on_display,
+      })
       .from(vehicleStatus)
       .where(eq(vehicleStatus.vehicle_id, vehicle.id));
 
     const resolvedYardId = body.status === 'in'
       ? body.yard_id ?? existingStatus?.current_yard_id ?? null
       : existingStatus?.current_yard_id ?? null;
+    const clearDisplay =
+      existingStatus?.on_display === true &&
+      (body.status !== 'in' || resolvedYardId !== existingStatus.current_yard_id);
 
     // Upsert status
     await db
@@ -156,6 +163,9 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
           current_yard_id: resolvedYardId,
           last_changed_at: new Date(),
           override_reason: body.reason,
+          ...(clearDisplay
+            ? { on_display: false, display_taken_by: null, display_location: null }
+            : {}),
         },
       });
 
@@ -408,6 +418,10 @@ router.patch('/vehicles/:vin', async (req, res, next) => {
       res.status(400).json({ error: 'Select a yard when status is IN.' });
       return;
     }
+    const clearDisplay =
+      existingStatus?.on_display === true &&
+      (body.status !== undefined || body.yard_id !== undefined) &&
+      (nextStatus !== 'in' || nextYardId !== existingStatus.current_yard_id);
 
     const statusPatch: Record<string, unknown> = {
       current_status: nextStatus,
@@ -416,6 +430,11 @@ router.patch('/vehicles/:vin', async (req, res, next) => {
       override_reason: 'Admin vehicle edit',
     };
     if (body.key_no !== undefined) statusPatch.key_no = body.key_no || null;
+    if (clearDisplay) {
+      statusPatch.on_display = false;
+      statusPatch.display_taken_by = null;
+      statusPatch.display_location = null;
+    }
 
     await db
       .insert(vehicleStatus)

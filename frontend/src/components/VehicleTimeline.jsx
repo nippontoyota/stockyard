@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { outRemarkLabel } from '../stockyardLogic.js';
 
 /**
  * §4.2 — Vertical vehicle timeline.
@@ -63,7 +64,15 @@ export function VehicleTimeline({ scans = [], vin }) {
                 </div>
                 {isExpanded && (
                   <div className="timeline-details">
-                    {scan.outRemark || scan.out_remark ? <p><strong>Remark:</strong> {scan.outRemark || scan.out_remark}</p> : null}
+                    {scan.outRemark || scan.out_remark ? (
+                      <p><strong>Remark:</strong> {outRemarkLabel(scan.outRemark || scan.out_remark)}</p>
+                    ) : null}
+                    {(scan.displayTakenBy || scan.display_taken_by) ? (
+                      <p><strong>Taken by:</strong> {scan.displayTakenBy || scan.display_taken_by}</p>
+                    ) : null}
+                    {(scan.displayLocation || scan.display_location) ? (
+                      <p><strong>Display location:</strong> {scan.displayLocation || scan.display_location}</p>
+                    ) : null}
                     {scan.keyNo || scan.key_no ? <p><strong>Key No:</strong> {scan.keyNo || scan.key_no}</p> : null}
                     {scan.damaged && <p className="timeline-damage"><strong>⚠ Damaged:</strong> {scan.damageRemark || scan.damage_remark || 'Yes'}</p>}
                     {scan.transferDestinationYardId || scan.transfer_destination_yard_id ? (

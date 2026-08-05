@@ -21,6 +21,8 @@ import {
   requisitionRequesterLabel,
   findYardById,
   yardsByRegion,
+  outRemarkLabel,
+  isVehicleOnDisplay,
 } from "./stockyardLogic.js";
 import {
   ExecutiveKpiCards,
@@ -145,6 +147,9 @@ function mapServerResponse(vehiclesData, flagsData, scansData, notifsData, reqsD
       outRemark: v.out_remark,
       keyNo: v.key_no || v.keyNo || "",
       entryMethod: v.entry_method || null,
+      onDisplay: Boolean(v.on_display),
+      displayTakenBy: v.display_taken_by || "",
+      displayLocation: v.display_location || "",
     };
   });
 
@@ -175,6 +180,8 @@ function mapServerResponse(vehiclesData, flagsData, scansData, notifsData, reqsD
     outRemark: s.outRemark || "",
     transferDestinationYardId: s.transferDestinationYardId || "",
     transferRequestedBy: s.transferRequestedBy || "",
+    displayTakenBy: s.displayTakenBy || s.display_taken_by || "",
+    displayLocation: s.displayLocation || s.display_location || "",
     keyNo: s.keyNo || s.key_no || "",
     syncStatus: "synced",
   }));
@@ -817,6 +824,8 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const [outRemark, setOutRemark] = useState("");
   const [transferDestinationYardId, setTransferDestinationYardId] = useState("");
   const [transferRequestedBy, setTransferRequestedBy] = useState("");
+  const [displayTakenBy, setDisplayTakenBy] = useState("");
+  const [displayLocation, setDisplayLocation] = useState("");
   const [keyNo, setKeyNo] = useState("");
   const [damaged, setDamaged] = useState(false);
   const [damageRemark, setDamageRemark] = useState("");
@@ -841,8 +850,11 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const scanLockedRef = useRef(false);
   const yard = findYardById(session.yardId) || yards[0];
   const pendingVin = normalizeVin(vin);
-  const isCarInCurrentYard = state.vehicles[pendingVin]?.currentStatus === "in" && state.vehicles[pendingVin]?.currentYardId === yard.id;
-  const scanType = isCarInCurrentYard ? "out" : "in";
+  const pendingVehicle = state.vehicles[pendingVin];
+  const vehicleOnDisplay = isVehicleOnDisplay(pendingVehicle);
+  const isCarInCurrentYard = pendingVehicle?.currentStatus === "in" && pendingVehicle?.currentYardId === yard.id;
+  // Displayed cars stay IN — QR/auto path treats same-yard scan as return (IN), not OUT
+  const scanType = isCarInCurrentYard && !vehicleOnDisplay ? "out" : "in";
   const activeFlag = state.flags?.find((f) => f.vin === pendingVin && !f.resolved);
   const isFlagged = Boolean(activeFlag);
 
@@ -905,6 +917,8 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     setOutRemark("");
     setTransferDestinationYardId("");
     setTransferRequestedBy("");
+    setDisplayTakenBy("");
+    setDisplayLocation("");
     setKeyNo("");
     setDriveType("");
     setCarModel("");
@@ -1137,12 +1151,14 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       outRemark,
       transferDestinationYardId,
       transferRequestedBy,
+      displayTakenBy: outRemark === "display" ? displayTakenBy.trim() : "",
+      displayLocation: outRemark === "display" ? displayLocation.trim() : "",
       keyNo,
       damaged,
       damageRemark,
       damageImage,
       driveType,
-      model: finalScanType === "in" ? carModel : "",
+      model: finalScanType === "in" ? (carModel || state.vehicles[normalizeVin(vin)]?.model || "") : "",
       entryMethod,
     });
     const result = applyScan(state, scan);
@@ -1184,9 +1200,14 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     let effectiveType = fromQr ? scanType : manualScanType;
 
     if (!vin.trim()) return setOverlayResult({ type: "error", message: "Enter or scan a VIN." });
+    if (effectiveType === "out" && vehicleOnDisplay) {
+      return setOverlayResult({ type: "error", message: "Vehicle is on display. Return it to yard first (use IN)." });
+    }
     if (effectiveType === "out" && !outRemark) return setOverlayResult({ type: "error", message: "Select an OUT reason." });
     if (outRemark === "stockyard_transfer" && !transferDestinationYardId) return setOverlayResult({ type: "error", message: "Select destination yard for transfer." });
     if (outRemark === "stockyard_transfer" && !transferRequestedBy.trim()) return setOverlayResult({ type: "error", message: "Enter the name of person who requested the transfer." });
+    if (outRemark === "display" && !displayTakenBy.trim()) return setOverlayResult({ type: "error", message: "Enter the person responsible for display." });
+    if (outRemark === "display" && !displayLocation.trim()) return setOverlayResult({ type: "error", message: "Enter the display location." });
     if (damaged) {
       if (!damageRemark.trim()) return setOverlayResult({ type: "error", message: "Add the damage remark." });
       if (!damageImage) return setOverlayResult({ type: "error", message: "Attach or capture a photo of the vehicle damage." });
@@ -1199,8 +1220,9 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       try {
         const liveStatus = await getVehicleStatus(pendingVin);
         if (liveStatus && liveStatus.current_status) {
+          const liveOnDisplay = Boolean(liveStatus.on_display);
           const liveIsIn = liveStatus.current_status === 'in' && liveStatus.current_yard_id === yard.id;
-          effectiveType = liveIsIn ? 'out' : 'in';
+          effectiveType = liveIsIn && !liveOnDisplay ? 'out' : 'in';
         }
       } catch (err) {
         if (isAuthError(err)) {
@@ -1210,7 +1232,8 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       }
     }
 
-    if (effectiveType === "in" && !isCarModel(carModel)) {
+    const isDisplayReturn = effectiveType === "in" && vehicleOnDisplay && isCarInCurrentYard;
+    if (effectiveType === "in" && !isDisplayReturn && !isCarModel(carModel)) {
       return setOverlayResult({ type: "error", message: "Select the car model." });
     }
 
@@ -1219,6 +1242,8 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
         vin: pendingVin,
         scanType: effectiveType,
         outRemark,
+        displayTakenBy: displayTakenBy.trim(),
+        displayLocation: displayLocation.trim(),
         model: state.vehicles[pendingVin]?.model || "Unknown",
         entryMethod: fromQr ? "qr" : "manual",
       });
@@ -1243,6 +1268,8 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     setOutRemark("");
     setTransferDestinationYardId("");
     setTransferRequestedBy("");
+    setDisplayTakenBy("");
+    setDisplayLocation("");
     setKeyNo("");
     setDriveType("");
     setCarModel("");
@@ -1265,7 +1292,13 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
             <h2 style={{color: 'var(--accent)', marginTop: 0}}>Confirm OUT Scan</h2>
             <p><strong>Model:</strong> {confirmOutData.model}</p>
             <p><strong>VIN:</strong> {confirmOutData.vin}</p>
-            <p><strong>Reason:</strong> {confirmOutData.outRemark.replace('_', ' ')}</p>
+            <p><strong>Reason:</strong> {outRemarkLabel(confirmOutData.outRemark)}</p>
+            {confirmOutData.outRemark === "display" && (
+              <>
+                <p><strong>Person responsible:</strong> {confirmOutData.displayTakenBy}</p>
+                <p><strong>Display location:</strong> {confirmOutData.displayLocation}</p>
+              </>
+            )}
             <div className="split" style={{marginTop: '16px'}}>
               <button type="button" className="ghost" onClick={() => setConfirmOutData(null)}>Cancel</button>
               <button type="button" className="primary" onClick={() => {
@@ -1384,12 +1417,25 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                     setTransferDestinationYardId("");
                     setTransferRequestedBy("");
                   }
+                  if (event.target.value !== "display") {
+                    setDisplayTakenBy("");
+                    setDisplayLocation("");
+                  }
                   setOverlayResult(null);
                 }} aria-label="OUT reason">
                   <option value="">Select OUT reason</option>
                   <option value="customer_acquisition">Customer Acquisition</option>
                   <option value="stockyard_transfer">Stockyard Transfer</option>
+                  <option value="display">Display</option>
                 </select>
+              )}
+              {scanType === "in" && vehicleOnDisplay && (
+                <div className="notice warn">
+                  <strong>On display:</strong> Submitting IN returns this vehicle to the yard
+                  {pendingVehicle?.displayTakenBy || pendingVehicle?.displayLocation
+                    ? ` (${[pendingVehicle.displayTakenBy, pendingVehicle.displayLocation].filter(Boolean).join(" · ")}).`
+                    : "."}
+                </div>
               )}
               {outRemark === "stockyard_transfer" && (
                 <>
@@ -1417,6 +1463,30 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                       setMessage(null);
                     }}
                     placeholder="DI account who requested"
+                  />
+                </>
+              )}
+              {outRemark === "display" && (
+                <>
+                  <input
+                    value={displayTakenBy}
+                    onChange={(event) => {
+                      setDisplayTakenBy(event.target.value);
+                      setOverlayResult(null);
+                    }}
+                    placeholder="Person responsible for taking car"
+                    aria-label="Person responsible for display"
+                    required
+                  />
+                  <input
+                    value={displayLocation}
+                    onChange={(event) => {
+                      setDisplayLocation(event.target.value);
+                      setOverlayResult(null);
+                    }}
+                    placeholder="Display location"
+                    aria-label="Display location"
+                    required
                   />
                 </>
               )}
@@ -1522,6 +1592,8 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                   setOutRemark("");
                   setTransferDestinationYardId("");
                   setTransferRequestedBy("");
+                  setDisplayTakenBy("");
+                  setDisplayLocation("");
                 }}
               >
                 IN
@@ -1554,6 +1626,11 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
           <div className="stack">
             {manualScanType === "out" && (
               <>
+                {vehicleOnDisplay && (
+                  <div className="notice warn">
+                    <strong>On display:</strong> Return this vehicle with IN before recording another OUT.
+                  </div>
+                )}
                 <label htmlFor="remark">OUT Reason</label>
                 <select id="remark" value={outRemark} onChange={(event) => {
                   setOutRemark(event.target.value);
@@ -1561,10 +1638,15 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                     setTransferDestinationYardId("");
                     setTransferRequestedBy("");
                   }
-                }}>
+                  if (event.target.value !== "display") {
+                    setDisplayTakenBy("");
+                    setDisplayLocation("");
+                  }
+                }} disabled={vehicleOnDisplay}>
                   <option value="">Select reason</option>
                   <option value="customer_acquisition">Customer Acquisition</option>
                   <option value="stockyard_transfer">Stockyard Transfer</option>
+                  <option value="display">Display</option>
                 </select>
                 {outRemark === "stockyard_transfer" && (
                   <>
@@ -1592,22 +1674,72 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                     />
                   </>
                 )}
+                {outRemark === "display" && (
+                  <>
+                    <label htmlFor="display-taken-by">Person responsible</label>
+                    <input
+                      id="display-taken-by"
+                      value={displayTakenBy}
+                      onChange={(event) => setDisplayTakenBy(event.target.value)}
+                      placeholder="Who is taking the vehicle"
+                    />
+                    <label htmlFor="display-location">Display location</label>
+                    <input
+                      id="display-location"
+                      value={displayLocation}
+                      onChange={(event) => setDisplayLocation(event.target.value)}
+                      placeholder="Where the vehicle will be displayed"
+                    />
+                  </>
+                )}
+                {outRemark === "display" && (
+                  <>
+                    <label htmlFor="display-taken-by">Person responsible</label>
+                    <input
+                      id="display-taken-by"
+                      value={displayTakenBy}
+                      onChange={(event) => setDisplayTakenBy(event.target.value)}
+                      placeholder="Who is taking the vehicle"
+                      required
+                    />
+                    <label htmlFor="display-location">Display location</label>
+                    <input
+                      id="display-location"
+                      value={displayLocation}
+                      onChange={(event) => setDisplayLocation(event.target.value)}
+                      placeholder="Where the vehicle will be displayed"
+                      required
+                    />
+                  </>
+                )}
               </>
             )}
             {manualScanType === "in" && (
               <>
-                <label htmlFor="carModel">Model</label>
-                <select
-                  id="carModel"
-                  value={carModel}
-                  onChange={(event) => setCarModel(event.target.value)}
-                  required
-                >
-                  <option value="">Select model</option>
-                  {CAR_MODELS.map((modelName) => (
-                    <option key={modelName} value={modelName}>{modelName}</option>
-                  ))}
-                </select>
+                {vehicleOnDisplay && (
+                  <div className="notice warn">
+                    <strong>On display:</strong> IN returns this vehicle to the yard
+                    {pendingVehicle?.displayTakenBy || pendingVehicle?.displayLocation
+                      ? ` (${[pendingVehicle.displayTakenBy, pendingVehicle.displayLocation].filter(Boolean).join(" · ")}).`
+                      : "."}
+                  </div>
+                )}
+                {!vehicleOnDisplay && (
+                  <>
+                    <label htmlFor="carModel">Model</label>
+                    <select
+                      id="carModel"
+                      value={carModel}
+                      onChange={(event) => setCarModel(event.target.value)}
+                      required
+                    >
+                      <option value="">Select model</option>
+                      {CAR_MODELS.map((modelName) => (
+                        <option key={modelName} value={modelName}>{modelName}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
               </>
             )}
             <label htmlFor="keyNo">Key No.</label>
@@ -1693,6 +1825,7 @@ function StockInventoryView({ state, setState, session }) {
   const visibleVehicles = Object.values(state.vehicles).filter((vehicle) => session.role === "admin" || vehicle.currentYardId === session.yardId);
   const options = (key) => [...new Set(visibleVehicles.map((vehicle) => vehicle[key]).filter(Boolean))].sort();
   const stockIn = visibleVehicles.filter((vehicle) => vehicle.currentStatus === "in").length;
+  const stockDisplay = visibleVehicles.filter((vehicle) => vehicle.currentStatus === "in" && isVehicleOnDisplay(vehicle)).length;
   const stockOut = visibleVehicles.filter((vehicle) => vehicle.currentStatus === "out").length;
   const flagged = visibleVehicles.filter((vehicle) => state.flags.some((flag) => flag.vin === vehicle.vin && !flag.resolved)).length;
   const visibleYardIds = session.role === "admin" ? yards.map((yard) => yard.id) : [session.yardId];
@@ -1710,7 +1843,12 @@ function StockInventoryView({ state, setState, session }) {
 
   const rows = Object.values(state.vehicles)
     .filter((vehicle) => session.role === "admin" || vehicle.currentYardId === session.yardId)
-    .filter((vehicle) => status === "all" || vehicle.currentStatus === status)
+    .filter((vehicle) => {
+      if (status === "all") return true;
+      if (status === "display") return vehicle.currentStatus === "in" && isVehicleOnDisplay(vehicle);
+      if (status === "in") return vehicle.currentStatus === "in" && !isVehicleOnDisplay(vehicle);
+      return vehicle.currentStatus === status;
+    })
     .filter((vehicle) => model === "all" || vehicle.model === model)
     .filter((vehicle) => yardId === "all" || vehicle.currentYardId === yardId)
     .filter((vehicle) => `${vehicle.vin} ${vehicle.model || ""}`.toLowerCase().includes(query.toLowerCase()))
@@ -1761,6 +1899,7 @@ function StockInventoryView({ state, setState, session }) {
 
       <div className="stock-analytics">
         <StockStat icon="inventory_2" label="In Stock" value={stockIn} tone="green" />
+        <StockStat icon="storefront" label="On Display" value={stockDisplay} />
         <StockStat icon="logout" label="Moved Out" value={stockOut} />
         <StockStat icon="flag" label="Flags" value={flagged} tone={flagged ? "red" : "green"} />
         <StockStat icon="percent" label="Utilisation" value={`${utilisation}%`} />
@@ -1791,9 +1930,10 @@ function StockInventoryView({ state, setState, session }) {
               <label className="filter-field">
                 <span>Status</span>
                 <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Status filter">
-                  <option value="all">All (In/Out)</option>
-                  <option value="in">IN only</option>
-                  <option value="out">OUT only</option>
+                  <option value="all">All statuses</option>
+                  <option value="in">Parked IN</option>
+                  <option value="display">On display</option>
+                  <option value="out">Moved OUT</option>
                 </select>
               </label>
               <label className="filter-field">
@@ -1835,6 +1975,8 @@ function StockInventoryView({ state, setState, session }) {
               vehicle={vehicle}
               flags={state.flags.filter((flag) => flag.vin === vehicle.vin && !flag.resolved)}
               isAdmin={session.role === "admin"}
+              canReturnDisplay={session.role === "stockyard" || session.role === "admin"}
+              state={state}
               setState={setState}
             />
           ))
@@ -1856,25 +1998,35 @@ function StockStat({ icon, label, value, tone = "" }) {
   );
 }
 
-function VehicleCard({ vehicle, flags, isAdmin = false, setState }) {
+function VehicleCard({ vehicle, flags, isAdmin = false, canReturnDisplay = false, state, setState }) {
   const yard = findYardById(vehicle.currentYardId);
+  const onDisplay = isVehicleOnDisplay(vehicle);
   const statusText = flags.length
     ? "Flagged"
-    : vehicle.currentStatus === "in"
-      ? "In yard"
-      : vehicle.currentStatus === "transit"
-        ? "In transit"
-        : "Out";
+    : onDisplay
+      ? "On display"
+      : vehicle.currentStatus === "in"
+        ? "In yard"
+        : vehicle.currentStatus === "transit"
+          ? "In transit"
+          : "Out";
   const entryLabel = entryMethodLabel(vehicle.entryMethod);
   return (
-    <article className={`vehicle ${vehicle.currentStatus} ${flags.length ? "flagged" : ""}`}>
+    <article className={`vehicle ${vehicle.currentStatus} ${flags.length ? "flagged" : ""} ${onDisplay ? "on-display" : ""}`}>
       <div className="vehicle-main">
         <span className="vehicle-mark">{vehicle.model?.slice(0, 1) || "V"}</span>
         <div>
           <strong>{vehicle.vin}</strong>
           <span>{vehicle.model || "Model not set"}</span>
+          {onDisplay ? (
+            <small>
+              {vehicle.displayTakenBy || "—"}
+              {vehicle.displayLocation ? ` · ${vehicle.displayLocation}` : ""}
+            </small>
+          ) : null}
           <small>{vehicle.keyNo ? `Key No: ${vehicle.keyNo}` : "No key number"}</small>
           {entryLabel ? <small>{entryLabel}</small> : null}
+          {onDisplay ? <span className="badge badge-display">On display</span> : null}
         </div>
       </div>
       <div className="vehicle-yard">
@@ -1885,6 +2037,9 @@ function VehicleCard({ vehicle, flags, isAdmin = false, setState }) {
         <b>{statusText}</b>
         <small>{new Date(vehicle.lastChangedAt).toLocaleDateString("en-GB")}</small>
       </div>
+      {canReturnDisplay && onDisplay && setState && state && vehicle.currentYardId ? (
+        <VehicleReturnButton vehicle={vehicle} state={state} setState={setState} />
+      ) : null}
       {isAdmin && setState && (
         <div className="vehicle-admin-actions">
           <AdminVehicleDeleteButton
@@ -1897,6 +2052,49 @@ function VehicleCard({ vehicle, flags, isAdmin = false, setState }) {
         </div>
       )}
     </article>
+  );
+}
+
+function VehicleReturnButton({ vehicle, state, setState }) {
+  const [loading, setLoading] = useState(false);
+  const yardId = vehicle.currentYardId;
+
+  async function handleReturn() {
+    const ok = window.confirm(
+      `Return ${vehicle.vin} to yard?\n\nTaken by: ${vehicle.displayTakenBy || "—"}\nLocation: ${vehicle.displayLocation || "—"}`,
+    );
+    if (!ok) return;
+    setLoading(true);
+    try {
+      const scan = createScan({
+        vin: vehicle.vin,
+        type: "in",
+        yardId,
+        model: vehicle.model || "",
+        keyNo: vehicle.keyNo || "",
+        driveType: vehicle.driveType || "",
+        entryMethod: "manual",
+      });
+      const result = applyScan(state, scan);
+      if (!result.accepted) {
+        window.alert(result.message || "Return rejected.");
+        return;
+      }
+      await bulkSync([scan]);
+      setState(result.state);
+    } catch (err) {
+      window.alert(err.message || "Return failed. Check connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="vehicle-return-action">
+      <button type="button" className="primary compact" disabled={loading} onClick={handleReturn}>
+        {loading ? "Returning…" : "Return to yard"}
+      </button>
+    </div>
   );
 }
 

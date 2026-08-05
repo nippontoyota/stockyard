@@ -191,6 +191,10 @@ export async function bulkSync(scans) {
       out_remark: s.outRemark,
       transfer_destination_yard_id: s.transferDestinationYardId || undefined,
       transfer_requested_by: s.transferRequestedBy || undefined,
+      ...(s.outRemark === "display" ? {
+        display_taken_by: s.displayTakenBy || undefined,
+        display_location: s.displayLocation || undefined,
+      } : {}),
     } : {})
   }));
 

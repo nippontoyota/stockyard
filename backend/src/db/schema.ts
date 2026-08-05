@@ -67,9 +67,11 @@ export const scans = pgTable(
     device_id: uuid('device_id').notNull().references(() => devices.id),
     scanned_at: timestamp('scanned_at', { withTimezone: true }).notNull(),
     received_at: timestamp('received_at', { withTimezone: true }).defaultNow().notNull(),
-    out_remark: text('out_remark'), // 'customer_acquisition' | 'stockyard_transfer'
+    out_remark: text('out_remark'), // 'customer_acquisition' | 'stockyard_transfer' | 'display'
     transfer_destination_yard_id: text('transfer_destination_yard_id').references(() => yards.id),
     transfer_requested_by: text('transfer_requested_by'),
+    display_taken_by: text('display_taken_by'),
+    display_location: text('display_location'),
     key_no: text('key_no'),
     damaged: boolean('damaged'),
     damage_remark: text('damage_remark'),
@@ -98,6 +100,9 @@ export const vehicleStatus = pgTable(
     last_changed_at: timestamp('last_changed_at', { withTimezone: true }).defaultNow().notNull(),
     key_no: text('key_no'),
     override_reason: text('override_reason'),
+    on_display: boolean('on_display'),
+    display_taken_by: text('display_taken_by'),
+    display_location: text('display_location'),
   },
   (t) => [
     index('vs_yard_status_idx').on(t.current_yard_id, t.current_status),

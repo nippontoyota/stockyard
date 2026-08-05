@@ -16,6 +16,7 @@ export function vehicleToExportRow(vehicle, yard, flags = []) {
   const openFlag = flags.find((f) => f.vin === vehicle.vin && !f.resolved);
   const yardMeta = yard || findYardById(vehicle.currentYardId);
 
+  const onDisplay = Boolean(vehicle.onDisplay);
   return {
     VIN: vehicle.vin,
     Model: vehicle.model || "",
@@ -26,6 +27,9 @@ export function vehicleToExportRow(vehicle, yard, flags = []) {
     "Yard Code": yardMeta?.code || "",
     "Yard Name": yardMeta?.name || "",
     Region: yardMeta?.city || "",
+    "On Display": onDisplay ? "Yes" : "",
+    "Taken By": onDisplay ? (vehicle.displayTakenBy || "") : "",
+    "Display Location": onDisplay ? (vehicle.displayLocation || "") : "",
     "VIN Valid": vehicle.vinValid === false ? "No" : "Yes",
     "Open Flag": openFlag ? flagLabel(openFlag.type) : "",
     "Last Updated": formatDate(vehicle.lastChangedAt),

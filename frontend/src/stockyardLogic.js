@@ -72,7 +72,7 @@ export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "", model = "", entryMethod = null }) {
+export function createScan({ vin, type, yardId, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", displayTakenBy = "", displayLocation = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "", model = "", entryMethod = null }) {
   return {
     id: crypto.randomUUID(),
     clientScanId: createClientScanId(),
@@ -82,6 +82,8 @@ export function createScan({ vin, type, yardId, outRemark = "", transferDestinat
     outRemark,
     transferDestinationYardId,
     transferRequestedBy,
+    displayTakenBy,
+    displayLocation,
     keyNo,
     damaged,
     damageRemark,
@@ -92,6 +94,17 @@ export function createScan({ vin, type, yardId, outRemark = "", transferDestinat
     deviceId: localStorage.getItem("yardDeviceId") || "unknown-device",
     scannedAt: new Date().toISOString(),
   };
+}
+
+export function outRemarkLabel(remark) {
+  if (remark === "customer_acquisition") return "Customer Acquisition";
+  if (remark === "stockyard_transfer") return "Stockyard Transfer";
+  if (remark === "display") return "Display";
+  return String(remark || "").replace(/_/g, " ");
+}
+
+export function isVehicleOnDisplay(vehicle) {
+  return Boolean(vehicle?.onDisplay);
 }
 
 export function normalizeVin(value) {
@@ -112,11 +125,26 @@ export function applyScan(state, scan) {
   const vinValid = isValidVin(vin);
   const existing = state.vehicles[vin];
   const yard = yards.find((item) => item.id === scan.yardId);
-  if (scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId === scan.yardId) {
+  const onDisplay = isVehicleOnDisplay(existing);
+  const sameYardIn = scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId === scan.yardId;
+  const isDisplayReturn = sameYardIn && onDisplay;
+  const isDisplayOut = scan.type === "out" && scan.outRemark === "display";
+
+  if (sameYardIn && !onDisplay) {
     return { state, accepted: false, message: "Vehicle is already IN at this yard." };
+  }
+  if (scan.type === "out" && onDisplay) {
+    return { state, accepted: false, message: "Return vehicle from display first." };
   }
   if (scan.type === "out" && existing?.currentStatus === "out") {
     return { state, accepted: false, message: "Vehicle is already marked OUT." };
+  }
+  if (isDisplayOut) {
+    const takenBy = String(scan.displayTakenBy || "").trim();
+    const location = String(scan.displayLocation || "").trim();
+    if (!takenBy || !location) {
+      return { state, accepted: false, message: "Person responsible and display location are required." };
+    }
   }
 
   const flags = [];
@@ -134,18 +162,36 @@ export function applyScan(state, scan) {
       ? scan.model
       : existing?.model || "";
 
+  let currentStatus;
+  let currentYardId;
+  let nextOnDisplay = false;
+  let nextDisplayTakenBy = "";
+  let nextDisplayLocation = "";
+
+  if (isDisplayOut) {
+    currentStatus = "in";
+    currentYardId = existing?.currentYardId || scan.yardId;
+    nextOnDisplay = true;
+    nextDisplayTakenBy = String(scan.displayTakenBy || "").trim();
+    nextDisplayLocation = String(scan.displayLocation || "").trim();
+  } else if (scan.type === "out" && scan.outRemark === "stockyard_transfer") {
+    currentStatus = "transit";
+    currentYardId = scan.transferDestinationYardId || existing?.currentYardId || scan.yardId;
+  } else if (scan.type === "out") {
+    currentStatus = "out";
+    currentYardId = existing?.currentYardId || scan.yardId;
+  } else {
+    currentStatus = "in";
+    currentYardId = scan.yardId;
+    // IN (including display return) clears active display fields
+  }
+
   const vehicle = {
     vin,
     model: nextModel,
     vinValid,
-    currentStatus: scan.type === "out" && scan.outRemark === "stockyard_transfer"
-      ? "transit"
-      : scan.type,
-    currentYardId: scan.type === "in"
-      ? scan.yardId
-      : scan.type === "out" && scan.outRemark === "stockyard_transfer" && scan.transferDestinationYardId
-        ? scan.transferDestinationYardId
-        : existing?.currentYardId || scan.yardId,
+    currentStatus,
+    currentYardId,
     lastChangedAt: scan.scannedAt,
     keyNo: scan.keyNo || existing?.keyNo || "",
     driveType: scan.driveType || existing?.driveType || "",
@@ -153,6 +199,9 @@ export function applyScan(state, scan) {
       scan.entryMethod === "qr" || scan.entryMethod === "manual"
         ? scan.entryMethod
         : existing?.entryMethod || null,
+    onDisplay: nextOnDisplay,
+    displayTakenBy: nextDisplayTakenBy,
+    displayLocation: nextDisplayLocation,
   };
   const next = {
     ...state,
@@ -160,7 +209,12 @@ export function applyScan(state, scan) {
     scans: [...state.scans, { ...scan, vin, keyNo: scan.keyNo || "", status: flags.length ? "flagged" : "accepted" }],
     flags: [...state.flags, ...flags],
   };
-  return { state: next, accepted: true, message: flags.length ? "Scan accepted with admin flag." : "Scan accepted." };
+  const message = isDisplayReturn
+    ? "Vehicle returned from display."
+    : flags.length
+      ? "Scan accepted with admin flag."
+      : "Scan accepted.";
+  return { state: next, accepted: true, message };
 }
 
 function flag(vin, type, message, meta = {}) {
