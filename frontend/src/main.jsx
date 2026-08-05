@@ -1682,24 +1682,6 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                       value={displayTakenBy}
                       onChange={(event) => setDisplayTakenBy(event.target.value)}
                       placeholder="Who is taking the vehicle"
-                    />
-                    <label htmlFor="display-location">Display location</label>
-                    <input
-                      id="display-location"
-                      value={displayLocation}
-                      onChange={(event) => setDisplayLocation(event.target.value)}
-                      placeholder="Where the vehicle will be displayed"
-                    />
-                  </>
-                )}
-                {outRemark === "display" && (
-                  <>
-                    <label htmlFor="display-taken-by">Person responsible</label>
-                    <input
-                      id="display-taken-by"
-                      value={displayTakenBy}
-                      onChange={(event) => setDisplayTakenBy(event.target.value)}
-                      placeholder="Who is taking the vehicle"
                       required
                     />
                     <label htmlFor="display-location">Display location</label>
