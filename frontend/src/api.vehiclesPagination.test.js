@@ -47,5 +47,5 @@ const capped = await fetchAllVehiclePages(
 assert.equal(calls, 3);
 assert.deepEqual(capped, [1, 1, 2, 2, 3, 3]);
 
-assert.equal(VEHICLE_PAGE_SIZE, 500);
+assert.equal(VEHICLE_PAGE_SIZE, 10000);
 console.log("api vehicle pagination tests passed");
