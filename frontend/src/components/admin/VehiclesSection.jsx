@@ -6,6 +6,7 @@ import { AllVehiclesTab } from "../AllVehiclesTab.jsx";
 import { TransitUploadTab } from "../TransitUploadTab.jsx";
 import { ManualOverride } from "./ManualOverride.jsx";
 import { DeliveredCleanup } from "./DeliveredCleanup.jsx";
+import { AddToYard } from "./AddToYard.jsx";
 
 export function VehiclesSection({
   state,
@@ -57,6 +58,10 @@ export function VehiclesSection({
     }
   }
 
+  function toggleTool(id) {
+    setVehicleTool((prev) => (prev === id ? null : id));
+  }
+
   const allVehicles = Object.values(state.vehicles || {});
   const inVehicles = allVehicles.filter((v) => v.currentStatus === "in");
   const qrVehicles = allVehicles.filter((v) => v.entryMethod === "qr");
@@ -66,7 +71,7 @@ export function VehiclesSection({
     <div className="admin-section stack">
       <div className="admin-section-intro">
         <strong>Find and edit any vehicle</strong>
-        <span>Tap a row to edit fields. Transit uploads and rare overrides live below.</span>
+        <span>Use the tools above the list to add stock, upload transit, or override status. Tap a row to edit.</span>
       </div>
 
       <div className="admin-export-row">
@@ -128,26 +133,54 @@ export function VehiclesSection({
         </div>
       </div>
 
-      <AllVehiclesTab
-        state={state}
-        setState={setState}
-        initialEditVin={editVinRequest?.vin}
-        onInitialEditConsumed={onEditVinConsumed}
-        toast={toast}
-      />
-
       <div className="admin-vehicle-tools">
-        <button
-          type="button"
-          className={`admin-tool-toggle ${vehicleTool === "transit" ? "open" : ""}`}
-          onClick={() => setVehicleTool(vehicleTool === "transit" ? null : "transit")}
-        >
-          <span className="material-symbols-outlined">local_shipping</span>
-          <span>In transit ({transitCount})</span>
-          <span className="material-symbols-outlined admin-tool-chevron">expand_more</span>
-        </button>
+        <div className="admin-vehicle-tool-bar sticky">
+          <button
+            type="button"
+            className={`admin-tool-toggle ${vehicleTool === "add" ? "open" : ""}`}
+            onClick={() => toggleTool("add")}
+          >
+            <span className="material-symbols-outlined">add_box</span>
+            <span>Add to yard</span>
+            <span className="material-symbols-outlined admin-tool-chevron">expand_more</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-tool-toggle ${vehicleTool === "transit" ? "open" : ""}`}
+            onClick={() => toggleTool("transit")}
+          >
+            <span className="material-symbols-outlined">local_shipping</span>
+            <span>In transit ({transitCount})</span>
+            <span className="material-symbols-outlined admin-tool-chevron">expand_more</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-tool-toggle ${vehicleTool === "override" ? "open" : ""}`}
+            onClick={() => toggleTool("override")}
+          >
+            <span className="material-symbols-outlined">build</span>
+            <span>Force status (override)</span>
+            <span className="material-symbols-outlined admin-tool-chevron">expand_more</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-tool-toggle ${vehicleTool === "delivered" ? "open" : ""}`}
+            onClick={() => toggleTool("delivered")}
+          >
+            <span className="material-symbols-outlined">playlist_remove</span>
+            <span>Remove delivered VINs</span>
+            <span className="material-symbols-outlined admin-tool-chevron">expand_more</span>
+          </button>
+        </div>
+
+        {vehicleTool === "add" && (
+          <div className="admin-tool-panel admin-tool-panel-standalone">
+            <AddToYard onSuccess={toast} onError={onError} onRefresh={onRefresh} />
+          </div>
+        )}
+
         {vehicleTool === "transit" && (
-          <div className="admin-tool-panel stack">
+          <div className="admin-tool-panel admin-tool-panel-standalone stack">
             {transitCount === 0 ? (
               <p className="notice ok">None in transit. Upload a TKM list to add vehicles awaiting yard IN.</p>
             ) : (
@@ -169,10 +202,15 @@ export function VehiclesSection({
                           <td className="damaged-vin">{vehicle.vin}</td>
                           <td>{vehicle.model}</td>
                           <td className="damaged-yard-cell">
-                            <span className="scan-badge in">{destinationYard?.code || "?"}</span> {destinationYard?.name || "Unknown yard"}
+                            <span className="scan-badge in">{destinationYard?.code || "?"}</span>{" "}
+                            {destinationYard?.name || "Unknown yard"}
                           </td>
                           <td className="transit-actions-cell">
-                            <button type="button" className="flag-btn ghost-flag" onClick={() => onEditVehicle(vehicle.vin)}>
+                            <button
+                              type="button"
+                              className="flag-btn ghost-flag"
+                              onClick={() => onEditVehicle(vehicle.vin)}
+                            >
                               Edit
                             </button>
                           </td>
@@ -187,36 +225,26 @@ export function VehiclesSection({
           </div>
         )}
 
-        <button
-          type="button"
-          className={`admin-tool-toggle ${vehicleTool === "override" ? "open" : ""}`}
-          onClick={() => setVehicleTool(vehicleTool === "override" ? null : "override")}
-        >
-          <span className="material-symbols-outlined">build</span>
-          <span>Force status (override)</span>
-          <span className="material-symbols-outlined admin-tool-chevron">expand_more</span>
-        </button>
         {vehicleTool === "override" && (
-          <div className="admin-tool-panel">
+          <div className="admin-tool-panel admin-tool-panel-standalone">
             <ManualOverride state={state} setState={setState} onSuccess={toast} onError={onError} />
           </div>
         )}
 
-        <button
-          type="button"
-          className={`admin-tool-toggle ${vehicleTool === "delivered" ? "open" : ""}`}
-          onClick={() => setVehicleTool(vehicleTool === "delivered" ? null : "delivered")}
-        >
-          <span className="material-symbols-outlined">playlist_remove</span>
-          <span>Remove delivered VINs</span>
-          <span className="material-symbols-outlined admin-tool-chevron">expand_more</span>
-        </button>
         {vehicleTool === "delivered" && (
-          <div className="admin-tool-panel">
+          <div className="admin-tool-panel admin-tool-panel-standalone">
             <DeliveredCleanup state={state} setState={setState} onSuccess={toast} onError={onError} />
           </div>
         )}
       </div>
+
+      <AllVehiclesTab
+        state={state}
+        setState={setState}
+        initialEditVin={editVinRequest?.vin}
+        onInitialEditConsumed={onEditVinConsumed}
+        toast={toast}
+      />
     </div>
   );
 }

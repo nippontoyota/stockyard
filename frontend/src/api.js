@@ -329,6 +329,14 @@ export async function uploadTransitListApi(vehicles) {
   });
 }
 
+/** Create-only stockyard import. Never mutates existing VINs. */
+export async function adminImportVehicles(vehicles) {
+  return apiFetch("/api/admin/import/vehicles", {
+    method: "POST",
+    body: JSON.stringify({ vehicles }),
+  });
+}
+
 export async function getIncomingVehicles() {
   const response = await apiFetch("/api/vehicles/incoming");
   return response.data || [];
