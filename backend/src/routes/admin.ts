@@ -2,11 +2,14 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { eq, and, sql, count, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { vehicles, vehicleStatus, scans, flags, requisitions, notifications, yards } from '../db/schema.js';
+import { vehicles, vehicleStatus, scans, flags, requisitions, notifications, yards, devices } from '../db/schema.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { isValidVin } from '../lib/vin.js';
 import { prepareVinRename } from '../lib/vinRename.js';
 import { DRIVE_TYPE_VALUES, isDriveType } from '../shared/driveTypes.js';
+import { uploadBase64Image } from '../lib/supabase.js';
+import { emitFlagEvent } from '../lib/socket.js';
+import { randomUUID } from 'node:crypto';
 
 const router = Router();
 router.use(authenticate);
@@ -389,9 +392,27 @@ const importBody = z.object({
       model: z.string().optional().nullable(),
       key_no: z.string().trim().max(40).optional().nullable(),
       drive_type: z.union([driveTypeSchema, z.literal(''), z.null()]).optional(),
+      damaged: z.boolean().optional(),
+      damage_remark: z.string().trim().max(2000).optional().nullable(),
+      damage_image: z.string().optional().nullable(),
     }),
   ),
 });
+
+async function findOrCreateAdminImportDevice(): Promise<string> {
+  const result = await db
+    .insert(devices)
+    .values({
+      device_fingerprint: 'admin-import',
+      label: 'Admin add to yard',
+    })
+    .onConflictDoUpdate({
+      target: devices.device_fingerprint,
+      set: { last_seen_at: new Date() },
+    })
+    .returning({ id: devices.id });
+  return result[0].id;
+}
 
 router.post('/import/vehicles', async (req, res, next) => {
   try {
@@ -415,9 +436,17 @@ router.post('/import/vehicles', async (req, res, next) => {
       for (const row of rows) knownYards.add(row.id);
     }
 
+    let adminDeviceId: string | null = null;
+    const needsDevice = body.vehicles.some((v) => v.damaged);
+    if (needsDevice) {
+      adminDeviceId = await findOrCreateAdminImportDevice();
+    }
+
     for (const v of body.vehicles) {
       const vin = v.vin.toUpperCase().trim();
       const yardId = (v.yard_id || '').trim();
+      const damaged = Boolean(v.damaged);
+      const damageRemark = v.damage_remark?.trim() || '';
 
       if (!vin) {
         rejected.push({ vin: v.vin || '', reason: 'invalid VIN' });
@@ -434,6 +463,16 @@ router.post('/import/vehicles', async (req, res, next) => {
         continue;
       }
 
+      if (damaged && !damageRemark) {
+        rejected.push({ vin, reason: 'damage remark required when damaged' });
+        continue;
+      }
+
+      if (damaged && !v.damage_image) {
+        rejected.push({ vin, reason: 'damage photo required when damaged' });
+        continue;
+      }
+
       const [existing] = await db
         .select({ id: vehicles.id })
         .from(vehicles)
@@ -444,10 +483,16 @@ router.post('/import/vehicles', async (req, res, next) => {
         continue;
       }
 
+      let damageImageUrl: string | null = null;
+      if (damaged && v.damage_image) {
+        damageImageUrl = await uploadBase64Image(v.damage_image);
+      }
+
       const modelValue = v.model?.trim() || null;
       const driveType =
         v.drive_type && isDriveType(v.drive_type) ? v.drive_type : null;
       const keyNo = v.key_no?.trim() || null;
+      const now = new Date();
 
       const [vehicle] = await db
         .insert(vehicles)
@@ -461,11 +506,72 @@ router.post('/import/vehicles', async (req, res, next) => {
         })
         .returning({ id: vehicles.id });
 
+      let scanId: string | null = null;
+      if (damaged && adminDeviceId) {
+        const [scan] = await db
+          .insert(scans)
+          .values({
+            client_scan_id: `admin-import-${randomUUID()}`,
+            vehicle_id: vehicle.id,
+            vin_raw: vin,
+            scan_type: 'in',
+            yard_id: yardId,
+            device_id: adminDeviceId,
+            scanned_at: now,
+            key_no: keyNo,
+            damaged: true,
+            damage_remark: damageRemark,
+            damage_image: damageImageUrl,
+            status: 'accepted',
+            entry_method: null,
+          })
+          .returning({ id: scans.id });
+        scanId = scan.id;
+
+        const [flag] = await db
+          .insert(flags)
+          .values({
+            vehicle_id: vehicle.id,
+            scan_id: scanId,
+            flag_type: 'damage_reported',
+            message: damageRemark || 'Damage reported',
+          })
+          .returning({ id: flags.id });
+
+        emitFlagEvent({
+          id: flag.id,
+          vehicleId: vehicle.id,
+          vin,
+          flagType: 'damage_reported',
+          message: damageRemark || 'Damage reported',
+        });
+
+        if (v.damage_image && !damageImageUrl) {
+          const [photoFlag] = await db
+            .insert(flags)
+            .values({
+              vehicle_id: vehicle.id,
+              scan_id: scanId,
+              flag_type: 'photo_upload_failed',
+              message: 'Damage photo upload failed — image not saved',
+            })
+            .returning({ id: flags.id });
+          emitFlagEvent({
+            id: photoFlag.id,
+            vehicleId: vehicle.id,
+            vin,
+            flagType: 'photo_upload_failed',
+            message: 'Damage photo upload failed — image not saved',
+          });
+        }
+      }
+
       await db.insert(vehicleStatus).values({
         vehicle_id: vehicle.id,
         current_status: 'in',
         current_yard_id: yardId,
-        last_changed_at: new Date(),
+        last_in_scan_id: scanId,
+        last_changed_at: now,
         key_no: keyNo,
         override_reason: 'Admin add to yard',
       });

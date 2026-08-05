@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   yards,
@@ -25,8 +25,40 @@ function findYard(value) {
   return null;
 }
 
+function compressImage(file, maxDimension = 1000, quality = 0.8) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => resolve(e.target.result || "");
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
 export function AddToYard({ onSuccess, onError, onRefresh }) {
   const [mode, setMode] = useState("single");
+  const damagePhotoInputRef = useRef(null);
 
   // Single form
   const [yardId, setYardId] = useState("");
@@ -34,6 +66,9 @@ export function AddToYard({ onSuccess, onError, onRefresh }) {
   const [model, setModel] = useState("");
   const [keyNo, setKeyNo] = useState("");
   const [driveType, setDriveType] = useState("");
+  const [damaged, setDamaged] = useState(false);
+  const [damageRemark, setDamageRemark] = useState("");
+  const [damageImage, setDamageImage] = useState("");
   const [singleLoading, setSingleLoading] = useState(false);
   const [singleError, setSingleError] = useState("");
   const [singleOk, setSingleOk] = useState("");
@@ -46,6 +81,34 @@ export function AddToYard({ onSuccess, onError, onRefresh }) {
   const [bulkError, setBulkError] = useState(null);
   const [bulkResult, setBulkResult] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  function resetDamageFields() {
+    setDamaged(false);
+    setDamageRemark("");
+    setDamageImage("");
+  }
+
+  async function handleDamagePhotoSelect(event) {
+    const selected = event.target.files?.[0];
+    if (!selected) return;
+    if (selected.size > 10 * 1024 * 1024) {
+      setSingleError("Photo is too large (max 10MB). Try a smaller image.");
+      return;
+    }
+    try {
+      const compressed = await compressImage(selected, 1000, 0.8);
+      if (compressed.length > 3 * 1024 * 1024) {
+        setSingleError("Compressed photo still too large (max 3MB).");
+        return;
+      }
+      setDamageImage(compressed);
+      setSingleError("");
+    } catch {
+      setSingleError("Could not read that photo.");
+    } finally {
+      event.target.value = "";
+    }
+  }
 
   async function handleSingleSubmit(event) {
     event.preventDefault();
@@ -65,6 +128,14 @@ export function AddToYard({ onSuccess, onError, onRefresh }) {
       setSingleError("Select a model.");
       return;
     }
+    if (damaged && !damageRemark.trim()) {
+      setSingleError("Describe the damage.");
+      return;
+    }
+    if (damaged && !damageImage) {
+      setSingleError("Attach or capture a photo of the vehicle damage.");
+      return;
+    }
 
     setSingleLoading(true);
     try {
@@ -75,18 +146,24 @@ export function AddToYard({ onSuccess, onError, onRefresh }) {
           model,
           key_no: keyNo.trim() || null,
           drive_type: driveType || null,
+          damaged: damaged || undefined,
+          damage_remark: damaged ? damageRemark.trim() : null,
+          damage_image: damaged ? damageImage : null,
         },
       ]);
       const rejected = result.rejected || [];
       if (result.imported === 1) {
         const yard = yards.find((y) => y.id === yardId);
         setSingleOk(
-          `Added ${normalized} as IN at ${yard ? `${yard.code} · ${yard.name}` : yardId}.`
+          `Added ${normalized} as IN at ${yard ? `${yard.code} · ${yard.name}` : yardId}${
+            damaged ? " (damage reported)" : ""
+          }.`
         );
         setVin("");
         setModel("");
         setKeyNo("");
         setDriveType("");
+        resetDamageFields();
         onSuccess?.(`Added ${normalized} to stockyard.`);
         onRefresh?.();
       } else {
@@ -350,6 +427,63 @@ export function AddToYard({ onSuccess, onError, onRefresh }) {
               </option>
             ))}
           </select>
+
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={damaged}
+              onChange={(event) => {
+                setDamaged(event.target.checked);
+                if (!event.target.checked) {
+                  setDamageRemark("");
+                  setDamageImage("");
+                }
+              }}
+            />{" "}
+            Car damaged
+          </label>
+          {damaged && (
+            <div className="damage-inputs stack">
+              <textarea
+                value={damageRemark}
+                onChange={(event) => setDamageRemark(event.target.value)}
+                rows={3}
+                placeholder="Type of damage & details..."
+                required
+              />
+              <input
+                ref={damagePhotoInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleDamagePhotoSelect}
+                style={{ display: "none" }}
+              />
+              <div className="damage-photo-upload-row">
+                <button
+                  type="button"
+                  className="ghost damage-photo-btn"
+                  onClick={() => damagePhotoInputRef.current?.click()}
+                >
+                  <span className="material-symbols-outlined">add_a_photo</span>
+                  <span>{damageImage ? "Change photo" : "Take damage photo"}</span>
+                </button>
+                {damageImage && (
+                  <div className="damage-thumb-wrap">
+                    <img src={damageImage} alt="Damage preview" className="damage-thumb" />
+                    <button
+                      type="button"
+                      className="damage-thumb-remove"
+                      onClick={() => setDamageImage("")}
+                      title="Remove photo"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {singleError && (
             <div className="notice warn" role="alert">
