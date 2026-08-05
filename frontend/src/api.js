@@ -256,6 +256,18 @@ export async function adminOverrideVehicle(vin, status, reason, yardId) {
   });
 }
 
+/** Report damage on an existing vehicle (does not change IN/OUT/yard). */
+export async function adminReportVehicleDamage(vin, reason, damageImage, yardId) {
+  return apiFetch(`/api/admin/vehicles/${encodeURIComponent(String(vin).toUpperCase())}/damage`, {
+    method: "POST",
+    body: JSON.stringify({
+      reason,
+      damage_image: damageImage,
+      ...(yardId ? { yardId } : {}),
+    }),
+  });
+}
+
 export async function adminUpdateVehicle(vin, fields) {
   return apiFetch(`/api/admin/vehicles/${encodeURIComponent(String(vin).toUpperCase())}`, {
     method: "PATCH",

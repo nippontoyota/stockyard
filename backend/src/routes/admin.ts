@@ -184,6 +184,144 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
   }
 });
 
+// ─── POST /vehicles/:vin/damage ──────────────────────────────────────
+// Report damage on an existing vehicle — does not change IN/OUT/yard.
+
+const damageReportBody = z.object({
+  reason: z.string().trim().min(1).max(2000),
+  damage_image: z.string().min(1),
+  yard_id: z.string().min(1).optional().nullable(),
+  yardId: z.string().min(1).optional().nullable(),
+}).transform((d) => ({
+  reason: d.reason,
+  damage_image: d.damage_image,
+  yard_id: d.yard_id || d.yardId || undefined,
+}));
+
+router.post('/vehicles/:vin/damage', async (req, res, next) => {
+  try {
+    const body = damageReportBody.parse(req.body);
+    const vin = req.params.vin.toUpperCase();
+
+    const [vehicle] = await db
+      .select({ id: vehicles.id })
+      .from(vehicles)
+      .where(eq(vehicles.vin, vin));
+
+    if (!vehicle) {
+      res.status(404).json({ error: 'Vehicle not found' });
+      return;
+    }
+
+    const [existingStatus] = await db
+      .select({
+        current_yard_id: vehicleStatus.current_yard_id,
+        current_status: vehicleStatus.current_status,
+      })
+      .from(vehicleStatus)
+      .where(eq(vehicleStatus.vehicle_id, vehicle.id));
+
+    const yardId = body.yard_id || existingStatus?.current_yard_id || null;
+    if (!yardId) {
+      res.status(400).json({
+        error: 'Vehicle has no yard — pick a yard or set status IN first',
+      });
+      return;
+    }
+
+    const [yardRow] = await db
+      .select({ id: yards.id })
+      .from(yards)
+      .where(eq(yards.id, yardId));
+    if (!yardRow) {
+      res.status(400).json({ error: 'Invalid yard' });
+      return;
+    }
+
+    const damageImageUrl = await uploadBase64Image(body.damage_image);
+    const deviceId = await findOrCreateAdminImportDevice();
+    const now = new Date();
+
+    const [scan] = await db
+      .insert(scans)
+      .values({
+        client_scan_id: `admin-damage-${randomUUID()}`,
+        vehicle_id: vehicle.id,
+        vin_raw: vin,
+        scan_type: existingStatus?.current_status === 'out' ? 'out' : 'in',
+        yard_id: yardId,
+        device_id: deviceId,
+        scanned_at: now,
+        damaged: true,
+        damage_remark: body.reason,
+        damage_image: damageImageUrl,
+        status: 'accepted',
+        entry_method: null,
+      })
+      .returning({ id: scans.id });
+
+    const [flag] = await db
+      .insert(flags)
+      .values({
+        vehicle_id: vehicle.id,
+        scan_id: scan.id,
+        flag_type: 'damage_reported',
+        message: body.reason,
+        resolved: false,
+      })
+      .returning({ id: flags.id });
+
+    emitFlagEvent({
+      id: flag.id,
+      vehicleId: vehicle.id,
+      vin,
+      flagType: 'damage_reported',
+      message: body.reason,
+    });
+
+    if (!damageImageUrl) {
+      const [photoFlag] = await db
+        .insert(flags)
+        .values({
+          vehicle_id: vehicle.id,
+          scan_id: scan.id,
+          flag_type: 'photo_upload_failed',
+          message: 'Damage photo upload failed — image not saved',
+          resolved: false,
+        })
+        .returning({ id: flags.id });
+      emitFlagEvent({
+        id: photoFlag.id,
+        vehicleId: vehicle.id,
+        vin,
+        flagType: 'photo_upload_failed',
+        message: 'Damage photo upload failed — image not saved',
+      });
+    }
+
+    // Audit trail (resolved) — does not clear open damage flags
+    await db.insert(flags).values({
+      vehicle_id: vehicle.id,
+      scan_id: scan.id,
+      flag_type: 'manual_admin_override',
+      message: `Admin reported damage. Reason: ${body.reason}`,
+      resolved: true,
+      resolved_by: req.user!.id,
+      resolved_at: new Date(),
+    });
+
+    res.json({
+      vin,
+      damaged: true,
+      flag_id: flag.id,
+      photo_saved: Boolean(damageImageUrl),
+      reason: body.reason,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── PATCH /vehicles/:vin ────────────────────────────────────────────
 // Full vehicle field edit (admin)
 

@@ -227,7 +227,13 @@ export function VehiclesSection({
 
         {vehicleTool === "override" && (
           <div className="admin-tool-panel admin-tool-panel-standalone">
-            <ManualOverride state={state} setState={setState} onSuccess={toast} onError={onError} />
+            <ManualOverride
+              state={state}
+              setState={setState}
+              onSuccess={toast}
+              onError={onError}
+              onRefresh={onRefresh}
+            />
           </div>
         )}
 
