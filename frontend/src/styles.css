@@ -920,7 +920,20 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 .admin-vehicle-tools {
   display: grid;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+.admin-vehicle-tool-bar {
+  display: grid;
+  gap: 8px;
+}
+.admin-vehicle-tool-bar.sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #fff;
+  box-shadow: 0 8px 16px -12px rgba(0, 32, 70, 0.35);
+  padding: 4px 0 8px;
 }
 .admin-tool-toggle {
   display: grid;
@@ -948,8 +961,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
 }
 .admin-tool-toggle.open {
   border-color: #002046;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
   background: #0b1f33;
   color: #fff;
   box-shadow: none;
@@ -968,8 +979,37 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   border-radius: 0 0 8px 8px;
   background: #fff;
 }
+.admin-tool-panel-standalone {
+  border-top: 1px solid #002046;
+  border-radius: 8px;
+}
 .admin-tool-form {
   max-width: 520px;
+}
+.add-to-yard-form.stack {
+  gap: 10px;
+}
+.add-to-yard-form label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+.add-to-yard-form select,
+.add-to-yard-form input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #9aa8b5;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+.add-to-yard-result .table-wrapper {
+  max-height: 240px;
+  overflow: auto;
 }
 .admin-push-row {
   display: flex;

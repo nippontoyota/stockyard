@@ -20,7 +20,7 @@ export function getAdminSectionBadge(sectionId, { openFlags, transitCount }) {
 export function adminSectionSubtitle(sectionId) {
   if (sectionId === "attention") return "Resolve exceptions and damage reports";
   if (sectionId === "yards") return "Browse yards by region and open vehicle lists";
-  if (sectionId === "vehicles") return "Find, edit, export stock, and clean up vehicle records";
+  if (sectionId === "vehicles") return "Find, edit, export stock, add to yards, and clean up vehicle records";
   if (sectionId === "setup") return "Passwords, branches, and push alerts";
   return "";
 }

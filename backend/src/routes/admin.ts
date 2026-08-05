@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { eq, and, sql, count, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { vehicles, vehicleStatus, scans, flags, requisitions, notifications } from '../db/schema.js';
+import { vehicles, vehicleStatus, scans, flags, requisitions, notifications, yards } from '../db/schema.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { isValidVin } from '../lib/vin.js';
 import { prepareVinRename } from '../lib/vinRename.js';
@@ -379,13 +379,16 @@ router.delete('/vehicles/:vin', async (req, res, next) => {
 });
 
 // ─── POST /import/vehicles ──────────────────────────────────────────
+// Create-only: never updates existing vehicles / status / fields.
 
 const importBody = z.object({
   vehicles: z.array(
     z.object({
       vin: z.string().min(1),
-      yard_id: z.string().uuid(),
-      model: z.string().optional(),
+      yard_id: z.string().min(1).optional().nullable(),
+      model: z.string().optional().nullable(),
+      key_no: z.string().trim().max(40).optional().nullable(),
+      drive_type: z.union([driveTypeSchema, z.literal(''), z.null()]).optional(),
     }),
   ),
 });
@@ -394,44 +397,88 @@ router.post('/import/vehicles', async (req, res, next) => {
   try {
     const body = importBody.parse(req.body);
     let imported = 0;
-    let skipped = 0;
+    const rejected: Array<{ vin: string; reason: string }> = [];
+
+    const yardIds = [
+      ...new Set(
+        body.vehicles
+          .map((v) => (v.yard_id || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+    const knownYards = new Set<string>();
+    if (yardIds.length) {
+      const rows = await db
+        .select({ id: yards.id })
+        .from(yards)
+        .where(inArray(yards.id, yardIds));
+      for (const row of rows) knownYards.add(row.id);
+    }
 
     for (const v of body.vehicles) {
       const vin = v.vin.toUpperCase().trim();
+      const yardId = (v.yard_id || '').trim();
 
-      // Check if vehicle already exists
+      if (!vin) {
+        rejected.push({ vin: v.vin || '', reason: 'invalid VIN' });
+        continue;
+      }
+
+      if (!isValidVin(vin)) {
+        rejected.push({ vin, reason: 'invalid VIN' });
+        continue;
+      }
+
+      if (!yardId || !knownYards.has(yardId)) {
+        rejected.push({ vin, reason: 'invalid or missing yard' });
+        continue;
+      }
+
       const [existing] = await db
         .select({ id: vehicles.id })
         .from(vehicles)
         .where(eq(vehicles.vin, vin));
 
       if (existing) {
-        skipped++;
+        rejected.push({ vin, reason: 'already exists' });
         continue;
       }
 
-      const vinValidCheck = isValidVin(vin);
       const modelValue = v.model?.trim() || null;
+      const driveType =
+        v.drive_type && isDriveType(v.drive_type) ? v.drive_type : null;
+      const keyNo = v.key_no?.trim() || null;
 
       const [vehicle] = await db
         .insert(vehicles)
-        .values({ vin, model: modelValue, vin_valid: vinValidCheck, variant: null, colour: null })
+        .values({
+          vin,
+          model: modelValue,
+          vin_valid: true,
+          drive_type: driveType,
+          variant: null,
+          colour: null,
+        })
         .returning({ id: vehicles.id });
 
-      await db
-        .insert(vehicleStatus)
-        .values({
-          vehicle_id: vehicle.id,
-          current_status: 'in',
-          current_yard_id: v.yard_id,
-          last_changed_at: new Date(),
-          override_reason: 'Bulk import at launch',
-        });
+      await db.insert(vehicleStatus).values({
+        vehicle_id: vehicle.id,
+        current_status: 'in',
+        current_yard_id: yardId,
+        last_changed_at: new Date(),
+        key_no: keyNo,
+        override_reason: 'Admin add to yard',
+      });
 
       imported++;
     }
 
-    res.json({ imported, skipped, total: body.vehicles.length });
+    res.json({
+      imported,
+      skipped: rejected.length,
+      total: body.vehicles.length,
+      rejected,
+    });
   } catch (err) {
     next(err);
   }
