@@ -72,7 +72,7 @@ export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "", model = "" }) {
+export function createScan({ vin, type, yardId, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "", model = "", entryMethod = null }) {
   return {
     id: crypto.randomUUID(),
     clientScanId: createClientScanId(),
@@ -88,6 +88,7 @@ export function createScan({ vin, type, yardId, outRemark = "", transferDestinat
     damageImage,
     driveType,
     model,
+    entryMethod: entryMethod === "qr" || entryMethod === "manual" ? entryMethod : null,
     deviceId: localStorage.getItem("yardDeviceId") || "unknown-device",
     scannedAt: new Date().toISOString(),
   };
@@ -148,6 +149,7 @@ export function applyScan(state, scan) {
     lastChangedAt: scan.scannedAt,
     keyNo: scan.keyNo || existing?.keyNo || "",
     driveType: scan.driveType || existing?.driveType || "",
+    entryMethod: existing?.entryMethod || scan.entryMethod || null,
   };
   const next = {
     ...state,
@@ -252,6 +254,12 @@ export function flagLabel(type) {
     manual_admin_override: "Admin Override",
     dwell_exceeded: "Dwell Time Exceeded",
   }[type] || String(type || "Flag").replace(/_/g, " ");
+}
+
+export function entryMethodLabel(method) {
+  if (method === "qr") return "QR scan";
+  if (method === "manual") return "Manual entry";
+  return "";
 }
 
 export function resolveFlag(state, id) {

@@ -59,6 +59,19 @@ assert.equal(firstScanResult.state.vehicles.JTMBA38V70D123456.currentYardId, "CO
 assert.equal(firstScanResult.state.vehicles.JTMBA38V70D123456.keyNo, "K-901");
 assert.equal(firstScanResult.state.vehicles.JTMBA38V70D123456.model, "Hilux");
 
+// Entry method: first tagged activity sticks on the vehicle locally
+const qrIn = applyScan(createInitialState(), { ...baseScan, clientScanId: "client-qr", entryMethod: "qr" });
+assert.equal(qrIn.state.vehicles.JTMBA38V70D123456.entryMethod, "qr");
+const laterManual = applyScan(qrIn.state, {
+  ...baseScan,
+  clientScanId: "client-manual-later",
+  type: "out",
+  outRemark: "customer_acquisition",
+  damaged: false,
+  entryMethod: "manual",
+});
+assert.equal(laterManual.state.vehicles.JTMBA38V70D123456.entryMethod, "qr");
+
 // Second scan at the SAME yard: should be rejected silently
 const sameYardDuplicate = applyScan(firstScanResult.state, { ...baseScan, clientScanId: "client-2" });
 assert.equal(sameYardDuplicate.accepted, false);

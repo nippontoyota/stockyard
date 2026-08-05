@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { eq, and, count, desc, inArray } from 'drizzle-orm';
+import { eq, and, count, desc, inArray, isNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { scans, vehicles, vehicleStatus, devices, flags, yards, requisitions, notifications, branchYards } from '../db/schema.js';
 import { isValidVin } from '../lib/vin.js';
@@ -42,6 +42,8 @@ const scanCommon = z.object({
   damage_remark: z.string().optional(),
   damage_image: z.string().optional(),
   drive_type: driveTypeSchema.optional(),
+  // Optional so rolling deploys / old offline queue payloads still validate
+  entry_method: z.enum(['qr', 'manual']).optional(),
 });
 
 const scanInBase = scanCommon.extend({
@@ -100,7 +102,7 @@ async function findOrCreateDevice(fingerprint: string, txOrDb: any = db): Promis
 
 async function findOrCreateVehicle(
   vinRaw: string,
-  opts: { driveType?: string; model?: string } = {},
+  opts: { driveType?: string; model?: string; entryMethod?: 'qr' | 'manual' } = {},
   txOrDb: any = db,
 ): Promise<{ id: string; vinValid: boolean }> {
   const vin = vinRaw.toUpperCase().trim();
@@ -116,6 +118,7 @@ async function findOrCreateVehicle(
       vin_valid: vinValid,
       variant: null,
       colour: null,
+      entry_method: opts.entryMethod ?? null,
     })
     .onConflictDoUpdate({
       target: vehicles.vin,
@@ -129,7 +132,18 @@ async function findOrCreateVehicle(
       },
     })
     .returning({ id: vehicles.id });
-  return { id: result[0].id, vinValid };
+
+  const vehicleId = result[0].id;
+
+  // First tagged activity only — never overwrite an existing label; never touch unlabeled rows at migrate time
+  if (opts.entryMethod) {
+    await txOrDb
+      .update(vehicles)
+      .set({ entry_method: opts.entryMethod, updated_at: new Date() })
+      .where(and(eq(vehicles.id, vehicleId), isNull(vehicles.entry_method)));
+  }
+
+  return { id: vehicleId, vinValid };
 }
 
 async function createFlag(vehicleId: string, scanId: string | null, flagType: string, message: string, vin?: string, txOrDb: any = db) {
@@ -154,7 +168,7 @@ async function processScanIn(body: ScanIn, yardId: string) {
   return db.transaction(async (tx) => {
     const { id: vehicleId, vinValid } = await findOrCreateVehicle(
       body.vin,
-      { driveType: body.drive_type, model: body.model },
+      { driveType: body.drive_type, model: body.model, entryMethod: body.entry_method },
       tx,
     );
     const deviceId = await findOrCreateDevice(body.device_fingerprint, tx);
@@ -162,13 +176,13 @@ async function processScanIn(body: ScanIn, yardId: string) {
 
     if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id === yardId) {
       const [scan] = await tx.insert(scans).values({
-        client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, status: 'rejected',
+        client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, status: 'rejected', entry_method: body.entry_method ?? null,
       }).returning();
       return { scan_id: scan.id, status: 'rejected' as const, error: 'Vehicle is already marked IN at this yard' };
     }
 
     const [scan] = await tx.insert(scans).values({
-      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted',
+      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted', entry_method: body.entry_method ?? null,
     }).returning();
 
     const scanTime = new Date(body.scanned_at);
@@ -216,14 +230,14 @@ async function processScanOut(body: ScanOut, yardId: string) {
   return db.transaction(async (tx) => {
     const { id: vehicleId, vinValid } = await findOrCreateVehicle(
       body.vin,
-      { driveType: body.drive_type },
+      { driveType: body.drive_type, entryMethod: body.entry_method },
       tx,
     );
     const deviceId = await findOrCreateDevice(body.device_fingerprint, tx);
     const [currentStatus] = await tx.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
     const [scan] = await tx.insert(scans).values({
-      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted',
+      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted', entry_method: body.entry_method ?? null,
     }).returning();
 
     const scanTime = new Date(body.scanned_at);

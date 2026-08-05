@@ -7,6 +7,7 @@ import {
   yardsByRegion,
   isValidVin,
   DRIVE_TYPES,
+  entryMethodLabel,
 } from "../stockyardLogic.js";
 import { adminUpdateVehicle } from "../api.js";
 import { AdminVehicleDeleteButton } from "./AdminVehicleDeleteButton.jsx";
@@ -267,6 +268,9 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
               <div>
                 <p className="vehicle-edit-kicker">{confirmVin ? "Confirm VIN change" : "Editing vehicle"}</p>
                 <h3 id="vehicle-edit-title" className="vehicle-edit-vin">{editingVin}</h3>
+                {!confirmVin && entryMethodLabel(editingVehicle?.entryMethod) ? (
+                  <p className="field-hint">{entryMethodLabel(editingVehicle.entryMethod)}</p>
+                ) : null}
               </div>
               <button type="button" className="close-modal-btn" onClick={closeEditor} aria-label="Close editor">
                 <span className="material-symbols-outlined">close</span>
@@ -439,6 +443,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
               <th>VIN</th>
               <th>Model</th>
               <th>Key No</th>
+              <th>Entry</th>
               <th>Status</th>
               <th>Yard</th>
               <th>Updated</th>
@@ -447,7 +452,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
           <tbody>
             {filteredVehicles.length === 0 ? (
               <tr>
-                <td colSpan="6" className="empty-state-cell">
+                <td colSpan="7" className="empty-state-cell">
                   {allVehicles.length === 0
                     ? "No vehicles in the system yet."
                     : "No vehicles match this search or filter."}
@@ -457,6 +462,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
               filteredVehicles.map((v) => {
                 const derivedStatus = getDerivedStatus(v);
                 const isActive = editingVin === v.vin;
+                const entryLabel = entryMethodLabel(v.entryMethod);
                 return (
                   <tr
                     key={v.vin}
@@ -473,6 +479,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
                     <td className="mono">{v.vin}</td>
                     <td>{v.model}</td>
                     <td className="mono">{v.keyNo || "—"}</td>
+                    <td>{entryLabel || "—"}</td>
                     <td>
                       <span className={`status-badge ${derivedStatus.badgeClass}`}>
                         {derivedStatus.label}

@@ -11,6 +11,7 @@ import {
   dashboard,
   normalizeVin,
   flagLabel,
+  entryMethodLabel,
   isCarModel,
   yards,
   fallbackBranches,
@@ -143,6 +144,7 @@ function mapServerResponse(vehiclesData, flagsData, scansData, notifsData, reqsD
       lastChangedAt: v.last_changed_at,
       outRemark: v.out_remark,
       keyNo: v.key_no || v.keyNo || "",
+      entryMethod: v.entry_method || null,
     };
   });
 
@@ -1125,7 +1127,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   }
 
   // Item 5: Actual submission logic (called after OUT confirmation or directly for IN)
-  async function doSubmit(confirmedScanType) {
+  async function doSubmit(confirmedScanType, entryMethod = "manual") {
     const finalScanType = confirmedScanType || scanType;
 
     const scan = createScan({
@@ -1141,6 +1143,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       damageImage,
       driveType,
       model: finalScanType === "in" ? carModel : "",
+      entryMethod,
     });
     const result = applyScan(state, scan);
 
@@ -1217,12 +1220,13 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
         scanType: effectiveType,
         outRemark,
         model: state.vehicles[pendingVin]?.model || "Unknown",
+        entryMethod: fromQr ? "qr" : "manual",
       });
       return;
     }
 
     setConfirmOutData(null);
-    await doSubmit(effectiveType);
+    await doSubmit(effectiveType, fromQr ? "qr" : "manual");
   }
 
   function finishSubmit(newState, type, msg, flags, submittedModel = "") {
@@ -1266,8 +1270,9 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
               <button type="button" className="ghost" onClick={() => setConfirmOutData(null)}>Cancel</button>
               <button type="button" className="primary" onClick={() => {
                 const type = confirmOutData.scanType;
+                const entryMethod = confirmOutData.entryMethod || "manual";
                 setConfirmOutData(null);
-                doSubmit(type);
+                doSubmit(type, entryMethod);
               }}>Confirm OUT</button>
             </div>
           </div>
@@ -1860,6 +1865,7 @@ function VehicleCard({ vehicle, flags, isAdmin = false, setState }) {
       : vehicle.currentStatus === "transit"
         ? "In transit"
         : "Out";
+  const entryLabel = entryMethodLabel(vehicle.entryMethod);
   return (
     <article className={`vehicle ${vehicle.currentStatus} ${flags.length ? "flagged" : ""}`}>
       <div className="vehicle-main">
@@ -1868,6 +1874,7 @@ function VehicleCard({ vehicle, flags, isAdmin = false, setState }) {
           <strong>{vehicle.vin}</strong>
           <span>{vehicle.model || "Model not set"}</span>
           <small>{vehicle.keyNo ? `Key No: ${vehicle.keyNo}` : "No key number"}</small>
+          {entryLabel ? <small>{entryLabel}</small> : null}
         </div>
       </div>
       <div className="vehicle-yard">

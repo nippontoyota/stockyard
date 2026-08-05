@@ -134,6 +134,12 @@ httpServer.listen(port, '0.0.0.0', () => {
     sql`ALTER TABLE requisitions ADD COLUMN IF NOT EXISTS destination_yard_id text REFERENCES yards(id)`,
   ).catch((err) => console.error('Failed to ensure destination_yard_id column:', err));
 
+  // Additive only — existing rows stay NULL; no backfill
+  db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS entry_method text`)
+    .catch((err) => console.error('Failed to ensure vehicles.entry_method column:', err));
+  db.execute(sql`ALTER TABLE scans ADD COLUMN IF NOT EXISTS entry_method text`)
+    .catch((err) => console.error('Failed to ensure scans.entry_method column:', err));
+
   // Run legacy variant/colour migration exactly once at startup
   db.execute(
     sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`
