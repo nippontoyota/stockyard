@@ -80,6 +80,9 @@ router.get('/incoming', async (req, res, next) => {
         current_yard_id: vehicleStatus.current_yard_id,
         last_changed_at: vehicleStatus.last_changed_at,
         key_no: vehicleStatus.key_no,
+        on_display: vehicleStatus.on_display,
+        display_taken_by: vehicleStatus.display_taken_by,
+        display_location: vehicleStatus.display_location,
         out_remark: scans.out_remark,
         transfer_requested_by: scans.transfer_requested_by,
         source_yard_id: scans.yard_id,
@@ -265,6 +268,9 @@ router.get('/', async (req, res, next) => {
         current_yard_id: vehicleStatus.current_yard_id,
         last_changed_at: vehicleStatus.last_changed_at,
         key_no: vehicleStatus.key_no,
+        on_display: vehicleStatus.on_display,
+        display_taken_by: vehicleStatus.display_taken_by,
+        display_location: vehicleStatus.display_location,
         out_remark: scans.out_remark,
       })
       .from(vehicles)
@@ -301,6 +307,9 @@ router.get('/:vin', async (req, res, next) => {
         last_changed_at: vehicleStatus.last_changed_at,
         key_no: vehicleStatus.key_no,
         override_reason: vehicleStatus.override_reason,
+        on_display: vehicleStatus.on_display,
+        display_taken_by: vehicleStatus.display_taken_by,
+        display_location: vehicleStatus.display_location,
       })
       .from(vehicles)
       .leftJoin(vehicleStatus, eq(vehicles.id, vehicleStatus.vehicle_id))
@@ -357,6 +366,8 @@ router.get('/:vin/history', async (req, res, next) => {
         scanned_at: scans.scanned_at,
         status: scans.status,
         out_remark: scans.out_remark,
+        display_taken_by: scans.display_taken_by,
+        display_location: scans.display_location,
         key_no: scans.key_no,
         damaged: scans.damaged,
         damage_remark: scans.damage_remark,

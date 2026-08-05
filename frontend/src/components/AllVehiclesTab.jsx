@@ -19,6 +19,9 @@ const DRIVE_TYPE_OPTIONS = [
 
 function getDerivedStatus(v) {
   if (v.currentStatus === "transit") return { label: "IN-TRANSIT", badgeClass: "badge-transit", value: "transit" };
+  if (v.currentStatus === "in" && v.onDisplay) {
+    return { label: "ON DISPLAY", badgeClass: "badge-display", value: "display" };
+  }
   if (v.currentStatus === "in") return { label: "IN", badgeClass: "badge-in", value: "in" };
   if (v.currentStatus === "out" && v.outRemark === "stockyard_transfer") {
     return { label: "BRANCH TRANSFER", badgeClass: "badge-transfer", value: "out" };
@@ -252,6 +255,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
           <option value="all">All statuses</option>
           <option value="IN-TRANSIT">In transit</option>
           <option value="IN">In</option>
+          <option value="ON DISPLAY">On display</option>
           <option value="BRANCH TRANSFER">Branch transfer</option>
           <option value="OUT">Out</option>
         </select>

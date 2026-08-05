@@ -183,4 +183,88 @@ assert.ok(renamed.scans.every((s) => s.vin !== renameFrom));
 assert.equal(renameVehicleVin(renameBase, renameFrom, renameFrom, { model: "X" }).vehicles[renameFrom].model, "X");
 assert.equal(renameVehicleVin(createInitialState(), renameFrom, renameTo).vehicles[renameTo], undefined);
 
+// Display OUT keeps vehicle IN at current yard and sets active display fields
+const displayOut = applyScan(firstScanResult.state, {
+  ...baseScan,
+  clientScanId: "client-display-out",
+  type: "out",
+  outRemark: "display",
+  displayTakenBy: "Ravi",
+  displayLocation: "Showroom bay 2",
+});
+assert.equal(displayOut.accepted, true);
+assert.equal(displayOut.state.vehicles.JTMBA38V70D123456.currentStatus, "in");
+assert.equal(displayOut.state.vehicles.JTMBA38V70D123456.currentYardId, "CO01B-1");
+assert.equal(displayOut.state.vehicles.JTMBA38V70D123456.onDisplay, true);
+assert.equal(displayOut.state.vehicles.JTMBA38V70D123456.displayTakenBy, "Ravi");
+assert.equal(displayOut.state.vehicles.JTMBA38V70D123456.displayLocation, "Showroom bay 2");
+assert.equal(displayOut.state.scans.at(-1).outRemark, "display");
+
+// Any OUT while already on display is rejected
+const secondOutWhileDisplay = applyScan(displayOut.state, {
+  ...baseScan,
+  clientScanId: "client-display-out-2",
+  type: "out",
+  outRemark: "customer_acquisition",
+});
+assert.equal(secondOutWhileDisplay.accepted, false);
+assert.equal(secondOutWhileDisplay.message, "Return vehicle from display first.");
+assert.equal(secondOutWhileDisplay.state.vehicles.JTMBA38V70D123456.onDisplay, true);
+
+const secondDisplayOut = applyScan(displayOut.state, {
+  ...baseScan,
+  clientScanId: "client-display-out-3",
+  type: "out",
+  outRemark: "display",
+  displayTakenBy: "Other",
+  displayLocation: "Elsewhere",
+});
+assert.equal(secondDisplayOut.accepted, false);
+assert.equal(secondDisplayOut.message, "Return vehicle from display first.");
+
+// Same-yard IN while on display is accepted as return and clears display fields
+const displayReturn = applyScan(displayOut.state, {
+  ...baseScan,
+  clientScanId: "client-display-return",
+  type: "in",
+  model: "Hilux",
+});
+assert.equal(displayReturn.accepted, true);
+assert.equal(displayReturn.state.vehicles.JTMBA38V70D123456.currentStatus, "in");
+assert.equal(displayReturn.state.vehicles.JTMBA38V70D123456.currentYardId, "CO01B-1");
+assert.equal(displayReturn.state.vehicles.JTMBA38V70D123456.onDisplay, false);
+assert.equal(displayReturn.state.vehicles.JTMBA38V70D123456.displayTakenBy, "");
+assert.equal(displayReturn.state.vehicles.JTMBA38V70D123456.displayLocation, "");
+assert.equal(displayReturn.state.flags.some((flag) => flag.type === "duplicate_yard_status"), false);
+
+// Ordinary same-yard IN remains rejected (non-display behavior unchanged)
+const stillSameYardReject = applyScan(displayReturn.state, {
+  ...baseScan,
+  clientScanId: "client-same-yard-after-return",
+});
+assert.equal(stillSameYardReject.accepted, false);
+assert.equal(stillSameYardReject.message, "Vehicle is already IN at this yard.");
+
+// Display OUT without required fields is rejected
+const displayMissingFields = applyScan(firstScanResult.state, {
+  ...baseScan,
+  clientScanId: "client-display-missing",
+  type: "out",
+  outRemark: "display",
+  displayTakenBy: "  ",
+  displayLocation: "",
+});
+assert.equal(displayMissingFields.accepted, false);
+
+// Non-display customer OUT still marks OUT
+const normalOut = applyScan(firstScanResult.state, {
+  ...baseScan,
+  clientScanId: "client-normal-out",
+  type: "out",
+  outRemark: "customer_acquisition",
+});
+assert.equal(normalOut.accepted, true);
+assert.equal(normalOut.state.vehicles.JTMBA38V70D123456.currentStatus, "out");
+assert.equal(normalOut.state.vehicles.JTMBA38V70D123456.onDisplay, false);
+
 console.log("stockyard logic ok");

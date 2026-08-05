@@ -601,6 +601,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   display: inline-block; padding: 5px 9px; border-radius: 999px; background: #eef4ff; color: #002046; font-size: 12px;
 }
 .vehicle.in .vehicle-state b { background: #dcfce7; color: #15803d; }
+.vehicle.on-display .vehicle-state b { background: #dbeafe; color: #1d4ed8; }
 .vehicle.out .vehicle-state b { background: #f1f5f9; color: #475569; }
 .vehicle.flagged .vehicle-state b { background: #fff7ed; color: #c2410c; }
 .vehicle-state small { margin-top: 6px; }
@@ -1869,6 +1870,14 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .status-tag { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; }
 .status-tag.in { background: #dcfce7; color: #166534; }
 .status-tag.out { background: #f1f5f9; color: #475569; }
+.status-tag.display { background: #dbeafe; color: #1d4ed8; }
+.status-tag.display { background: #fef3c7; color: #92400e; }
+.vehicle-row-card.on-display { border-left: 3px solid #f59e0b; }
+.vehicle.on-display { border-left: 3px solid #f59e0b; }
+.vehicle-display-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: #64748b; }
+.admin-return-panel { display: grid; gap: 12px; padding: 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; }
+.vehicle-return-action { display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; }
+.vehicle-return-action .compact { min-height: 36px; padding: 0 12px; font-size: 13px; }
 .v-row-status small { display: block; font-size: 10px; color: #94a3b8; margin-top: 2px; }
 
 .modal-footer {
@@ -3145,6 +3154,7 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .badge-in { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
 .badge-out { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
 .badge-transfer { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge-display { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
 .badge-unknown { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
 
 /* Admin vehicle edit */
@@ -3613,6 +3623,36 @@ progress { width: 100%; height: 10px; accent-color: #EB0A1E; }
 .admin-out-actions .primary {
   flex: 1;
   min-height: 44px;
+}
+.admin-return-panel {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #111827;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.vehicle-display-meta {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #1e40af;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.vehicle-return-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.vehicle-return-action .primary.compact {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 12px;
 }
 @media (prefers-reduced-motion: reduce) {
   .admin-out-panel {

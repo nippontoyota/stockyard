@@ -160,6 +160,12 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: 'Vehicle is not available at the source branch' });
     }
 
+    if (vStatus.on_display === true) {
+      return res.status(409).json({
+        error: 'Vehicle is on display and unavailable for requisition. Return it to the yard first.',
+      });
+    }
+
     const [existing] = await db
       .select()
       .from(requisitions)

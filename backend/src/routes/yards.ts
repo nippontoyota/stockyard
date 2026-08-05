@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { eq, and, count, inArray } from 'drizzle-orm';
+import { eq, and, count, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { yards, vehicles, vehicleStatus, branchYards, requisitions } from '../db/schema.js';
 import { authenticate, optionalAuthenticate } from '../middleware/auth.js';
@@ -89,6 +89,7 @@ router.get('/request-targets', authenticate, async (req, res, next) => {
           and(
             eq(vehicleStatus.current_status, 'in'),
             inArray(vehicleStatus.current_yard_id, yardIds),
+            sql`${vehicleStatus.on_display} IS DISTINCT FROM TRUE`,
           ),
         )
         .groupBy(vehicleStatus.current_yard_id);
@@ -150,6 +151,7 @@ router.get('/:id/stock', authenticate, async (req, res, next) => {
         and(
           eq(vehicleStatus.current_yard_id, yardId),
           eq(vehicleStatus.current_status, 'in'),
+          sql`${vehicleStatus.on_display} IS DISTINCT FROM TRUE`,
         ),
       )
       .orderBy(vehicleStatus.last_changed_at);

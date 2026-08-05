@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { flagLabel, createScan, applyScan, yardsByRegion, findYardById, findApprovedTransferReq, requisitionDestinationYardId, requisitionRequesterLabel, DRIVE_TYPES, driveTypeLabel } from "../stockyardLogic.js";
+import { flagLabel, createScan, applyScan, yardsByRegion, findYardById, findApprovedTransferReq, requisitionDestinationYardId, requisitionRequesterLabel, DRIVE_TYPES, driveTypeLabel, outRemarkLabel, isVehicleOnDisplay } from "../stockyardLogic.js";
 import { bulkSync } from "../api.js";
 import { exportYardVehiclesExcel } from "../exportStockExcel.js";
 import { VehicleTimeline } from "./VehicleTimeline.jsx";
@@ -9,6 +9,8 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
   const [outRemark, setOutRemark] = useState("");
   const [transferDestinationYardId, setTransferDestinationYardId] = useState("");
   const [transferRequestedBy, setTransferRequestedBy] = useState("");
+  const [displayTakenBy, setDisplayTakenBy] = useState("");
+  const [displayLocation, setDisplayLocation] = useState("");
   const [keyNo, setKeyNo] = useState(vehicle?.keyNo || "");
   const [driveType, setDriveType] = useState(vehicle?.driveType || "");
   const [damaged, setDamaged] = useState(false);
@@ -39,6 +41,8 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         outRemark,
         transferDestinationYardId,
         transferRequestedBy,
+        displayTakenBy: outRemark === "display" ? displayTakenBy.trim() : "",
+        displayLocation: outRemark === "display" ? displayLocation.trim() : "",
         keyNo,
         damaged,
         damageRemark,
@@ -68,6 +72,12 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
     if (outRemark === "stockyard_transfer" && !transferRequestedBy.trim()) {
       return "Enter who requested the transfer.";
     }
+    if (outRemark === "display" && !displayTakenBy.trim()) {
+      return "Enter the person responsible for display.";
+    }
+    if (outRemark === "display" && !displayLocation.trim()) {
+      return "Enter the display location.";
+    }
     if (damaged && !damageRemark.trim()) return "Add the damage remark.";
     return "";
   }
@@ -90,7 +100,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         <dl className="admin-out-summary">
           <div><dt>VIN</dt><dd>{vin}</dd></div>
           <div><dt>Model</dt><dd>{displayModel}</dd></div>
-          <div><dt>Reason</dt><dd>{outRemark === "customer_acquisition" ? "Customer Acquisition" : "Stockyard Transfer"}</dd></div>
+          <div><dt>Reason</dt><dd>{outRemarkLabel(outRemark)}</dd></div>
           {outRemark === "stockyard_transfer" && (
             <>
               <div>
@@ -100,6 +110,12 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
                 </dd>
               </div>
               <div><dt>Requested by</dt><dd>{transferRequestedBy}</dd></div>
+            </>
+          )}
+          {outRemark === "display" && (
+            <>
+              <div><dt>Person responsible</dt><dd>{displayTakenBy.trim()}</dd></div>
+              <div><dt>Display location</dt><dd>{displayLocation.trim()}</dd></div>
             </>
           )}
           {keyNo ? <div><dt>Key No</dt><dd>{keyNo}</dd></div> : null}
@@ -140,6 +156,10 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
             setTransferDestinationYardId("");
             setTransferRequestedBy("");
           }
+          if (e.target.value !== "display") {
+            setDisplayTakenBy("");
+            setDisplayLocation("");
+          }
           setError("");
         }}
         required
@@ -147,6 +167,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         <option value="">Select reason</option>
         <option value="customer_acquisition">Customer Acquisition</option>
         <option value="stockyard_transfer">Stockyard Transfer</option>
+        <option value="display">Display</option>
       </select>
 
       {outRemark === "stockyard_transfer" && (
@@ -184,6 +205,33 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
               setError("");
             }}
             placeholder="DI account who requested"
+            required
+          />
+        </>
+      )}
+
+      {outRemark === "display" && (
+        <>
+          <label className="admin-out-field-label" htmlFor="admin-out-taken-by">Person responsible</label>
+          <input
+            id="admin-out-taken-by"
+            value={displayTakenBy}
+            onChange={(e) => {
+              setDisplayTakenBy(e.target.value);
+              setError("");
+            }}
+            placeholder="Who is taking the vehicle"
+            required
+          />
+          <label className="admin-out-field-label" htmlFor="admin-out-display-loc">Display location</label>
+          <input
+            id="admin-out-display-loc"
+            value={displayLocation}
+            onChange={(e) => {
+              setDisplayLocation(e.target.value);
+              setError("");
+            }}
+            placeholder="Where the vehicle will be displayed"
             required
           />
         </>
@@ -244,6 +292,83 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
   );
 }
 
+function ReturnToYardPanel({ vin, yard, vehicle, state, setState, onDone }) {
+  const [confirming, setConfirming] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submitReturn() {
+    setError("");
+    setLoading(true);
+    try {
+      const scan = createScan({
+        vin,
+        type: "in",
+        yardId: yard.id,
+        model: vehicle?.model || "",
+        keyNo: vehicle?.keyNo || "",
+        driveType: vehicle?.driveType || "",
+        entryMethod: "manual",
+      });
+      const result = applyScan(state, scan);
+      if (!result.accepted) {
+        setError(result.message || "Return rejected.");
+        setLoading(false);
+        return;
+      }
+      await bulkSync([scan]);
+      setState(result.state);
+      onDone();
+    } catch (err) {
+      setError(err.message || "Return failed. Check connection and try again.");
+      setLoading(false);
+    }
+  }
+
+  if (!confirming) {
+    return (
+      <div className="admin-return-panel">
+        <div className="admin-out-heading">
+          <span className="material-symbols-outlined" aria-hidden="true">storefront</span>
+          <div>
+            <h4>On display</h4>
+            <p>
+              Taken by {vehicle?.displayTakenBy || "—"}
+              {vehicle?.displayLocation ? ` · ${vehicle.displayLocation}` : ""}
+            </p>
+          </div>
+        </div>
+        {error && <p className="notice bad">{error}</p>}
+        <button type="button" className="primary admin-out-submit" onClick={() => setConfirming(true)}>
+          Return to yard
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="admin-return-panel admin-out-confirm" role="status">
+      <h4>Confirm return to yard</h4>
+      <dl className="admin-out-summary">
+        <div><dt>VIN</dt><dd>{vin}</dd></div>
+        <div><dt>Model</dt><dd>{vehicle?.model || "Model not set"}</dd></div>
+        <div><dt>Taken by</dt><dd>{vehicle?.displayTakenBy || "—"}</dd></div>
+        <div><dt>Display location</dt><dd>{vehicle?.displayLocation || "—"}</dd></div>
+      </dl>
+      <p className="admin-out-note">Records a normal IN scan and clears active display fields.</p>
+      {error && <p className="notice bad">{error}</p>}
+      <div className="admin-out-actions">
+        <button type="button" className="ghost" disabled={loading} onClick={() => setConfirming(false)}>
+          Back
+        </button>
+        <button type="button" className="primary" disabled={loading} onClick={submitReturn}>
+          {loading ? "Returning…" : "Confirm return"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function YardVehiclesModal({ yard, state, setState, onClose, readOnly = false }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -264,17 +389,25 @@ export function YardVehiclesModal({ yard, state, setState, onClose, readOnly = f
   const yardVehicles = allVehicles.filter((v) => v.currentYardId === yard.id);
 
   const filteredVehicles = yardVehicles.filter((v) => {
-    const matchesStatus = statusFilter === "all" || v.currentStatus === statusFilter;
+    const onDisplay = isVehicleOnDisplay(v);
+    let matchesStatus = true;
+    if (statusFilter === "in") matchesStatus = v.currentStatus === "in" && !onDisplay;
+    else if (statusFilter === "display") matchesStatus = v.currentStatus === "in" && onDisplay;
+    else if (statusFilter === "out") matchesStatus = v.currentStatus === "out";
     const searchString = `${v.vin} ${v.model || ""}`.toLowerCase();
     const matchesSearch = searchString.includes(searchQuery.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
   const countIn = yardVehicles.filter((v) => v.currentStatus === "in").length;
+  const countParked = yardVehicles.filter((v) => v.currentStatus === "in" && !isVehicleOnDisplay(v)).length;
+  const countDisplay = yardVehicles.filter((v) => v.currentStatus === "in" && isVehicleOnDisplay(v)).length;
   const countOut = yardVehicles.filter((v) => v.currentStatus === "out").length;
   const emptySpace = Math.max(0, yard.capacity - countIn);
   const selectedVehicle = selectedVin ? state?.vehicles?.[selectedVin] : null;
-  const canMarkOut = !readOnly && selectedVehicle?.currentStatus === "in";
+  const selectedOnDisplay = isVehicleOnDisplay(selectedVehicle);
+  const canMarkOut = !readOnly && selectedVehicle?.currentStatus === "in" && !selectedOnDisplay;
+  const canReturnDisplay = !readOnly && selectedVehicle?.currentStatus === "in" && selectedOnDisplay;
 
   return (
     <div className="modal-overlay" onClick={onClose} aria-modal="true" role="dialog">
@@ -318,7 +451,14 @@ export function YardVehiclesModal({ yard, state, setState, onClose, readOnly = f
                 className={statusFilter === "in" ? "active" : ""}
                 onClick={() => setStatusFilter("in")}
               >
-                Parked IN ({countIn})
+                Parked IN ({countParked})
+              </button>
+              <button
+                type="button"
+                className={statusFilter === "display" ? "active" : ""}
+                onClick={() => setStatusFilter("display")}
+              >
+                On display ({countDisplay})
               </button>
               <button
                 type="button"
@@ -338,32 +478,39 @@ export function YardVehiclesModal({ yard, state, setState, onClose, readOnly = f
             {filteredVehicles.length === 0 ? (
               <div className="no-results modal-no-results">
                 <span className="material-symbols-outlined">directions_car</span>
-                <p>No vehicles found {statusFilter !== "all" ? `with status ${statusFilter.toUpperCase()}` : "in this stockyard"}.</p>
+                <p>No vehicles found {statusFilter !== "all" ? `with status ${statusFilter === "display" ? "ON DISPLAY" : statusFilter.toUpperCase()}` : "in this stockyard"}.</p>
               </div>
             ) : (
               filteredVehicles.map((vehicle) => {
                 const activeFlag = state?.flags?.find((f) => f.vin === vehicle.vin && !f.resolved);
                 const displayModel = vehicle.model || "Model not set";
+                const onDisplay = isVehicleOnDisplay(vehicle);
 
                 return (
-                  <div key={vehicle.vin} className={`vehicle-row-card ${vehicle.currentStatus} ${activeFlag ? "flagged" : ""}`} onClick={() => setSelectedVin(vehicle.vin)} style={{ cursor: "pointer" }}>
+                  <div key={vehicle.vin} className={`vehicle-row-card ${vehicle.currentStatus} ${activeFlag ? "flagged" : ""} ${onDisplay ? "on-display" : ""}`} onClick={() => setSelectedVin(vehicle.vin)} style={{ cursor: "pointer" }}>
                     <div className="v-row-mark">
                       <span className="material-symbols-outlined">
-                        {vehicle.currentStatus === "in" ? "directions_car" : "logout"}
+                        {onDisplay ? "storefront" : vehicle.currentStatus === "in" ? "directions_car" : "logout"}
                       </span>
                     </div>
                     <div className="v-row-info">
                       <div className="v-row-top">
                         <strong>{vehicle.vin}</strong>
+                        {onDisplay && <span className="badge badge-display">On display</span>}
                         {activeFlag && (
                           <span className="badge bad">{flagLabel(activeFlag.type)}</span>
                         )}
                       </div>
-                      <small>{displayModel}{vehicle.keyNo ? ` · Key No: ${vehicle.keyNo}` : ""}</small>
+                      <small>
+                        {displayModel}
+                        {vehicle.keyNo ? ` · Key No: ${vehicle.keyNo}` : ""}
+                        {onDisplay && vehicle.displayTakenBy ? ` · ${vehicle.displayTakenBy}` : ""}
+                        {onDisplay && vehicle.displayLocation ? ` · ${vehicle.displayLocation}` : ""}
+                      </small>
                     </div>
                     <div className="v-row-status">
-                      <span className={`status-tag ${vehicle.currentStatus}`}>
-                        {vehicle.currentStatus.toUpperCase()}
+                      <span className={`status-tag ${onDisplay ? "display" : vehicle.currentStatus}`}>
+                        {onDisplay ? "DISPLAY" : vehicle.currentStatus.toUpperCase()}
                       </span>
                       <small>{vehicle.lastChangedAt ? new Date(vehicle.lastChangedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</small>
                     </div>
@@ -381,6 +528,14 @@ export function YardVehiclesModal({ yard, state, setState, onClose, readOnly = f
                 <div>
                   <h3>Vehicle history</h3>
                   <p className="vehicle-history-vin">{selectedVin}</p>
+                  {selectedOnDisplay && (
+                    <p className="vehicle-display-meta">
+                      <span className="badge badge-display">On display</span>
+                      {" "}
+                      {selectedVehicle?.displayTakenBy || "—"}
+                      {selectedVehicle?.displayLocation ? ` · ${selectedVehicle.displayLocation}` : ""}
+                    </p>
+                  )}
                 </div>
                 <button type="button" className="close-modal-btn" onClick={() => setSelectedVin(null)} aria-label="Close history">
                   <span className="material-symbols-outlined">close</span>
@@ -398,6 +553,17 @@ export function YardVehiclesModal({ yard, state, setState, onClose, readOnly = f
                     onDeleted={() => setSelectedVin(null)}
                   />
                 </div>
+              )}
+              {canReturnDisplay && setState && (
+                <ReturnToYardPanel
+                  key={`return-${selectedVin}`}
+                  vin={selectedVin}
+                  yard={yard}
+                  vehicle={selectedVehicle}
+                  state={state}
+                  setState={setState}
+                  onDone={() => setSelectedVin(null)}
+                />
               )}
               {canMarkOut && setState && (
                 <AdminOutForm
