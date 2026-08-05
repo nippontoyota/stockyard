@@ -20,11 +20,16 @@ import { authRouter } from './routes/auth.js';
 import { authenticate } from './middleware/auth.js';
 import { initSocket } from './lib/socket.js';
 import { checkDwellAlerts } from './lib/dwellCheck.js';
+import {
+  startNipponstockLocationSync,
+  syncNipponstockLocations,
+} from './lib/syncNipponstockLocations.js';
 import { ensureBuckets } from './lib/supabase.js';
 import uploadRoutes from './routes/upload.js';
 import pushRoutes from './routes/pushSubscriptions.js';
 import { db, pingDatabase } from './db/client.js';
 import { sql } from 'drizzle-orm';
+import crypto from 'crypto';
 
 const app = express();
 const httpServer = createServer(app);
@@ -84,6 +89,42 @@ app.get('/ready', async (_req, res) => {
   } catch (err) {
     console.error('Readiness check failed:', err);
     res.status(503).json({ status: 'not_ready', error: 'database unavailable' });
+  }
+});
+
+function locationSyncSecretOk(req: express.Request): boolean {
+  const secret = process.env.LOCATION_SYNC_SECRET;
+  if (!secret) return false;
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) return false;
+  const token = Buffer.from(header.slice(7));
+  const expected = Buffer.from(secret);
+  return token.length === expected.length && crypto.timingSafeEqual(token, expected);
+}
+
+// Manual / cron trigger for nipponstock location push (shared secret, not user JWT).
+app.post('/api/internal/sync-nipponstock-locations', async (req, res) => {
+  if (!process.env.NIPPONSTOCK_API_URL || !process.env.LOCATION_SYNC_SECRET) {
+    res.status(503).json({ error: 'NIPPONSTOCK_API_URL / LOCATION_SYNC_SECRET not configured' });
+    return;
+  }
+  if (!locationSyncSecretOk(req)) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  try {
+    const result = await syncNipponstockLocations();
+    if (!result) {
+      res.status(409).json({ error: 'Sync already running or not configured' });
+      return;
+    }
+    res.json(result);
+  } catch (err) {
+    console.error('[nipponstock-sync] trigger failed:', err);
+    res.status(502).json({
+      error: 'Sync failed',
+      detail: err instanceof Error ? err.message : String(err),
+    });
   }
 });
 
@@ -150,6 +191,8 @@ async function start() {
       checkDwellAlerts().catch(console.error);
       setInterval(() => checkDwellAlerts().catch(console.error), 6 * 60 * 60 * 1000);
     }, 2 * 60 * 1000);
+
+    startNipponstockLocationSync();
   });
 }
 
