@@ -178,14 +178,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #EB0A1E; outline-
   flex-direction: column;
   gap: 6px;
 }
-.login-yard-hint {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: #64748b;
-  line-height: 1.4;
-  text-transform: none;
-  font-weight: 500;
-}
 .segmented .out { background: #475569; }
 .scan-grid {
   display: grid;
