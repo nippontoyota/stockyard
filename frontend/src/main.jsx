@@ -699,9 +699,6 @@ function Login({ onLogin, authExpiredMessage = "", onClearAuthExpired }) {
                       </option>
                     ))}
                   </select>
-                  <p className="login-yard-hint">
-                    Password is the yard code ({selectedYardObj?.code || "e.g. CO01A"}).
-                  </p>
                 </div>
               </div>
             )}
