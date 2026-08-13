@@ -72,6 +72,7 @@ export const scans = pgTable(
     transfer_requested_by: text('transfer_requested_by'),
     display_taken_by: text('display_taken_by'),
     display_location: text('display_location'),
+    customer_name: text('customer_name'),
     key_no: text('key_no'),
     damaged: boolean('damaged'),
     damage_remark: text('damage_remark'),

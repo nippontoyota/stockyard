@@ -171,6 +171,7 @@ async function start() {
   // Ensure new columns exist before serving traffic (additive NULL only — no backfill)
   await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS entry_method text`);
   await db.execute(sql`ALTER TABLE scans ADD COLUMN IF NOT EXISTS entry_method text`);
+  await db.execute(sql`ALTER TABLE scans ADD COLUMN IF NOT EXISTS customer_name text`);
 
   httpServer.listen(port, '0.0.0.0', () => {
     console.log(`Stockyard API listening on port ${port}`);

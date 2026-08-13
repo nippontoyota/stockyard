@@ -182,6 +182,7 @@ function mapServerResponse(vehiclesData, flagsData, scansData, notifsData, reqsD
     transferRequestedBy: s.transferRequestedBy || "",
     displayTakenBy: s.displayTakenBy || s.display_taken_by || "",
     displayLocation: s.displayLocation || s.display_location || "",
+    customerName: s.customerName || s.customer_name || "",
     keyNo: s.keyNo || s.key_no || "",
     syncStatus: "synced",
   }));
@@ -823,6 +824,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const [transferRequestedBy, setTransferRequestedBy] = useState("");
   const [displayTakenBy, setDisplayTakenBy] = useState("");
   const [displayLocation, setDisplayLocation] = useState("");
+  const [customerName, setCustomerName] = useState("");
   const [keyNo, setKeyNo] = useState("");
   const [damaged, setDamaged] = useState(false);
   const [damageRemark, setDamageRemark] = useState("");
@@ -916,6 +918,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     setTransferRequestedBy("");
     setDisplayTakenBy("");
     setDisplayLocation("");
+    setCustomerName("");
     setKeyNo("");
     setDriveType("");
     setCarModel("");
@@ -1150,6 +1153,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       transferRequestedBy,
       displayTakenBy: outRemark === "display" ? displayTakenBy.trim() : "",
       displayLocation: outRemark === "display" ? displayLocation.trim() : "",
+      customerName: outRemark === "customer_acquisition" ? customerName.trim() : "",
       keyNo,
       damaged,
       damageRemark,
@@ -1241,6 +1245,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
         outRemark,
         displayTakenBy: displayTakenBy.trim(),
         displayLocation: displayLocation.trim(),
+        customerName: customerName.trim(),
         model: state.vehicles[pendingVin]?.model || "Unknown",
         entryMethod: fromQr ? "qr" : "manual",
       });
@@ -1267,6 +1272,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
     setTransferRequestedBy("");
     setDisplayTakenBy("");
     setDisplayLocation("");
+    setCustomerName("");
     setKeyNo("");
     setDriveType("");
     setCarModel("");
@@ -1290,6 +1296,9 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
             <p><strong>Model:</strong> {confirmOutData.model}</p>
             <p><strong>VIN:</strong> {confirmOutData.vin}</p>
             <p><strong>Reason:</strong> {outRemarkLabel(confirmOutData.outRemark)}</p>
+            {confirmOutData.outRemark === "customer_acquisition" && confirmOutData.customerName ? (
+              <p><strong>Customer:</strong> {confirmOutData.customerName}</p>
+            ) : null}
             {confirmOutData.outRemark === "display" && (
               <>
                 <p><strong>Person responsible:</strong> {confirmOutData.displayTakenBy}</p>
@@ -1418,6 +1427,9 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                     setDisplayTakenBy("");
                     setDisplayLocation("");
                   }
+                  if (event.target.value !== "customer_acquisition") {
+                    setCustomerName("");
+                  }
                   setOverlayResult(null);
                 }} aria-label="OUT reason">
                   <option value="">Select OUT reason</option>
@@ -1425,6 +1437,18 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                   <option value="stockyard_transfer">Stockyard Transfer</option>
                   <option value="display">Display</option>
                 </select>
+              )}
+              {scanType === "out" && outRemark === "customer_acquisition" && (
+                <input
+                  value={customerName}
+                  onChange={(event) => {
+                    setCustomerName(event.target.value);
+                    setOverlayResult(null);
+                  }}
+                  placeholder="Customer name (optional)"
+                  aria-label="Customer name"
+                  maxLength={120}
+                />
               )}
               {scanType === "in" && vehicleOnDisplay && (
                 <div className="notice warn">
@@ -1591,6 +1615,7 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                   setTransferRequestedBy("");
                   setDisplayTakenBy("");
                   setDisplayLocation("");
+                  setCustomerName("");
                 }}
               >
                 IN
@@ -1639,12 +1664,27 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                     setDisplayTakenBy("");
                     setDisplayLocation("");
                   }
+                  if (event.target.value !== "customer_acquisition") {
+                    setCustomerName("");
+                  }
                 }} disabled={vehicleOnDisplay}>
                   <option value="">Select reason</option>
                   <option value="customer_acquisition">Customer Acquisition</option>
                   <option value="stockyard_transfer">Stockyard Transfer</option>
                   <option value="display">Display</option>
                 </select>
+                {outRemark === "customer_acquisition" && (
+                  <>
+                    <label htmlFor="customer-name">Customer name (optional)</label>
+                    <input
+                      id="customer-name"
+                      value={customerName}
+                      onChange={(event) => setCustomerName(event.target.value)}
+                      placeholder="Customer name, if known"
+                      maxLength={120}
+                    />
+                  </>
+                )}
                 {outRemark === "stockyard_transfer" && (
                   <>
                     <label htmlFor="transfer-dest">Transfer Destination Yard</label>

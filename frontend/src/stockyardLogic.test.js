@@ -3,6 +3,7 @@ import {
   applyScan,
   CAR_MODELS,
   createInitialState,
+  createScan,
   dashboard,
   findApprovedTransferReq,
   isCarModel,
@@ -266,5 +267,41 @@ const normalOut = applyScan(firstScanResult.state, {
 assert.equal(normalOut.accepted, true);
 assert.equal(normalOut.state.vehicles.JTMBA38V70D123456.currentStatus, "out");
 assert.equal(normalOut.state.vehicles.JTMBA38V70D123456.onDisplay, false);
+
+// Optional customer name on customer-acquisition OUT is kept on the scan, not required
+const namedCaScan = createScan({
+  vin: "JTMBA38V70D123456",
+  type: "out",
+  yardId: "CO01B-1",
+  outRemark: "customer_acquisition",
+  customerName: "  Priya Nair  ",
+});
+assert.equal(namedCaScan.customerName, "Priya Nair");
+const namedCa = applyScan(firstScanResult.state, { ...namedCaScan, clientScanId: "client-ca-name" });
+assert.equal(namedCa.accepted, true);
+assert.equal(namedCa.state.scans.at(-1).customerName, "Priya Nair");
+assert.equal(namedCa.state.vehicles.JTMBA38V70D123456.currentStatus, "out");
+
+const blankCaScan = createScan({
+  vin: "JTMBA38V70D123456",
+  type: "out",
+  yardId: "CO01B-1",
+  outRemark: "customer_acquisition",
+  customerName: "   ",
+});
+assert.equal(blankCaScan.customerName, "");
+const blankCa = applyScan(firstScanResult.state, { ...blankCaScan, clientScanId: "client-ca-blank" });
+assert.equal(blankCa.accepted, true);
+
+const displayIgnoresCustomer = createScan({
+  vin: "JTMBA38V70D123456",
+  type: "out",
+  yardId: "CO01B-1",
+  outRemark: "display",
+  displayTakenBy: "Ravi",
+  displayLocation: "Showroom",
+  customerName: "Should not stick",
+});
+assert.equal(displayIgnoresCustomer.customerName, "");
 
 console.log("stockyard logic ok");

@@ -61,6 +61,7 @@ const scanOutBase = scanCommon.extend({
   transfer_requested_by: z.string().optional(),
   display_taken_by: z.string().trim().optional(),
   display_location: z.string().trim().optional(),
+  customer_name: z.string().trim().max(120).optional(),
   damaged: z.boolean(),
   damage_remark: z.string().optional(),
   damage_image: z.string().optional(),
@@ -83,6 +84,11 @@ const scanOutBody = scanOutBase
     message: 'display_location is required for display',
     path: ['display_location'],
   });
+
+function optionalCustomerName(outRemark: string, name?: string) {
+  if (outRemark !== 'customer_acquisition') return null;
+  return name || null;
+}
 
 const bulkSyncBody = z.object({
   scans: z.array(
@@ -266,13 +272,13 @@ async function processScanOut(body: ScanOut, yardId: string) {
 
     if (currentStatus?.on_display === true) {
       const [scan] = await tx.insert(scans).values({
-        client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, display_taken_by: body.display_taken_by, display_location: body.display_location, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'rejected', entry_method: body.entry_method ?? null,
+        client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, display_taken_by: body.display_taken_by, display_location: body.display_location, customer_name: optionalCustomerName(body.out_remark, body.customer_name), damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'rejected', entry_method: body.entry_method ?? null,
       }).returning();
       return { scan_id: scan.id, status: 'rejected' as const, error: 'Return vehicle from display first.' };
     }
 
     const [scan] = await tx.insert(scans).values({
-      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, display_taken_by: body.display_taken_by, display_location: body.display_location, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted', entry_method: body.entry_method ?? null,
+      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, display_taken_by: body.display_taken_by, display_location: body.display_location, customer_name: optionalCustomerName(body.out_remark, body.customer_name), damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted', entry_method: body.entry_method ?? null,
     }).returning();
 
     const scanTime = new Date(body.scanned_at);
@@ -498,6 +504,7 @@ router.get('/', async (req, res, next) => {
         outRemark: scans.out_remark,
         displayTakenBy: scans.display_taken_by,
         displayLocation: scans.display_location,
+        customerName: scans.customer_name,
         transferDestinationYardId: scans.transfer_destination_yard_id,
         transferRequestedBy: scans.transfer_requested_by,
         keyNo: scans.key_no,

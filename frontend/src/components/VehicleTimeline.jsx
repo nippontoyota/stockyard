@@ -67,6 +67,9 @@ export function VehicleTimeline({ scans = [], vin }) {
                     {scan.outRemark || scan.out_remark ? (
                       <p><strong>Remark:</strong> {outRemarkLabel(scan.outRemark || scan.out_remark)}</p>
                     ) : null}
+                    {(scan.customerName || scan.customer_name) ? (
+                      <p><strong>Customer:</strong> {scan.customerName || scan.customer_name}</p>
+                    ) : null}
                     {(scan.displayTakenBy || scan.display_taken_by) ? (
                       <p><strong>Taken by:</strong> {scan.displayTakenBy || scan.display_taken_by}</p>
                     ) : null}

@@ -72,7 +72,7 @@ export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", displayTakenBy = "", displayLocation = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "", model = "", entryMethod = null }) {
+export function createScan({ vin, type, yardId, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", displayTakenBy = "", displayLocation = "", customerName = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "", model = "", entryMethod = null }) {
   return {
     id: crypto.randomUUID(),
     clientScanId: createClientScanId(),
@@ -84,6 +84,7 @@ export function createScan({ vin, type, yardId, outRemark = "", transferDestinat
     transferRequestedBy,
     displayTakenBy,
     displayLocation,
+    customerName: outRemark === "customer_acquisition" ? String(customerName || "").trim() : "",
     keyNo,
     damaged,
     damageRemark,

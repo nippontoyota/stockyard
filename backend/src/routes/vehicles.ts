@@ -368,6 +368,7 @@ router.get('/:vin/history', async (req, res, next) => {
         out_remark: scans.out_remark,
         display_taken_by: scans.display_taken_by,
         display_location: scans.display_location,
+        customer_name: scans.customer_name,
         key_no: scans.key_no,
         damaged: scans.damaged,
         damage_remark: scans.damage_remark,

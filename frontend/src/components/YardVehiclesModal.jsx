@@ -11,6 +11,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
   const [transferRequestedBy, setTransferRequestedBy] = useState("");
   const [displayTakenBy, setDisplayTakenBy] = useState("");
   const [displayLocation, setDisplayLocation] = useState("");
+  const [customerName, setCustomerName] = useState("");
   const [keyNo, setKeyNo] = useState(vehicle?.keyNo || "");
   const [driveType, setDriveType] = useState(vehicle?.driveType || "");
   const [damaged, setDamaged] = useState(false);
@@ -43,6 +44,7 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         transferRequestedBy,
         displayTakenBy: outRemark === "display" ? displayTakenBy.trim() : "",
         displayLocation: outRemark === "display" ? displayLocation.trim() : "",
+        customerName: outRemark === "customer_acquisition" ? customerName.trim() : "",
         keyNo,
         damaged,
         damageRemark,
@@ -112,6 +114,9 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
               <div><dt>Requested by</dt><dd>{transferRequestedBy}</dd></div>
             </>
           )}
+          {outRemark === "customer_acquisition" && customerName.trim() ? (
+            <div><dt>Customer</dt><dd>{customerName.trim()}</dd></div>
+          ) : null}
           {outRemark === "display" && (
             <>
               <div><dt>Person responsible</dt><dd>{displayTakenBy.trim()}</dd></div>
@@ -160,6 +165,9 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
             setDisplayTakenBy("");
             setDisplayLocation("");
           }
+          if (e.target.value !== "customer_acquisition") {
+            setCustomerName("");
+          }
           setError("");
         }}
         required
@@ -169,6 +177,22 @@ function AdminOutForm({ vin, yard, vehicle, state, setState, requisitions, onDon
         <option value="stockyard_transfer">Stockyard Transfer</option>
         <option value="display">Display</option>
       </select>
+
+      {outRemark === "customer_acquisition" && (
+        <>
+          <label className="admin-out-field-label" htmlFor="admin-out-customer">Customer name (optional)</label>
+          <input
+            id="admin-out-customer"
+            value={customerName}
+            onChange={(e) => {
+              setCustomerName(e.target.value);
+              setError("");
+            }}
+            placeholder="Customer name, if known"
+            maxLength={120}
+          />
+        </>
+      )}
 
       {outRemark === "stockyard_transfer" && (
         <>

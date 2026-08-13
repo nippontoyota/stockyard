@@ -195,6 +195,9 @@ export async function bulkSync(scans) {
         display_taken_by: s.displayTakenBy || undefined,
         display_location: s.displayLocation || undefined,
       } : {}),
+      ...(s.outRemark === "customer_acquisition" && s.customerName ? {
+        customer_name: s.customerName,
+      } : {}),
     } : {})
   }));
 
