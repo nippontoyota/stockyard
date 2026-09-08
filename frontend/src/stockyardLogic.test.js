@@ -100,6 +100,49 @@ assert.equal(transferOut.accepted, true);
 assert.equal(transferOut.state.vehicles.JTMBA38V70D123456.currentStatus, "transit");
 assert.equal(transferOut.state.vehicles.JTMBA38V70D123456.currentYardId, "CO01A-1");
 
+// Dwell-time flags do not block a valid stockyard transfer
+const dwellFlagState = {
+  ...firstScanResult.state,
+  flags: [{ id: "dwell-1", vin: "JTMBA38V70D123456", type: "dwell_exceeded", resolved: false }],
+};
+const transferWithDwellFlag = applyScan(dwellFlagState, {
+  ...baseScan,
+  clientScanId: "client-transfer-dwell",
+  type: "out",
+  outRemark: "stockyard_transfer",
+  transferDestinationYardId: "CO01A-1",
+  transferRequestedBy: "DI Test",
+});
+assert.equal(transferWithDwellFlag.accepted, true);
+assert.equal(transferWithDwellFlag.state.vehicles.JTMBA38V70D123456.currentStatus, "transit");
+assert.equal(transferWithDwellFlag.state.flags[0].type, "dwell_exceeded");
+assert.equal(transferWithDwellFlag.state.flags[0].resolved, true);
+
+// Display OUT keeps the dwell flag because the vehicle remains IN
+const displayWithDwellFlag = applyScan(dwellFlagState, {
+  ...baseScan,
+  clientScanId: "client-display-dwell",
+  type: "out",
+  outRemark: "display",
+  displayTakenBy: "Ravi",
+  displayLocation: "Showroom bay 2",
+});
+assert.equal(displayWithDwellFlag.accepted, true);
+assert.equal(displayWithDwellFlag.state.flags[0].resolved, false);
+
+// A fresh ordinary IN starts a new dwell cycle and closes the old alert
+const freshInWithDwellFlag = applyScan({
+  ...dwellFlagState,
+  vehicles: { ...dwellFlagState.vehicles, JTMBA38V70D123456: { ...dwellFlagState.vehicles.JTMBA38V70D123456, currentStatus: "out" } },
+}, {
+  ...baseScan,
+  clientScanId: "client-in-dwell",
+  type: "in",
+  model: "Hilux",
+});
+assert.equal(freshInWithDwellFlag.accepted, true);
+assert.equal(freshInWithDwellFlag.state.flags[0].resolved, true);
+
 // OUT scan with no prior IN (using a completely new state and VIN)
 const outNoIn = applyScan(createInitialState(), { ...baseScan, clientScanId: "client-4", vinRaw: "AAAAAAAAAAAAAAAAA", type: "out", outRemark: "customer_acquisition", model: "" });
 assert.equal(outNoIn.accepted, true);

@@ -854,9 +854,6 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
   const isCarInCurrentYard = pendingVehicle?.currentStatus === "in" && pendingVehicle?.currentYardId === yard.id;
   // Displayed cars stay IN — QR/auto path treats same-yard scan as return (IN), not OUT
   const scanType = isCarInCurrentYard && !vehicleOnDisplay ? "out" : "in";
-  const activeFlag = state.flags?.find((f) => f.vin === pendingVin && !f.resolved);
-  const isFlagged = Boolean(activeFlag);
-
   useEffect(() => {
     if (!pendingVin) return;
     const vehicle = state.vehicles[pendingVin];
@@ -1213,10 +1210,6 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
       if (!damageRemark.trim()) return setOverlayResult({ type: "error", message: "Add the damage remark." });
       if (!damageImage) return setOverlayResult({ type: "error", message: "Attach or capture a photo of the vehicle damage." });
     }
-    if (isFlagged && !damageImage) {
-      return setOverlayResult({ type: "error", message: "This vehicle has an active flag. You must attach a photo to proceed." });
-    }
-
     if (fromQr && online && pendingVin.length === 17) {
       try {
         const liveStatus = await getVehicleStatus(pendingVin);
@@ -1532,15 +1525,10 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
-              {isFlagged && (
-                <div className="notice warn">
-                  <strong>Active Flag:</strong> A photo of the vehicle is required to complete this scan.
-                </div>
-              )}
               <label className="check scan-damage-check">
                 <input type="checkbox" checked={damaged} onChange={(event) => {
                   setDamaged(event.target.checked);
-                  if (!event.target.checked && !isFlagged) {
+                  if (!event.target.checked) {
                     setDamageRemark("");
                     setDamageImage("");
                   }
@@ -1548,24 +1536,22 @@ function ScanView({ state, setState, session, online, onRefresh, lastSyncedAt })
                 }} />
                 Car damaged
               </label>
-              {(damaged || isFlagged) && (
+              {damaged && (
                 <div className="damage-inputs stack">
-                  {damaged && (
-                    <textarea
-                      value={damageRemark}
-                      onChange={(event) => {
-                        setDamageRemark(event.target.value);
-                        setMessage(null);
-                      }}
-                      rows="2"
-                      placeholder="Type of damage & details..."
-                    />
-                  )}
+                  <textarea
+                    value={damageRemark}
+                    onChange={(event) => {
+                      setDamageRemark(event.target.value);
+                      setMessage(null);
+                    }}
+                    rows="2"
+                    placeholder="Type of damage & details..."
+                  />
                   <input ref={damagePhotoInputRef} type="file" accept="image/*" capture="environment" onChange={handleDamagePhotoSelect} style={{ display: "none" }} />
                   <div className="damage-photo-upload-row">
                     <button type="button" className="ghost damage-photo-btn" onClick={() => damagePhotoInputRef.current?.click()}>
                       <span className="material-symbols-outlined">add_a_photo</span>
-                      <span>{damageImage ? "Change photo" : (isFlagged && !damaged ? "Take mandatory photo" : "Take damage photo")}</span>
+                      <span>{damageImage ? "Change photo" : "Take damage photo"}</span>
                     </button>
                     {damageImage && (
                       <div className="damage-thumb-wrap">

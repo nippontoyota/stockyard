@@ -10,6 +10,18 @@ import { vehicleStatus, flags, yards, vehicles } from '../db/schema.js';
  */
 export async function checkDwellAlerts(defaultThresholdDays = 30) {
   try {
+    // Dwell is only active while a vehicle remains IN. Clean up alerts from
+    // older scans so they do not follow vehicles after they leave the yard.
+    await db.execute(sql`
+      UPDATE flags AS f
+      SET resolved = true, resolved_at = NOW()
+      FROM vehicle_status AS vs
+      WHERE f.vehicle_id = vs.vehicle_id
+        AND f.flag_type = 'dwell_exceeded'
+        AND f.resolved = false
+        AND vs.current_status IS DISTINCT FROM 'in'
+    `);
+
     // Find vehicles that have been IN too long and don't already have an open dwell flag
     const staleVehicles = await db.execute(sql`
       SELECT vs.vehicle_id, v.vin, vs.current_yard_id, y.code AS yard_code, y.name AS yard_name,

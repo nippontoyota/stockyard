@@ -177,6 +177,19 @@ async function createFlag(vehicleId: string, scanId: string | null, flagType: st
   emitFlagEvent({ id: flag.id, vehicleId, vin: vin ?? '', flagType, message });
 }
 
+async function resolveDwellFlag(vehicleId: string, resolvedAt: Date, txOrDb: any) {
+  await txOrDb
+    .update(flags)
+    .set({ resolved: true, resolved_at: resolvedAt })
+    .where(
+      and(
+        eq(flags.vehicle_id, vehicleId),
+        eq(flags.flag_type, 'dwell_exceeded'),
+        eq(flags.resolved, false),
+      ),
+    );
+}
+
 // ─── Core Logic ──────────────────────────────────────────────────────
 
 async function processScanIn(body: ScanIn, yardId: string) {
@@ -220,12 +233,14 @@ async function processScanIn(body: ScanIn, yardId: string) {
     }).returning();
 
     const scanTime = new Date(body.scanned_at);
-    if (isDisplayReturn || !currentStatus || currentStatus.last_changed_at <= scanTime) {
+    const shouldApplyStatus = isDisplayReturn || !currentStatus || currentStatus.last_changed_at <= scanTime;
+    if (shouldApplyStatus) {
       await tx.insert(vehicleStatus).values({
         vehicle_id: vehicleId, current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no, on_display: false, display_taken_by: null, display_location: null,
       }).onConflictDoUpdate({
         target: vehicleStatus.vehicle_id, set: { current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null, on_display: false, display_taken_by: null, display_location: null },
       });
+      if (!isDisplayReturn) await resolveDwellFlag(vehicleId, scanTime, tx);
     }
 
     const flagsList: string[] = [];
@@ -318,6 +333,7 @@ async function processScanOut(body: ScanOut, yardId: string) {
             : {}),
         },
       });
+      if (!isDisplay) await resolveDwellFlag(vehicleId, scanTime, tx);
     }
 
     const flagsList: string[] = [];

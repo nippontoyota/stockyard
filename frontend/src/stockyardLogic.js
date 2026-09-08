@@ -204,11 +204,20 @@ export function applyScan(state, scan) {
     displayTakenBy: nextDisplayTakenBy,
     displayLocation: nextDisplayLocation,
   };
+  const startsFreshDwellCycle = (scan.type === "in" && !isDisplayReturn) || (scan.type === "out" && !isDisplayOut);
+  const hasDwellFlag = startsFreshDwellCycle && state.flags.some((flagItem) => flagItem.vin === vin && flagItem.type === "dwell_exceeded" && !flagItem.resolved);
+  const nextFlags = hasDwellFlag
+    ? state.flags.map((flagItem) =>
+      flagItem.vin === vin && flagItem.type === "dwell_exceeded" && !flagItem.resolved
+        ? { ...flagItem, resolved: true, resolvedAt: scan.scannedAt }
+        : flagItem,
+    )
+    : state.flags;
   const next = {
     ...state,
     vehicles: { ...state.vehicles, [vin]: vehicle },
     scans: [...state.scans, { ...scan, vin, keyNo: scan.keyNo || "", status: flags.length ? "flagged" : "accepted" }],
-    flags: [...state.flags, ...flags],
+    flags: [...nextFlags, ...flags],
   };
   const message = isDisplayReturn
     ? "Vehicle returned from display."
