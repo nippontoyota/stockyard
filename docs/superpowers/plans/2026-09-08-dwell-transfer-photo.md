@@ -4,7 +4,7 @@
 
 **Goal:** Allow Stockyard Transfer OUT scans for vehicles with dwell-time flags without requiring an unrelated photo.
 
-**Architecture:** Keep the existing scan form and scan state flow unchanged. Remove only the generic active-flag photo gate in the client validation path; damage-specific validation remains the sole photo requirement for the current scan. No backend or database changes are needed because the server already accepts valid transfer payloads.
+**Architecture:** Keep the existing scan form and scan state flow unchanged except for removing the generic active-flag photo gate. Resolve matching dwell flags inside the existing scan transaction for ordinary OUT/IN lifecycle changes, and clean up legacy flags in the existing background dwell checker. No new request path or database schema is needed.
 
 **Tech Stack:** React 19, Vite, plain JavaScript logic tests with Node.
 
@@ -33,6 +33,9 @@
 
 **Files:**
 - Modify: `frontend/src/main.jsx:1216-1218` and the matching active-flag notice near the scan form damage controls.
+- Modify: `frontend/src/stockyardLogic.js` and `frontend/src/stockyardLogic.test.js` for immediate local dwell-flag lifecycle state.
+- Modify: `backend/src/routes/scans.ts` to resolve dwell flags in the existing IN/OUT transaction.
+- Modify: `backend/src/lib/dwellCheck.ts` to clean up legacy flags for vehicles no longer IN.
 
 **Interfaces:**
 - Consumes: Existing `damaged`, `damageRemark`, and `damageImage` form state.
@@ -42,6 +45,8 @@
 - [ ] Delete the notice that says every active flag requires a photo.
 - [ ] Leave the `damaged` branch requiring both a non-empty damage remark and `damageImage` unchanged.
 - [ ] Leave scan construction, `applyScan`, `bulkSync`, offline queuing, flags, and server payloads unchanged.
+- [ ] Resolve only unresolved `dwell_exceeded` flags when accepted ordinary OUT/IN changes the vehicle dwell cycle; preserve them for Display OUT/display-return IN.
+- [ ] Resolve legacy dwell flags for vehicles whose current status is no longer `in` during the existing periodic checker.
 
 ### Task 3: Verify behavior and build
 
@@ -52,7 +57,6 @@
 - Consumes: The completed client validation and regression test.
 - Produces: Fresh test/build evidence and a diff limited to the requested behavior.
 
-- [ ] Run `npm.cmd test` from `frontend`.
-- [ ] Run `npm.cmd run build` from `frontend`.
+- [ ] Run `npm.cmd test` and `npm.cmd run build` from `frontend`.
+- [ ] Run `npm.cmd test` and `npm.cmd run build` from `backend`.
 - [ ] Inspect `git diff --check` and `git diff --stat`; confirm no backend, schema, queue, or unrelated files changed.
-
