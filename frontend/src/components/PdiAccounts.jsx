@@ -1,28 +1,74 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPdiAccount, updateCredentialApi, humanizeApiError } from '../api.js';
+import { useToast } from '../hooks/useToast.js';
 
 export function PdiAccounts({ accounts, branches, onRefresh }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [branch, setBranch] = useState('');
   const [editing, setEditing] = useState(null);
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState(null);
+  const [error, setError] = useState('');
+  const dialogRef = useRef(null);
+  const { toastMessage, toast, clearToast } = useToast(5000);
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    const previousOverflow = document.body.style.overflow;
+    dialog.showModal();
+    dialog.querySelector('input')?.focus();
+    document.body.style.overflow = 'hidden';
+    return () => {
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  function openForm(account = null) {
+    setEditing(account); setUsername(''); setPassword(''); setBranch(''); setError('');
+    clearToast(); setOpen(true);
+  }
+
+  function closeForm() {
+    if (busy) return;
+    setOpen(false); setPassword(''); setError('');
+  }
+
   async function save(event) {
-    event.preventDefault(); setBusy(true); setMessage(null);
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true); setError('');
+    const successMessage = editing ? 'PDI password updated.' : 'Account created successfully.';
     try {
       if (editing) await updateCredentialApi(editing.username, password);
       else await createPdiAccount({ username: username.trim(), password, branch_id: branch });
-      setMessage({ ok: true, text: editing ? 'PDI password updated.' : 'PDI account created. Share the username and password with the inspector.' });
-      setUsername(''); setPassword(''); setEditing(null);
-      await onRefresh();
-    } catch (err) { setMessage({ ok: false, text: humanizeApiError(err) }); }
-    finally { setBusy(false); }
+    } catch (err) {
+      setError(humanizeApiError(err));
+      return;
+    } finally { setBusy(false); }
+
+    setOpen(false); setUsername(''); setPassword(''); setBranch(''); setEditing(null);
+    toast(successMessage);
+    try { await onRefresh(); }
+    catch { toast(`${successMessage} Refresh the list to see the latest accounts.`); }
   }
   return <section className="pdi-accounts pdi-panel">
-    <h3>PDI branch teams</h3><p>Create an individual account for each inspector. Their assigned branch controls which vehicles they can inspect.</p>
-    {message && <p role={message.ok ? 'status' : 'alert'} className={`notice ${message.ok ? 'ok' : 'bad'}`}>{message.text}</p>}
-    <form className="pdi-account-form" onSubmit={save}>
+    <div className="pdi-accounts-heading">
+      <h3>PDI branch teams</h3>
+      <button type="button" className="primary" onClick={() => openForm()}>Create PDI account</button>
+    </div>
+    {toastMessage && <div className="pdi-account-toast notice ok" role="status">{toastMessage}</div>}
+    <dialog ref={dialogRef} className="pdi-account-dialog" aria-labelledby="pdi-account-title"
+      aria-describedby="pdi-account-description" onCancel={event => { event.preventDefault(); closeForm(); }}>
+      <div className="pdi-account-dialog-heading">
+        <h3 id="pdi-account-title">{editing ? 'Change PDI password' : 'Create PDI account'}</h3>
+        <button type="button" className="pdi-account-close" aria-label="Close PDI account popup" disabled={busy} onClick={closeForm}>×</button>
+      </div>
+      <p id="pdi-account-description">{editing ? 'Set a new password for this inspector.' : 'Create an individual account for an inspector and choose the branch they can inspect.'}</p>
+      {error && <p role="alert" className="notice bad">{error}</p>}
+      <form className="pdi-account-form" onSubmit={save} aria-busy={busy}>
       {editing ? <p>New password for <strong>{editing.username}</strong></p> : <>
         <label>Inspector username<input required minLength={3} maxLength={80} pattern="[a-zA-Z0-9._\-]+" autoComplete="off" value={username} onChange={e => setUsername(e.target.value)} disabled={busy} /></label>
         <label>Branch<select aria-label="Branch" required value={branch} onChange={e => setBranch(e.target.value)} disabled={busy}>
@@ -32,11 +78,12 @@ export function PdiAccounts({ accounts, branches, onRefresh }) {
       <label>{editing ? 'New password' : 'Password'}<input type="password" autoComplete="new-password" required minLength={8} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} disabled={busy} /></label>
       <small>Use at least 8 characters. PDI passwords are case-sensitive and are not displayed after saving.</small>
       <div className="pdi-form-actions"><button className="primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Update PDI password' : 'Create PDI account'}</button>
-        {editing && <button type="button" disabled={busy} onClick={() => { setEditing(null); setPassword(''); }}>Cancel</button>}</div>
-    </form>
+        <button type="button" disabled={busy} onClick={closeForm}>Cancel</button></div>
+      </form>
+    </dialog>
     <div className="pdi-account-list">{accounts.map(account => <div key={account.id || account.username}>
       <span><strong>{account.username}</strong><small>{branches.find(b => b.id === account.branchId)?.name || account.yardName}</small></span>
-      <button type="button" disabled={busy} onClick={() => { setEditing(account); setPassword(''); setMessage(null); }}>Change password</button>
+      <button type="button" disabled={busy} onClick={() => openForm(account)}>Change password</button>
     </div>)}</div>
     {!accounts.length && <p>No PDI accounts in this view.</p>}
   </section>;
