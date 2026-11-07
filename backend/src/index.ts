@@ -20,11 +20,16 @@ import { authRouter } from './routes/auth.js';
 import { authenticate } from './middleware/auth.js';
 import { initSocket } from './lib/socket.js';
 import { checkDwellAlerts } from './lib/dwellCheck.js';
+import {
+  startNipponstockLocationSync,
+  syncNipponstockLocations,
+} from './lib/syncNipponstockLocations.js';
 import { ensureBuckets } from './lib/supabase.js';
 import uploadRoutes from './routes/upload.js';
 import pushRoutes from './routes/pushSubscriptions.js';
 import { db, pingDatabase } from './db/client.js';
 import { sql } from 'drizzle-orm';
+import crypto from 'crypto';
 
 const app = express();
 const httpServer = createServer(app);
@@ -87,6 +92,42 @@ app.get('/ready', async (_req, res) => {
   }
 });
 
+function locationSyncSecretOk(req: express.Request): boolean {
+  const secret = process.env.LOCATION_SYNC_SECRET;
+  if (!secret) return false;
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) return false;
+  const token = Buffer.from(header.slice(7));
+  const expected = Buffer.from(secret);
+  return token.length === expected.length && crypto.timingSafeEqual(token, expected);
+}
+
+// Manual / cron trigger for nipponstock location push (shared secret, not user JWT).
+app.post('/api/internal/sync-nipponstock-locations', async (req, res) => {
+  if (!process.env.NIPPONSTOCK_API_URL || !process.env.LOCATION_SYNC_SECRET) {
+    res.status(503).json({ error: 'NIPPONSTOCK_API_URL / LOCATION_SYNC_SECRET not configured' });
+    return;
+  }
+  if (!locationSyncSecretOk(req)) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  try {
+    const result = await syncNipponstockLocations();
+    if (!result) {
+      res.status(409).json({ error: 'Sync already running or not configured' });
+      return;
+    }
+    res.json(result);
+  } catch (err) {
+    console.error('[nipponstock-sync] trigger failed:', err);
+    res.status(502).json({
+      error: 'Sync failed',
+      detail: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
 // Auth check — returns decoded user info
 app.get('/api/auth/me', authenticate, (req, res) => {
   res.json(req.user);
@@ -125,23 +166,38 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 
 const port = Number(process.env.PORT) || 3000;
-httpServer.listen(port, '0.0.0.0', () => {
-  console.log(`Stockyard API listening on port ${port}`);
 
-  ensureBuckets();
+async function start() {
+  // Ensure new columns exist before serving traffic (additive NULL only — no backfill)
+  await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS entry_method text`);
+  await db.execute(sql`ALTER TABLE scans ADD COLUMN IF NOT EXISTS entry_method text`);
+  await db.execute(sql`ALTER TABLE scans ADD COLUMN IF NOT EXISTS customer_name text`);
 
-  db.execute(
-    sql`ALTER TABLE requisitions ADD COLUMN IF NOT EXISTS destination_yard_id text REFERENCES yards(id)`,
-  ).catch((err) => console.error('Failed to ensure destination_yard_id column:', err));
+  httpServer.listen(port, '0.0.0.0', () => {
+    console.log(`Stockyard API listening on port ${port}`);
 
-  // Run legacy variant/colour migration exactly once at startup
-  db.execute(
-    sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`
-  ).catch((err) => console.error('Failed to clear legacy variant/colour:', err));
+    ensureBuckets();
 
-  // F6 — Dwell check: delay after boot so login traffic isn't competing with scan work.
-  setTimeout(() => {
-    checkDwellAlerts().catch(console.error);
-    setInterval(() => checkDwellAlerts().catch(console.error), 6 * 60 * 60 * 1000);
-  }, 2 * 60 * 1000);
+    db.execute(
+      sql`ALTER TABLE requisitions ADD COLUMN IF NOT EXISTS destination_yard_id text REFERENCES yards(id)`,
+    ).catch((err) => console.error('Failed to ensure destination_yard_id column:', err));
+
+    // Run legacy variant/colour migration exactly once at startup
+    db.execute(
+      sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`
+    ).catch((err) => console.error('Failed to clear legacy variant/colour:', err));
+
+    // F6 — Dwell check: delay after boot so login traffic isn't competing with scan work.
+    setTimeout(() => {
+      checkDwellAlerts().catch(console.error);
+      setInterval(() => checkDwellAlerts().catch(console.error), 6 * 60 * 60 * 1000);
+    }, 2 * 60 * 1000);
+
+    startNipponstockLocationSync();
+  });
+}
+
+start().catch((err) => {
+  console.error('Failed to start API:', err);
+  process.exit(1);
 });

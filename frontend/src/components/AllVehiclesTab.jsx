@@ -7,6 +7,7 @@ import {
   yardsByRegion,
   isValidVin,
   DRIVE_TYPES,
+  entryMethodLabel,
 } from "../stockyardLogic.js";
 import { adminUpdateVehicle } from "../api.js";
 import { AdminVehicleDeleteButton } from "./AdminVehicleDeleteButton.jsx";
@@ -18,6 +19,9 @@ const DRIVE_TYPE_OPTIONS = [
 
 function getDerivedStatus(v) {
   if (v.currentStatus === "transit") return { label: "IN-TRANSIT", badgeClass: "badge-transit", value: "transit" };
+  if (v.currentStatus === "in" && v.onDisplay) {
+    return { label: "ON DISPLAY", badgeClass: "badge-display", value: "display" };
+  }
   if (v.currentStatus === "in") return { label: "IN", badgeClass: "badge-in", value: "in" };
   if (v.currentStatus === "out" && v.outRemark === "stockyard_transfer") {
     return { label: "BRANCH TRANSFER", badgeClass: "badge-transfer", value: "out" };
@@ -251,6 +255,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
           <option value="all">All statuses</option>
           <option value="IN-TRANSIT">In transit</option>
           <option value="IN">In</option>
+          <option value="ON DISPLAY">On display</option>
           <option value="BRANCH TRANSFER">Branch transfer</option>
           <option value="OUT">Out</option>
         </select>
@@ -267,6 +272,9 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
               <div>
                 <p className="vehicle-edit-kicker">{confirmVin ? "Confirm VIN change" : "Editing vehicle"}</p>
                 <h3 id="vehicle-edit-title" className="vehicle-edit-vin">{editingVin}</h3>
+                {!confirmVin && entryMethodLabel(editingVehicle?.entryMethod) ? (
+                  <p className="field-hint">{entryMethodLabel(editingVehicle.entryMethod)}</p>
+                ) : null}
               </div>
               <button type="button" className="close-modal-btn" onClick={closeEditor} aria-label="Close editor">
                 <span className="material-symbols-outlined">close</span>
@@ -439,6 +447,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
               <th>VIN</th>
               <th>Model</th>
               <th>Key No</th>
+              <th>Entry</th>
               <th>Status</th>
               <th>Yard</th>
               <th>Updated</th>
@@ -447,7 +456,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
           <tbody>
             {filteredVehicles.length === 0 ? (
               <tr>
-                <td colSpan="6" className="empty-state-cell">
+                <td colSpan="7" className="empty-state-cell">
                   {allVehicles.length === 0
                     ? "No vehicles in the system yet."
                     : "No vehicles match this search or filter."}
@@ -457,6 +466,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
               filteredVehicles.map((v) => {
                 const derivedStatus = getDerivedStatus(v);
                 const isActive = editingVin === v.vin;
+                const entryLabel = entryMethodLabel(v.entryMethod);
                 return (
                   <tr
                     key={v.vin}
@@ -473,6 +483,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
                     <td className="mono">{v.vin}</td>
                     <td>{v.model}</td>
                     <td className="mono">{v.keyNo || "—"}</td>
+                    <td>{entryLabel || "—"}</td>
                     <td>
                       <span className={`status-badge ${derivedStatus.badgeClass}`}>
                         {derivedStatus.label}

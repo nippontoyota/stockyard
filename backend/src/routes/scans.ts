@@ -10,6 +10,7 @@ import { authenticate } from '../middleware/auth.js';
 import { emitScanEvent, emitFlagEvent, emitRequisitionEvent } from '../lib/socket.js';
 import { uploadBase64Image } from '../lib/supabase.js';
 import { notifyRoleAtBranch, notifyStockyardAtYard } from '../lib/webPush.js';
+import { formatYardLabel } from '../lib/yardLabel.js';
 
 const router = Router();
 router.use(authenticate);
@@ -41,6 +42,8 @@ const scanCommon = z.object({
   damage_remark: z.string().optional(),
   damage_image: z.string().optional(),
   drive_type: driveTypeSchema.optional(),
+  // Optional so rolling deploys / old offline queue payloads still validate
+  entry_method: z.enum(['qr', 'manual']).optional(),
 });
 
 const scanInBase = scanCommon.extend({
@@ -53,9 +56,12 @@ const scanInBody = scanInBase.refine((d) => !d.damaged || (d.damage_remark && d.
 });
 
 const scanOutBase = scanCommon.extend({
-  out_remark: z.enum(['customer_acquisition', 'stockyard_transfer']),
+  out_remark: z.enum(['customer_acquisition', 'stockyard_transfer', 'display']),
   transfer_destination_yard_id: z.string().optional(),
   transfer_requested_by: z.string().optional(),
+  display_taken_by: z.string().trim().optional(),
+  display_location: z.string().trim().optional(),
+  customer_name: z.string().trim().max(120).optional(),
   damaged: z.boolean(),
   damage_remark: z.string().optional(),
   damage_image: z.string().optional(),
@@ -69,7 +75,20 @@ const scanOutBody = scanOutBase
   .refine((d) => d.out_remark !== 'stockyard_transfer' || (d.transfer_destination_yard_id && d.transfer_requested_by), {
     message: 'transfer_destination_yard_id and transfer_requested_by are required for stockyard_transfer',
     path: ['transfer_destination_yard_id'],
+  })
+  .refine((d) => d.out_remark !== 'display' || Boolean(d.display_taken_by), {
+    message: 'display_taken_by is required for display',
+    path: ['display_taken_by'],
+  })
+  .refine((d) => d.out_remark !== 'display' || Boolean(d.display_location), {
+    message: 'display_location is required for display',
+    path: ['display_location'],
   });
+
+function optionalCustomerName(outRemark: string, name?: string) {
+  if (outRemark !== 'customer_acquisition') return null;
+  return name || null;
+}
 
 const bulkSyncBody = z.object({
   scans: z.array(
@@ -78,6 +97,24 @@ const bulkSyncBody = z.object({
       z.object({ scan_type: z.literal('out') }).merge(scanOutBase),
     ]),
   ),
+}).superRefine((body, ctx) => {
+  body.scans.forEach((scan, index) => {
+    if (scan.scan_type !== 'out' || scan.out_remark !== 'display') return;
+    if (!scan.display_taken_by) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'display_taken_by is required for display',
+        path: ['scans', index, 'display_taken_by'],
+      });
+    }
+    if (!scan.display_location) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'display_location is required for display',
+        path: ['scans', index, 'display_location'],
+      });
+    }
+  });
 });
 
 type ScanIn = z.infer<typeof scanInBody>;
@@ -99,7 +136,7 @@ async function findOrCreateDevice(fingerprint: string, txOrDb: any = db): Promis
 
 async function findOrCreateVehicle(
   vinRaw: string,
-  opts: { driveType?: string; model?: string } = {},
+  opts: { driveType?: string; model?: string; entryMethod?: 'qr' | 'manual' } = {},
   txOrDb: any = db,
 ): Promise<{ id: string; vinValid: boolean }> {
   const vin = vinRaw.toUpperCase().trim();
@@ -115,6 +152,7 @@ async function findOrCreateVehicle(
       vin_valid: vinValid,
       variant: null,
       colour: null,
+      entry_method: opts.entryMethod ?? null,
     })
     .onConflictDoUpdate({
       target: vehicles.vin,
@@ -122,18 +160,34 @@ async function findOrCreateVehicle(
         updated_at: new Date(),
         ...(model ? { model } : {}),
         ...(opts.driveType ? { drive_type: opts.driveType } : {}),
+        // Last tagged activity wins (sticker signal); omit when payload has no method
+        ...(opts.entryMethod ? { entry_method: opts.entryMethod } : {}),
         vin_valid: vinValid,
         variant: null,
         colour: null,
       },
     })
     .returning({ id: vehicles.id });
+
   return { id: result[0].id, vinValid };
 }
 
 async function createFlag(vehicleId: string, scanId: string | null, flagType: string, message: string, vin?: string, txOrDb: any = db) {
   const [flag] = await txOrDb.insert(flags).values({ vehicle_id: vehicleId, scan_id: scanId, flag_type: flagType, message }).returning();
   emitFlagEvent({ id: flag.id, vehicleId, vin: vin ?? '', flagType, message });
+}
+
+async function resolveDwellFlag(vehicleId: string, resolvedAt: Date, txOrDb: any) {
+  await txOrDb
+    .update(flags)
+    .set({ resolved: true, resolved_at: resolvedAt })
+    .where(
+      and(
+        eq(flags.vehicle_id, vehicleId),
+        eq(flags.flag_type, 'dwell_exceeded'),
+        eq(flags.resolved, false),
+      ),
+    );
 }
 
 // ─── Core Logic ──────────────────────────────────────────────────────
@@ -153,30 +207,40 @@ async function processScanIn(body: ScanIn, yardId: string) {
   return db.transaction(async (tx) => {
     const { id: vehicleId, vinValid } = await findOrCreateVehicle(
       body.vin,
-      { driveType: body.drive_type, model: body.model },
+      { driveType: body.drive_type, model: body.model, entryMethod: body.entry_method },
       tx,
     );
     const deviceId = await findOrCreateDevice(body.device_fingerprint, tx);
     const [currentStatus] = await tx.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
+    const isDisplayReturn =
+      currentStatus?.current_status === 'in' &&
+      currentStatus.current_yard_id === yardId &&
+      currentStatus.on_display === true;
 
-    if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id === yardId) {
+    if (
+      currentStatus?.current_status === 'in' &&
+      currentStatus.current_yard_id === yardId &&
+      !isDisplayReturn
+    ) {
       const [scan] = await tx.insert(scans).values({
-        client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, status: 'rejected',
+        client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, status: 'rejected', entry_method: body.entry_method ?? null,
       }).returning();
       return { scan_id: scan.id, status: 'rejected' as const, error: 'Vehicle is already marked IN at this yard' };
     }
 
     const [scan] = await tx.insert(scans).values({
-      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted',
+      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'in', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted', entry_method: body.entry_method ?? null,
     }).returning();
 
     const scanTime = new Date(body.scanned_at);
-    if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
+    const shouldApplyStatus = isDisplayReturn || !currentStatus || currentStatus.last_changed_at <= scanTime;
+    if (shouldApplyStatus) {
       await tx.insert(vehicleStatus).values({
-        vehicle_id: vehicleId, current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no,
+        vehicle_id: vehicleId, current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, key_no: body.key_no, on_display: false, display_taken_by: null, display_location: null,
       }).onConflictDoUpdate({
-        target: vehicleStatus.vehicle_id, set: { current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null },
+        target: vehicleStatus.vehicle_id, set: { current_status: 'in', current_yard_id: yardId, last_in_scan_id: scan.id, last_changed_at: scanTime, ...(body.key_no ? { key_no: body.key_no } : {}), override_reason: null, on_display: false, display_taken_by: null, display_location: null },
       });
+      if (!isDisplayReturn) await resolveDwellFlag(vehicleId, scanTime, tx);
     }
 
     const flagsList: string[] = [];
@@ -185,16 +249,15 @@ async function processScanIn(body: ScanIn, yardId: string) {
     if (body.damage_image && !damageImageUrl) { await createFlag(vehicleId, scan.id, 'photo_upload_failed', 'Damage photo upload failed — image not saved', body.vin, tx); flagsList.push('photo_upload_failed'); }
     
     if (currentStatus?.current_status === 'in' && currentStatus.current_yard_id !== yardId) {
-      let oldYardCode = String(currentStatus.current_yard_id);
-      if (currentStatus.current_yard_id) {
-        const [oldY] = await tx.select({ code: yards.code }).from(yards).where(eq(yards.id, currentStatus.current_yard_id));
-        if (oldY) oldYardCode = oldY.code;
-      }
-      let newYardCode = yardId;
-      const [newY] = await tx.select({ code: yards.code }).from(yards).where(eq(yards.id, yardId));
-      if (newY) newYardCode = newY.code;
+      const yardCols = { code: yards.code, name: yards.name, id: yards.id };
+      const [oldY] = currentStatus.current_yard_id
+        ? await tx.select(yardCols).from(yards).where(eq(yards.id, currentStatus.current_yard_id))
+        : [];
+      const [newY] = await tx.select(yardCols).from(yards).where(eq(yards.id, yardId));
+      const oldLabel = formatYardLabel(oldY, currentStatus.current_yard_id || 'Unknown');
+      const newLabel = formatYardLabel(newY, yardId);
 
-      await createFlag(vehicleId, scan.id, 'duplicate_yard_status', `Vehicle was IN at yard ${oldYardCode}, now scanned IN at ${newYardCode}`, body.vin, tx);
+      await createFlag(vehicleId, scan.id, 'duplicate_yard_status', `Vehicle was IN at ${oldLabel}, now scanned IN at ${newLabel}`, body.vin, tx);
       flagsList.push('duplicate_yard_status');
     }
     
@@ -216,20 +279,30 @@ async function processScanOut(body: ScanOut, yardId: string) {
   return db.transaction(async (tx) => {
     const { id: vehicleId, vinValid } = await findOrCreateVehicle(
       body.vin,
-      { driveType: body.drive_type },
+      { driveType: body.drive_type, entryMethod: body.entry_method },
       tx,
     );
     const deviceId = await findOrCreateDevice(body.device_fingerprint, tx);
     const [currentStatus] = await tx.select().from(vehicleStatus).where(eq(vehicleStatus.vehicle_id, vehicleId));
 
+    if (currentStatus?.on_display === true) {
+      const [scan] = await tx.insert(scans).values({
+        client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, display_taken_by: body.display_taken_by, display_location: body.display_location, customer_name: optionalCustomerName(body.out_remark, body.customer_name), damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'rejected', entry_method: body.entry_method ?? null,
+      }).returning();
+      return { scan_id: scan.id, status: 'rejected' as const, error: 'Return vehicle from display first.' };
+    }
+
     const [scan] = await tx.insert(scans).values({
-      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted',
+      client_scan_id: body.client_scan_id, vehicle_id: vehicleId, vin_raw: body.vin, scan_type: 'out', yard_id: yardId, device_id: deviceId, scanned_at: new Date(body.scanned_at), key_no: body.key_no, out_remark: body.out_remark, transfer_destination_yard_id: body.transfer_destination_yard_id, transfer_requested_by: body.transfer_requested_by, display_taken_by: body.display_taken_by, display_location: body.display_location, customer_name: optionalCustomerName(body.out_remark, body.customer_name), damaged: body.damaged, damage_remark: body.damage_remark, damage_image: damageImageUrl, status: 'accepted', entry_method: body.entry_method ?? null,
     }).returning();
 
     const scanTime = new Date(body.scanned_at);
     const isTransfer = body.out_remark === 'stockyard_transfer';
-    const nextStatus = isTransfer ? 'transit' : 'out';
-    const nextYardId = isTransfer ? body.transfer_destination_yard_id! : yardId;
+    const isDisplay = body.out_remark === 'display';
+    const nextStatus = isDisplay ? 'in' : isTransfer ? 'transit' : 'out';
+    const nextYardId = isDisplay
+      ? currentStatus?.current_yard_id ?? yardId
+      : isTransfer ? body.transfer_destination_yard_id! : yardId;
 
     if (!currentStatus || currentStatus.last_changed_at <= scanTime) {
       await tx.insert(vehicleStatus).values({
@@ -239,6 +312,9 @@ async function processScanOut(body: ScanOut, yardId: string) {
         last_out_scan_id: scan.id,
         last_changed_at: scanTime,
         key_no: body.key_no,
+        on_display: isDisplay ? true : null,
+        display_taken_by: isDisplay ? body.display_taken_by : null,
+        display_location: isDisplay ? body.display_location : null,
       }).onConflictDoUpdate({
         target: vehicleStatus.vehicle_id,
         set: {
@@ -248,8 +324,16 @@ async function processScanOut(body: ScanOut, yardId: string) {
           last_changed_at: scanTime,
           ...(body.key_no ? { key_no: body.key_no } : {}),
           override_reason: null,
+          ...(isDisplay
+            ? {
+                on_display: true,
+                display_taken_by: body.display_taken_by,
+                display_location: body.display_location,
+              }
+            : {}),
         },
       });
+      if (!isDisplay) await resolveDwellFlag(vehicleId, scanTime, tx);
     }
 
     const flagsList: string[] = [];
@@ -305,10 +389,15 @@ async function processScanOut(body: ScanOut, yardId: string) {
       }
 
       if (destBranch) {
+        const [destYard] = await tx
+          .select({ code: yards.code, name: yards.name, id: yards.id })
+          .from(yards)
+          .where(eq(yards.id, destYardId));
+        const destLabel = formatYardLabel(destYard, destYardId);
         await tx.insert(notifications).values({
           user_role: 'stockyard',
           branch_id: destBranch.branch_id,
-          message: `Vehicle ${body.vin.toUpperCase()} is in transit to yard ${destYardId}. Open Incoming to receive it.`,
+          message: `Vehicle ${body.vin.toUpperCase()} is in transit to ${destLabel}. Open Incoming to receive it.`,
           type: 'vehicle_inbound',
         });
       }
@@ -367,7 +456,8 @@ router.post('/out', async (req, res, next) => {
       emitScanEvent({ type: 'out', vin: parsed.vin, model: null, yardId, timestamp: parsed.scanned_at, status: 'accepted', flagType: result.flags?.[0] });
       emitRequisitionEvent();
     }
-    res.status(result.status === 'already_processed' ? 200 : 201).json(result);
+    if (result.status === 'rejected') res.status(409).json(result);
+    else res.status(result.status === 'already_processed' ? 200 : 201).json(result);
   } catch (err) { next(err); }
 });
 
@@ -428,6 +518,9 @@ router.get('/', async (req, res, next) => {
         damageRemark: scans.damage_remark,
         damageImage: scans.damage_image,
         outRemark: scans.out_remark,
+        displayTakenBy: scans.display_taken_by,
+        displayLocation: scans.display_location,
+        customerName: scans.customer_name,
         transferDestinationYardId: scans.transfer_destination_yard_id,
         transferRequestedBy: scans.transfer_requested_by,
         keyNo: scans.key_no,

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { eq, and, count, inArray } from 'drizzle-orm';
+import { eq, and, count, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { branchYards, vehicleStatus, vehicles, requisitions, branches, yards } from '../db/schema.js';
 import { authenticate } from '../middleware/auth.js';
@@ -132,6 +132,7 @@ router.get('/:id/stock', async (req, res, next) => {
         and(
           eq(vehicleStatus.current_status, 'in'),
           inArray(vehicleStatus.current_yard_id, yardIds),
+          sql`${vehicleStatus.on_display} IS DISTINCT FROM TRUE`,
         ),
       );
 

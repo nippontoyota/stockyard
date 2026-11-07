@@ -2,11 +2,14 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { eq, and, sql, count, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { vehicles, vehicleStatus, scans, flags, requisitions, notifications } from '../db/schema.js';
+import { vehicles, vehicleStatus, scans, flags, requisitions, notifications, yards, devices } from '../db/schema.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { isValidVin } from '../lib/vin.js';
 import { prepareVinRename } from '../lib/vinRename.js';
 import { DRIVE_TYPE_VALUES, isDriveType } from '../shared/driveTypes.js';
+import { uploadBase64Image } from '../lib/supabase.js';
+import { emitFlagEvent } from '../lib/socket.js';
+import { randomUUID } from 'node:crypto';
 
 const router = Router();
 router.use(authenticate);
@@ -128,13 +131,20 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
 
     // Read existing status to preserve yard on force-OUT
     const [existingStatus] = await db
-      .select({ current_yard_id: vehicleStatus.current_yard_id })
+      .select({
+        current_status: vehicleStatus.current_status,
+        current_yard_id: vehicleStatus.current_yard_id,
+        on_display: vehicleStatus.on_display,
+      })
       .from(vehicleStatus)
       .where(eq(vehicleStatus.vehicle_id, vehicle.id));
 
     const resolvedYardId = body.status === 'in'
       ? body.yard_id ?? existingStatus?.current_yard_id ?? null
       : existingStatus?.current_yard_id ?? null;
+    const clearDisplay =
+      existingStatus?.on_display === true &&
+      (body.status !== 'in' || resolvedYardId !== existingStatus.current_yard_id);
 
     // Upsert status
     await db
@@ -153,6 +163,9 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
           current_yard_id: resolvedYardId,
           last_changed_at: new Date(),
           override_reason: body.reason,
+          ...(clearDisplay
+            ? { on_display: false, display_taken_by: null, display_location: null }
+            : {}),
         },
       });
 
@@ -176,6 +189,144 @@ router.patch('/vehicles/:vin/status', async (req, res, next) => {
       .where(and(eq(flags.vehicle_id, vehicle.id), eq(flags.resolved, false)));
 
     res.json({ vin: req.params.vin.toUpperCase(), status: body.status, reason: body.reason });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── POST /vehicles/:vin/damage ──────────────────────────────────────
+// Report damage on an existing vehicle — does not change IN/OUT/yard.
+
+const damageReportBody = z.object({
+  reason: z.string().trim().min(1).max(2000),
+  damage_image: z.string().min(1),
+  yard_id: z.string().min(1).optional().nullable(),
+  yardId: z.string().min(1).optional().nullable(),
+}).transform((d) => ({
+  reason: d.reason,
+  damage_image: d.damage_image,
+  yard_id: d.yard_id || d.yardId || undefined,
+}));
+
+router.post('/vehicles/:vin/damage', async (req, res, next) => {
+  try {
+    const body = damageReportBody.parse(req.body);
+    const vin = req.params.vin.toUpperCase();
+
+    const [vehicle] = await db
+      .select({ id: vehicles.id })
+      .from(vehicles)
+      .where(eq(vehicles.vin, vin));
+
+    if (!vehicle) {
+      res.status(404).json({ error: 'Vehicle not found' });
+      return;
+    }
+
+    const [existingStatus] = await db
+      .select({
+        current_yard_id: vehicleStatus.current_yard_id,
+        current_status: vehicleStatus.current_status,
+      })
+      .from(vehicleStatus)
+      .where(eq(vehicleStatus.vehicle_id, vehicle.id));
+
+    const yardId = body.yard_id || existingStatus?.current_yard_id || null;
+    if (!yardId) {
+      res.status(400).json({
+        error: 'Vehicle has no yard — pick a yard or set status IN first',
+      });
+      return;
+    }
+
+    const [yardRow] = await db
+      .select({ id: yards.id })
+      .from(yards)
+      .where(eq(yards.id, yardId));
+    if (!yardRow) {
+      res.status(400).json({ error: 'Invalid yard' });
+      return;
+    }
+
+    const damageImageUrl = await uploadBase64Image(body.damage_image);
+    const deviceId = await findOrCreateAdminImportDevice();
+    const now = new Date();
+
+    const [scan] = await db
+      .insert(scans)
+      .values({
+        client_scan_id: `admin-damage-${randomUUID()}`,
+        vehicle_id: vehicle.id,
+        vin_raw: vin,
+        scan_type: existingStatus?.current_status === 'out' ? 'out' : 'in',
+        yard_id: yardId,
+        device_id: deviceId,
+        scanned_at: now,
+        damaged: true,
+        damage_remark: body.reason,
+        damage_image: damageImageUrl,
+        status: 'accepted',
+        entry_method: null,
+      })
+      .returning({ id: scans.id });
+
+    const [flag] = await db
+      .insert(flags)
+      .values({
+        vehicle_id: vehicle.id,
+        scan_id: scan.id,
+        flag_type: 'damage_reported',
+        message: body.reason,
+        resolved: false,
+      })
+      .returning({ id: flags.id });
+
+    emitFlagEvent({
+      id: flag.id,
+      vehicleId: vehicle.id,
+      vin,
+      flagType: 'damage_reported',
+      message: body.reason,
+    });
+
+    if (!damageImageUrl) {
+      const [photoFlag] = await db
+        .insert(flags)
+        .values({
+          vehicle_id: vehicle.id,
+          scan_id: scan.id,
+          flag_type: 'photo_upload_failed',
+          message: 'Damage photo upload failed — image not saved',
+          resolved: false,
+        })
+        .returning({ id: flags.id });
+      emitFlagEvent({
+        id: photoFlag.id,
+        vehicleId: vehicle.id,
+        vin,
+        flagType: 'photo_upload_failed',
+        message: 'Damage photo upload failed — image not saved',
+      });
+    }
+
+    // Audit trail (resolved) — does not clear open damage flags
+    await db.insert(flags).values({
+      vehicle_id: vehicle.id,
+      scan_id: scan.id,
+      flag_type: 'manual_admin_override',
+      message: `Admin reported damage. Reason: ${body.reason}`,
+      resolved: true,
+      resolved_by: req.user!.id,
+      resolved_at: new Date(),
+    });
+
+    res.json({
+      vin,
+      damaged: true,
+      flag_id: flag.id,
+      photo_saved: Boolean(damageImageUrl),
+      reason: body.reason,
+    });
   } catch (err) {
     next(err);
   }
@@ -267,6 +418,10 @@ router.patch('/vehicles/:vin', async (req, res, next) => {
       res.status(400).json({ error: 'Select a yard when status is IN.' });
       return;
     }
+    const clearDisplay =
+      existingStatus?.on_display === true &&
+      (body.status !== undefined || body.yard_id !== undefined) &&
+      (nextStatus !== 'in' || nextYardId !== existingStatus.current_yard_id);
 
     const statusPatch: Record<string, unknown> = {
       current_status: nextStatus,
@@ -275,6 +430,11 @@ router.patch('/vehicles/:vin', async (req, res, next) => {
       override_reason: 'Admin vehicle edit',
     };
     if (body.key_no !== undefined) statusPatch.key_no = body.key_no || null;
+    if (clearDisplay) {
+      statusPatch.on_display = false;
+      statusPatch.display_taken_by = null;
+      statusPatch.display_location = null;
+    }
 
     await db
       .insert(vehicleStatus)
@@ -379,59 +539,209 @@ router.delete('/vehicles/:vin', async (req, res, next) => {
 });
 
 // ─── POST /import/vehicles ──────────────────────────────────────────
+// Create-only: never updates existing vehicles / status / fields.
 
 const importBody = z.object({
   vehicles: z.array(
     z.object({
       vin: z.string().min(1),
-      yard_id: z.string().uuid(),
-      model: z.string().optional(),
+      yard_id: z.string().min(1).optional().nullable(),
+      model: z.string().optional().nullable(),
+      key_no: z.string().trim().max(40).optional().nullable(),
+      drive_type: z.union([driveTypeSchema, z.literal(''), z.null()]).optional(),
+      damaged: z.boolean().optional(),
+      damage_remark: z.string().trim().max(2000).optional().nullable(),
+      damage_image: z.string().optional().nullable(),
     }),
   ),
 });
+
+async function findOrCreateAdminImportDevice(): Promise<string> {
+  const result = await db
+    .insert(devices)
+    .values({
+      device_fingerprint: 'admin-import',
+      label: 'Admin add to yard',
+    })
+    .onConflictDoUpdate({
+      target: devices.device_fingerprint,
+      set: { last_seen_at: new Date() },
+    })
+    .returning({ id: devices.id });
+  return result[0].id;
+}
 
 router.post('/import/vehicles', async (req, res, next) => {
   try {
     const body = importBody.parse(req.body);
     let imported = 0;
-    let skipped = 0;
+    const rejected: Array<{ vin: string; reason: string }> = [];
+
+    const yardIds = [
+      ...new Set(
+        body.vehicles
+          .map((v) => (v.yard_id || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+    const knownYards = new Set<string>();
+    if (yardIds.length) {
+      const rows = await db
+        .select({ id: yards.id })
+        .from(yards)
+        .where(inArray(yards.id, yardIds));
+      for (const row of rows) knownYards.add(row.id);
+    }
+
+    let adminDeviceId: string | null = null;
+    const needsDevice = body.vehicles.some((v) => v.damaged);
+    if (needsDevice) {
+      adminDeviceId = await findOrCreateAdminImportDevice();
+    }
 
     for (const v of body.vehicles) {
       const vin = v.vin.toUpperCase().trim();
+      const yardId = (v.yard_id || '').trim();
+      const damaged = Boolean(v.damaged);
+      const damageRemark = v.damage_remark?.trim() || '';
 
-      // Check if vehicle already exists
+      if (!vin) {
+        rejected.push({ vin: v.vin || '', reason: 'invalid VIN' });
+        continue;
+      }
+
+      if (!isValidVin(vin)) {
+        rejected.push({ vin, reason: 'invalid VIN' });
+        continue;
+      }
+
+      if (!yardId || !knownYards.has(yardId)) {
+        rejected.push({ vin, reason: 'invalid or missing yard' });
+        continue;
+      }
+
+      if (damaged && !damageRemark) {
+        rejected.push({ vin, reason: 'damage remark required when damaged' });
+        continue;
+      }
+
+      if (damaged && !v.damage_image) {
+        rejected.push({ vin, reason: 'damage photo required when damaged' });
+        continue;
+      }
+
       const [existing] = await db
         .select({ id: vehicles.id })
         .from(vehicles)
         .where(eq(vehicles.vin, vin));
 
       if (existing) {
-        skipped++;
+        rejected.push({ vin, reason: 'already exists' });
         continue;
       }
 
-      const vinValidCheck = isValidVin(vin);
+      let damageImageUrl: string | null = null;
+      if (damaged && v.damage_image) {
+        damageImageUrl = await uploadBase64Image(v.damage_image);
+      }
+
       const modelValue = v.model?.trim() || null;
+      const driveType =
+        v.drive_type && isDriveType(v.drive_type) ? v.drive_type : null;
+      const keyNo = v.key_no?.trim() || null;
+      const now = new Date();
 
       const [vehicle] = await db
         .insert(vehicles)
-        .values({ vin, model: modelValue, vin_valid: vinValidCheck, variant: null, colour: null })
+        .values({
+          vin,
+          model: modelValue,
+          vin_valid: true,
+          drive_type: driveType,
+          variant: null,
+          colour: null,
+        })
         .returning({ id: vehicles.id });
 
-      await db
-        .insert(vehicleStatus)
-        .values({
-          vehicle_id: vehicle.id,
-          current_status: 'in',
-          current_yard_id: v.yard_id,
-          last_changed_at: new Date(),
-          override_reason: 'Bulk import at launch',
+      let scanId: string | null = null;
+      if (damaged && adminDeviceId) {
+        const [scan] = await db
+          .insert(scans)
+          .values({
+            client_scan_id: `admin-import-${randomUUID()}`,
+            vehicle_id: vehicle.id,
+            vin_raw: vin,
+            scan_type: 'in',
+            yard_id: yardId,
+            device_id: adminDeviceId,
+            scanned_at: now,
+            key_no: keyNo,
+            damaged: true,
+            damage_remark: damageRemark,
+            damage_image: damageImageUrl,
+            status: 'accepted',
+            entry_method: null,
+          })
+          .returning({ id: scans.id });
+        scanId = scan.id;
+
+        const [flag] = await db
+          .insert(flags)
+          .values({
+            vehicle_id: vehicle.id,
+            scan_id: scanId,
+            flag_type: 'damage_reported',
+            message: damageRemark || 'Damage reported',
+          })
+          .returning({ id: flags.id });
+
+        emitFlagEvent({
+          id: flag.id,
+          vehicleId: vehicle.id,
+          vin,
+          flagType: 'damage_reported',
+          message: damageRemark || 'Damage reported',
         });
+
+        if (v.damage_image && !damageImageUrl) {
+          const [photoFlag] = await db
+            .insert(flags)
+            .values({
+              vehicle_id: vehicle.id,
+              scan_id: scanId,
+              flag_type: 'photo_upload_failed',
+              message: 'Damage photo upload failed — image not saved',
+            })
+            .returning({ id: flags.id });
+          emitFlagEvent({
+            id: photoFlag.id,
+            vehicleId: vehicle.id,
+            vin,
+            flagType: 'photo_upload_failed',
+            message: 'Damage photo upload failed — image not saved',
+          });
+        }
+      }
+
+      await db.insert(vehicleStatus).values({
+        vehicle_id: vehicle.id,
+        current_status: 'in',
+        current_yard_id: yardId,
+        last_in_scan_id: scanId,
+        last_changed_at: now,
+        key_no: keyNo,
+        override_reason: 'Admin add to yard',
+      });
 
       imported++;
     }
 
-    res.json({ imported, skipped, total: body.vehicles.length });
+    res.json({
+      imported,
+      skipped: rejected.length,
+      total: body.vehicles.length,
+      rejected,
+    });
   } catch (err) {
     next(err);
   }

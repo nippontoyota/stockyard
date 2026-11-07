@@ -1,6 +1,10 @@
+import { VEHICLE_PAGE_SIZE, fetchAllVehiclePages } from "./vehiclePagination.js";
+
 const API_BASE = import.meta.env.VITE_API_URL || "https://stockyard-api-xvaa.onrender.com";
 
 const FETCH_TIMEOUT_MS = 12000;
+/** Vehicle list can be thousands of rows; allow a longer budget than default API calls. */
+const VEHICLE_FETCH_TIMEOUT_MS = 60000;
 
 function isRetryableError(err, status) {
   // Timeouts/aborts must not retry — under multi-device load that amplifies DB pressure.
@@ -10,11 +14,13 @@ function isRetryableError(err, status) {
 }
 
 async function fetchWithRetry(url, options = {}, retries = 1) {
+  const timeoutMs = options.timeoutMs ?? FETCH_TIMEOUT_MS;
+  const { timeoutMs: _ignored, ...fetchOptions } = options;
   for (let i = 0; i < retries; i++) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
+      const res = await fetch(url, { ...fetchOptions, signal: controller.signal });
       clearTimeout(timeout);
       if (!res.ok) {
         const err = new Error(`HTTP ${res.status}`);
@@ -179,11 +185,19 @@ export async function bulkSync(scans) {
     damage_remark: s.damageRemark || undefined,
     damage_image: s.damageImage || undefined,
     drive_type: s.driveType || undefined,
+    ...(s.entryMethod === "qr" || s.entryMethod === "manual" ? { entry_method: s.entryMethod } : {}),
     ...(s.type === 'in' && s.model ? { model: s.model } : {}),
     ...(s.type === 'out' ? {
       out_remark: s.outRemark,
       transfer_destination_yard_id: s.transferDestinationYardId || undefined,
       transfer_requested_by: s.transferRequestedBy || undefined,
+      ...(s.outRemark === "display" ? {
+        display_taken_by: s.displayTakenBy || undefined,
+        display_location: s.displayLocation || undefined,
+      } : {}),
+      ...(s.outRemark === "customer_acquisition" && s.customerName ? {
+        customer_name: s.customerName,
+      } : {}),
     } : {})
   }));
 
@@ -195,13 +209,36 @@ export async function bulkSync(scans) {
 }
 
 export async function getVehicles(params = {}) {
-  const { page = 1, limit = 300, yardId, status, model } = params;
-  let url = `/api/vehicles?page=${page}&limit=${limit}`;
-  if (yardId) url += `&yard_id=${yardId}`;
-  if (status) url += `&status=${status}`;
-  if (model) url += `&model=${encodeURIComponent(model)}`;
-  const response = await apiFetch(url);
-  return response.data || [];
+  const {
+    limit = VEHICLE_PAGE_SIZE,
+    yardId,
+    status,
+    model,
+    // Explicit single-page fetch (tests / rare callers). Default: load every page.
+    page: singlePage,
+    allPages = singlePage == null,
+  } = params;
+
+  const buildUrl = (page) => {
+    let url = `/api/vehicles?page=${page}&limit=${limit}`;
+    if (yardId) url += `&yard_id=${encodeURIComponent(yardId)}`;
+    if (status) url += `&status=${encodeURIComponent(status)}`;
+    if (model) url += `&model=${encodeURIComponent(model)}`;
+    return url;
+  };
+
+  const fetchPage = async (page) => {
+    const response = await apiFetch(buildUrl(page), { timeoutMs: VEHICLE_FETCH_TIMEOUT_MS });
+    return response.data || [];
+  };
+
+  // Yard-scoped stock views and admin/global sync must both be complete.
+  // A single default page (formerly 300) left admin undercounting many yards.
+  if (!allPages) {
+    return fetchPage(singlePage || 1);
+  }
+
+  return fetchAllVehiclePages(fetchPage, { pageSize: limit });
 }
 
 export async function getFlags() {
@@ -223,6 +260,18 @@ export async function adminOverrideVehicle(vin, status, reason, yardId) {
   return apiFetch(`/api/admin/vehicles/${vin}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status, reason, yardId })
+  });
+}
+
+/** Report damage on an existing vehicle (does not change IN/OUT/yard). */
+export async function adminReportVehicleDamage(vin, reason, damageImage, yardId) {
+  return apiFetch(`/api/admin/vehicles/${encodeURIComponent(String(vin).toUpperCase())}/damage`, {
+    method: "POST",
+    body: JSON.stringify({
+      reason,
+      damage_image: damageImage,
+      ...(yardId ? { yardId } : {}),
+    }),
   });
 }
 
@@ -294,6 +343,14 @@ export async function updateCredentialApi(username, password) {
 
 export async function uploadTransitListApi(vehicles) {
   return apiFetch("/api/vehicles/transit-list", {
+    method: "POST",
+    body: JSON.stringify({ vehicles }),
+  });
+}
+
+/** Create-only stockyard import. Never mutates existing VINs. */
+export async function adminImportVehicles(vehicles) {
+  return apiFetch("/api/admin/import/vehicles", {
     method: "POST",
     body: JSON.stringify({ vehicles }),
   });

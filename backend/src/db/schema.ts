@@ -48,6 +48,8 @@ export const vehicles = pgTable('vehicles', {
   colour: text('colour'),
   drive_type: text('drive_type'), // 'neo_drive' | 'hybrid' | 'petrol' | 'diesel' | 'cng' | 'electric'
   vin_valid: boolean('vin_valid').notNull(),
+  // null = pre-tracking / unlabeled; set only on first tagged yard scan going forward
+  entry_method: text('entry_method'), // 'qr' | 'manual' | null
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -65,14 +67,19 @@ export const scans = pgTable(
     device_id: uuid('device_id').notNull().references(() => devices.id),
     scanned_at: timestamp('scanned_at', { withTimezone: true }).notNull(),
     received_at: timestamp('received_at', { withTimezone: true }).defaultNow().notNull(),
-    out_remark: text('out_remark'), // 'customer_acquisition' | 'stockyard_transfer'
+    out_remark: text('out_remark'), // 'customer_acquisition' | 'stockyard_transfer' | 'display'
     transfer_destination_yard_id: text('transfer_destination_yard_id').references(() => yards.id),
     transfer_requested_by: text('transfer_requested_by'),
+    display_taken_by: text('display_taken_by'),
+    display_location: text('display_location'),
+    customer_name: text('customer_name'),
     key_no: text('key_no'),
     damaged: boolean('damaged'),
     damage_remark: text('damage_remark'),
     damage_image: text('damage_image'),
     status: text('status').notNull(), // 'accepted' | 'rejected' | 'flagged'
+    // null = legacy scans before tracking; optional on API so old clients keep working
+    entry_method: text('entry_method'), // 'qr' | 'manual' | null
   },
   (t) => [
     index('scans_vehicle_id_idx').on(t.vehicle_id),
@@ -94,6 +101,9 @@ export const vehicleStatus = pgTable(
     last_changed_at: timestamp('last_changed_at', { withTimezone: true }).defaultNow().notNull(),
     key_no: text('key_no'),
     override_reason: text('override_reason'),
+    on_display: boolean('on_display'),
+    display_taken_by: text('display_taken_by'),
+    display_location: text('display_location'),
   },
   (t) => [
     index('vs_yard_status_idx').on(t.current_yard_id, t.current_status),

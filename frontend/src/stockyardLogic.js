@@ -20,6 +20,16 @@ export function findYardById(yardId) {
   return yards.find((y) => y.id === yardId) || null;
 }
 
+/** Display label: "TR01C · Showroom, Enchakkal" (codes alone collide across sites). */
+export function formatYardLabel(yardOrId, fallback = "Unknown") {
+  const yard = typeof yardOrId === "string" ? findYardById(yardOrId) : yardOrId;
+  if (!yard) return (typeof yardOrId === "string" && yardOrId) || fallback;
+  const code = String(yard.code || "").trim();
+  const name = String(yard.name || "").trim();
+  if (code && name) return `${code} · ${name}`;
+  return code || name || yard.id || fallback;
+}
+
 /** Group yards by region for selects / assign UIs. */
 export function yardsByRegion() {
   return YARD_REGIONS.map((region) => ({
@@ -62,7 +72,7 @@ export function createClientScanId() {
   return `${Date.now()}-${crypto.randomUUID()}`;
 }
 
-export function createScan({ vin, type, yardId, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "", model = "" }) {
+export function createScan({ vin, type, yardId, outRemark = "", transferDestinationYardId = "", transferRequestedBy = "", displayTakenBy = "", displayLocation = "", customerName = "", keyNo = "", damaged = false, damageRemark = "", damageImage = "", driveType = "", model = "", entryMethod = null }) {
   return {
     id: crypto.randomUUID(),
     clientScanId: createClientScanId(),
@@ -72,15 +82,30 @@ export function createScan({ vin, type, yardId, outRemark = "", transferDestinat
     outRemark,
     transferDestinationYardId,
     transferRequestedBy,
+    displayTakenBy,
+    displayLocation,
+    customerName: outRemark === "customer_acquisition" ? String(customerName || "").trim() : "",
     keyNo,
     damaged,
     damageRemark,
     damageImage,
     driveType,
     model,
+    entryMethod: entryMethod === "qr" || entryMethod === "manual" ? entryMethod : null,
     deviceId: localStorage.getItem("yardDeviceId") || "unknown-device",
     scannedAt: new Date().toISOString(),
   };
+}
+
+export function outRemarkLabel(remark) {
+  if (remark === "customer_acquisition") return "Customer Acquisition";
+  if (remark === "stockyard_transfer") return "Stockyard Transfer";
+  if (remark === "display") return "Display";
+  return String(remark || "").replace(/_/g, " ");
+}
+
+export function isVehicleOnDisplay(vehicle) {
+  return Boolean(vehicle?.onDisplay);
 }
 
 export function normalizeVin(value) {
@@ -101,11 +126,26 @@ export function applyScan(state, scan) {
   const vinValid = isValidVin(vin);
   const existing = state.vehicles[vin];
   const yard = yards.find((item) => item.id === scan.yardId);
-  if (scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId === scan.yardId) {
+  const onDisplay = isVehicleOnDisplay(existing);
+  const sameYardIn = scan.type === "in" && existing?.currentStatus === "in" && existing.currentYardId === scan.yardId;
+  const isDisplayReturn = sameYardIn && onDisplay;
+  const isDisplayOut = scan.type === "out" && scan.outRemark === "display";
+
+  if (sameYardIn && !onDisplay) {
     return { state, accepted: false, message: "Vehicle is already IN at this yard." };
+  }
+  if (scan.type === "out" && onDisplay) {
+    return { state, accepted: false, message: "Return vehicle from display first." };
   }
   if (scan.type === "out" && existing?.currentStatus === "out") {
     return { state, accepted: false, message: "Vehicle is already marked OUT." };
+  }
+  if (isDisplayOut) {
+    const takenBy = String(scan.displayTakenBy || "").trim();
+    const location = String(scan.displayLocation || "").trim();
+    if (!takenBy || !location) {
+      return { state, accepted: false, message: "Person responsible and display location are required." };
+    }
   }
 
   const flags = [];
@@ -123,29 +163,68 @@ export function applyScan(state, scan) {
       ? scan.model
       : existing?.model || "";
 
+  let currentStatus;
+  let currentYardId;
+  let nextOnDisplay = false;
+  let nextDisplayTakenBy = "";
+  let nextDisplayLocation = "";
+
+  if (isDisplayOut) {
+    currentStatus = "in";
+    currentYardId = existing?.currentYardId || scan.yardId;
+    nextOnDisplay = true;
+    nextDisplayTakenBy = String(scan.displayTakenBy || "").trim();
+    nextDisplayLocation = String(scan.displayLocation || "").trim();
+  } else if (scan.type === "out" && scan.outRemark === "stockyard_transfer") {
+    currentStatus = "transit";
+    currentYardId = scan.transferDestinationYardId || existing?.currentYardId || scan.yardId;
+  } else if (scan.type === "out") {
+    currentStatus = "out";
+    currentYardId = existing?.currentYardId || scan.yardId;
+  } else {
+    currentStatus = "in";
+    currentYardId = scan.yardId;
+    // IN (including display return) clears active display fields
+  }
+
   const vehicle = {
     vin,
     model: nextModel,
     vinValid,
-    currentStatus: scan.type === "out" && scan.outRemark === "stockyard_transfer"
-      ? "transit"
-      : scan.type,
-    currentYardId: scan.type === "in"
-      ? scan.yardId
-      : scan.type === "out" && scan.outRemark === "stockyard_transfer" && scan.transferDestinationYardId
-        ? scan.transferDestinationYardId
-        : existing?.currentYardId || scan.yardId,
+    currentStatus,
+    currentYardId,
     lastChangedAt: scan.scannedAt,
     keyNo: scan.keyNo || existing?.keyNo || "",
     driveType: scan.driveType || existing?.driveType || "",
+    entryMethod:
+      scan.entryMethod === "qr" || scan.entryMethod === "manual"
+        ? scan.entryMethod
+        : existing?.entryMethod || null,
+    onDisplay: nextOnDisplay,
+    displayTakenBy: nextDisplayTakenBy,
+    displayLocation: nextDisplayLocation,
   };
+  const startsFreshDwellCycle = (scan.type === "in" && !isDisplayReturn) || (scan.type === "out" && !isDisplayOut);
+  const hasDwellFlag = startsFreshDwellCycle && state.flags.some((flagItem) => flagItem.vin === vin && flagItem.type === "dwell_exceeded" && !flagItem.resolved);
+  const nextFlags = hasDwellFlag
+    ? state.flags.map((flagItem) =>
+      flagItem.vin === vin && flagItem.type === "dwell_exceeded" && !flagItem.resolved
+        ? { ...flagItem, resolved: true, resolvedAt: scan.scannedAt }
+        : flagItem,
+    )
+    : state.flags;
   const next = {
     ...state,
     vehicles: { ...state.vehicles, [vin]: vehicle },
     scans: [...state.scans, { ...scan, vin, keyNo: scan.keyNo || "", status: flags.length ? "flagged" : "accepted" }],
-    flags: [...state.flags, ...flags],
+    flags: [...nextFlags, ...flags],
   };
-  return { state: next, accepted: true, message: flags.length ? "Scan accepted with admin flag." : "Scan accepted." };
+  const message = isDisplayReturn
+    ? "Vehicle returned from display."
+    : flags.length
+      ? "Scan accepted with admin flag."
+      : "Scan accepted.";
+  return { state: next, accepted: true, message };
 }
 
 function flag(vin, type, message, meta = {}) {
@@ -153,9 +232,7 @@ function flag(vin, type, message, meta = {}) {
 }
 
 function duplicateMessage(currentYardId, scanYardId) {
-  const currentYard = yards.find((item) => item.id === currentYardId);
-  const scanYard = yards.find((item) => item.id === scanYardId);
-  return `Vehicle was IN at ${currentYard?.code || currentYardId} (${currentYard?.name || "Unknown"}), now scanned IN at ${scanYard?.code || scanYardId} (${scanYard?.name || "Unknown"}) without prior OUT scan.`;
+  return `Vehicle was IN at ${formatYardLabel(currentYardId)}, now scanned IN at ${formatYardLabel(scanYardId)}`;
 }
 
 function groupCount(items, key) {
@@ -244,6 +321,12 @@ export function flagLabel(type) {
     manual_admin_override: "Admin Override",
     dwell_exceeded: "Dwell Time Exceeded",
   }[type] || String(type || "Flag").replace(/_/g, " ");
+}
+
+export function entryMethodLabel(method) {
+  if (method === "qr") return "QR scan";
+  if (method === "manual") return "Manual entry";
+  return "";
 }
 
 export function resolveFlag(state, id) {
