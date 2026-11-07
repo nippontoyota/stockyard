@@ -14,6 +14,9 @@ import {
 } from '../lib/credentials.js';
 import { signSessionToken } from '../lib/session.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { hashPdiPassword, verifyPdiPassword } from '../lib/pdiPasswords.js';
+import { pdiEnabled } from '../lib/pdiPolicy.js';
+import { z } from 'zod';
 
 export const authRouter = Router();
 
@@ -99,11 +102,16 @@ authRouter.post('/login', async (req: Request, res: Response) => {
 
     if (found.length > 0) {
       const user = found[0];
+      if (user.role === 'pdi') {
+        if (!pdiEnabled()) return res.status(503).json({ error: 'PDI is not enabled yet.' });
+        const [branch] = user.branch_id ? await db.select().from(branches).where(eq(branches.id, user.branch_id)) : [];
+        if (!branch?.active) return res.status(403).json({ error: 'Contact Admin to assign an active PDI branch.' });
+      }
       // Case-insensitive: UI treats yard codes as case-insensitive, and mobile
       // keyboards often lowercase the password field.
-      const passwordOk =
-        user.password === cleanPassword ||
-        user.password.toLowerCase() === cleanPassword.toLowerCase();
+      const passwordOk = user.role === 'pdi'
+        ? verifyPdiPassword(cleanPassword, user.password)
+        : user.password === cleanPassword || user.password.toLowerCase() === cleanPassword.toLowerCase();
       if (passwordOk) {
         return res.json({
           success: true,
@@ -154,7 +162,7 @@ authRouter.get('/credentials', authenticate, requireRole('admin'), async (req: R
       return {
         id: row.id,
         username: row.username,
-        password: row.password,
+        password: row.role === 'pdi' ? null : row.password,
         role: row.role,
         yardId: row.yard_id,
         yardCode: yard?.code ?? null,
@@ -190,9 +198,12 @@ authRouter.post('/credentials/update', authenticate, requireRole('admin'), async
     const existing = await db.select().from(credentials).where(eq(credentials.username, cleanUsername));
 
     if (existing.length > 0) {
+      if (existing[0].role === 'pdi' && !z.string().min(8).max(128).safeParse(cleanPassword).success) {
+        return res.status(400).json({ error: 'PDI passwords must contain 8 to 128 characters.' });
+      }
       await db
         .update(credentials)
-        .set({ password: cleanPassword, updated_at: new Date() })
+        .set({ password: existing[0].role === 'pdi' ? hashPdiPassword(cleanPassword) : cleanPassword, updated_at: new Date() })
         .where(eq(credentials.username, cleanUsername));
     } else {
       const yardList = await db.select().from(yards);
@@ -226,4 +237,22 @@ authRouter.post('/credentials/update', authenticate, requireRole('admin'), async
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
+});
+
+authRouter.post('/pdi-accounts', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    if (!pdiEnabled()) return res.status(503).json({ error: 'Enable PDI after applying its migration.' });
+    const body = z.object({
+      username: z.string().trim().min(3).max(80).regex(/^[a-zA-Z0-9._-]+$/),
+      password: z.string().trim().min(8).max(128),
+      branch_id: z.string().uuid(),
+    }).strict().parse(req.body);
+    const [branch] = await db.select().from(branches).where(eq(branches.id, body.branch_id));
+    if (!branch?.active) return res.status(400).json({ error: 'Select an active branch.' });
+    const [account] = await db.insert(credentials).values({
+      username: body.username, password: hashPdiPassword(body.password), role: 'pdi', branch_id: body.branch_id,
+    }).onConflictDoNothing().returning({ id: credentials.id, username: credentials.username, branch_id: credentials.branch_id });
+    if (!account) return res.status(409).json({ error: 'That username already exists. Choose another.' });
+    return res.status(201).json(account);
+  } catch (err) { next(err); }
 });

@@ -57,6 +57,7 @@ export function verifySessionToken(token: string): AuthUser | null {
       exp: number;
     };
     if (!payload.exp || payload.exp < Date.now()) return null;
+    if (!['admin', 'stockyard', 'delivery_incharge', 'pdi'].includes(payload.role)) return null;
     return {
       id: payload.sub,
       role: payload.role,

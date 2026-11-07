@@ -4169,3 +4169,84 @@ button.primary:disabled {
   font-weight: 600;
   color: #58595B;
 }
+
+/* PDI: inspection sheet, using the existing Toyota palette and type system. */
+.pdi-workspace { --pdi-ok: #166534; --pdi-repair: #991b1b; }
+.pdi-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 16px 0 24px; }
+.pdi-heading h1 { font-size: clamp(24px, 5vw, 38px); text-transform: none; margin: 8px 0; letter-spacing: -.03em; }
+.pdi-heading p { color: var(--ink-muted); margin: 0; }
+.pdi-scope { border-left: 3px solid var(--brand); padding: 8px 12px; white-space: nowrap; font-size: 13px; }
+.pdi-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.pdi-tabs button { padding: 14px 16px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--ink-muted); }
+.pdi-tabs button[aria-current] { color: var(--ink); border-bottom-color: var(--brand); font-weight: 700; }
+.pdi-inspect-layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.pdi-panel { padding: 24px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 12px; min-width: 0; }
+.pdi-panel h2 { font-size: 19px; margin: 0 0 18px; }
+.pdi-panel h3 { margin-top: 0; }
+.pdi-panel p, .pdi-details p { line-height: 1.55; }
+.pdi-hint { color: var(--ink-muted); }
+.pdi-lookup { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.pdi-lookup label { grid-column: 1 / -1; }
+.pdi-lookup input { min-width: 0; font-family: ui-monospace, monospace; }
+.pdi-lookup button:last-child { grid-column: 1 / -1; }
+.pdi-workspace input:not([type=checkbox]):not([type=radio]), .pdi-workspace textarea, .pdi-workspace select,
+.pdi-account-form input, .pdi-account-form select { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; color: var(--ink); background: #fff; font-size: 16px; }
+.pdi-workspace button, .pdi-accounts button, .pdi-history button { min-height: 44px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--ink); }
+.pdi-workspace button.primary, .pdi-accounts button.primary { background: var(--brand); color: white; border-color: var(--brand); }
+.pdi-workspace button:disabled, .pdi-accounts button:disabled, .pdi-history button:disabled { opacity: .5; cursor: not-allowed; }
+.pdi-workspace :focus-visible, .pdi-accounts :focus-visible, .pdi-details :focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.pdi-vehicle-sheet { margin: 24px 0; padding: 20px 0; border-top: 3px solid var(--ink); border-bottom: 1px solid var(--border-soft); }
+.pdi-vehicle-sheet h2 { margin: 8px 0 18px; font-size: clamp(16px, 4.5vw, 24px); overflow-wrap: anywhere; }
+.pdi-vin, .pdi-vin-link { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .02em; }
+.pdi-vehicle-sheet dl { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 20px; }
+.pdi-vehicle-sheet dt { color: var(--ink-muted); font-size: 12px; margin-bottom: 5px; }
+.pdi-vehicle-sheet dd { margin: 0; overflow-wrap: anywhere; }
+.pdi-badge { display: inline-flex; width: fit-content; align-items: center; border: 1px solid #cbd5e1; background: #f1f5f9; color: #475569; border-radius: 5px; padding: 5px 8px; font: 600 12px/1.4 "Tenor Sans", system-ui, sans-serif; white-space: normal; text-align: left; }
+.pdi-badge.pdi-ok { color: #166534; border-color: #bbdfc8; background: #f0fdf4; }
+.pdi-badge.pdi-repair_required { color: #991b1b; border-color: #fecaca; background: #fff1f2; }
+.pdi-form > fieldset, .pdi-results { margin: 0; padding: 0; border: 0; min-width: 0; }
+.pdi-form label { display: block; }
+.pdi-form .pdi-check { display: flex; align-items: center; gap: 10px; padding: 14px 0; font-weight: 600; }
+.pdi-check input, .pdi-results input { width: 20px; height: 20px; accent-color: var(--brand); flex-shrink: 0; }
+.pdi-results { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 20px; }
+.pdi-results legend { margin-bottom: 10px; }
+.pdi-results label { display: flex; align-items: center; gap: 8px; padding: 14px 10px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.pdi-results label.selected { border-color: var(--ink); background: var(--surface-tint); box-shadow: inset 0 0 0 1px var(--ink); }
+.pdi-form textarea { margin-top: 8px; resize: vertical; }
+.pdi-form-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.pdi-saved { padding: 20px 0; }
+.pdi-saved button { margin: 0 8px 8px 0; }
+.pdi-record { padding: 16px 0; border-bottom: 1px solid var(--border-soft); overflow-wrap: anywhere; }
+.pdi-record p { margin: 10px 0 4px; font-size: 13px; }
+.pdi-record time, .pdi-record small { display: block; color: var(--ink-muted); font-size: 12px; }
+.pdi-record .pdi-remarks { white-space: pre-wrap; margin: 12px 0; color: var(--ink); }
+.pdi-details { margin-top: 7px; font-family: "Tenor Sans", system-ui, sans-serif; letter-spacing: normal; white-space: normal; }
+.pdi-details summary { cursor: pointer; width: fit-content; }
+.pdi-details[open] { min-width: min(280px, 100%); }
+.pdi-details .pdi-history { padding: 10px 0; max-width: 480px; }
+.pdi-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 20px; }
+.pdi-filters label { display: grid; gap: 6px; flex: 1; min-width: 160px; }
+.pdi-list { display: grid; gap: 12px; }
+.pdi-list .pdi-vehicle-row { display: flex; justify-content: space-between; gap: 16px; text-align: left; padding: 16px; width: 100%; }
+.pdi-vehicle-row > span { display: grid; gap: 8px; min-width: 0; }
+.pdi-vehicle-row small { color: var(--ink-muted); }
+.pdi-pagination { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 20px; font-size: 13px; }
+.pdi-camera { margin-top: 16px; }
+.pdi-camera video { width: 100%; aspect-ratio: 4/3; background: var(--ink); border-radius: 8px; object-fit: cover; }
+.pdi-account-form { display: grid; gap: 14px; max-width: 560px; }
+.pdi-account-form label { display: grid; gap: 6px; }
+.pdi-account-list { display: grid; gap: 12px; margin-top: 24px; }
+.pdi-account-list > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border-soft); padding-top: 12px; }
+.pdi-account-list small { display: block; margin-top: 5px; color: var(--ink-muted); }
+@media (max-width: 720px) {
+  .pdi-inspect-layout { grid-template-columns: 1fr; }
+  .pdi-panel { padding: 18px; }
+  .pdi-heading { align-items: flex-start; }
+  .pdi-scope { display: none; }
+  .pdi-tabs button { flex: 1; font-size: 12px; padding: 12px 6px; }
+  .pdi-results { grid-template-columns: 1fr; }
+  .pdi-list .pdi-vehicle-row { flex-direction: column; }
+}
+
+.pdi-details summary .pdi-badge { display: inline-flex; }
+.pdi-details .pdi-record p strong { display: inline; font-size: inherit; }

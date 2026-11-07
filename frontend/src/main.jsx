@@ -62,7 +62,11 @@ import { IncomingTab } from "./components/IncomingTab.jsx";
 import { exportVehiclesExcel } from "./exportStockExcel.js";
 import { AdminVehicleDeleteButton } from "./components/AdminVehicleDeleteButton.jsx";
 
+import { PdiWorkspace } from "./components/PdiWorkspace.jsx";
+import { PdiDetails } from "./components/PdiDetails.jsx";
+
 function getRoutePath(viewName, role) {
+  if (role === "pdi") return "/pdi";
   if (role === "admin") {
     if (viewName === "stock") return "/stock";
     return "/dashboard";
@@ -84,6 +88,7 @@ function getRoutePath(viewName, role) {
 
 function getViewFromPath(pathname, role) {
   const path = (pathname || "").toLowerCase();
+  if (role === "pdi") return "pdi";
   if (role === "admin") {
     if (path === "/stock") return "stock";
     // Legacy /admin and /admin-branches URLs land on the unified Admin console
@@ -138,6 +143,7 @@ function mapServerResponse(vehiclesData, flagsData, scansData, notifsData, reqsD
   vehiclesData.forEach((v) => {
     mappedVehicles[v.vin] = {
       vin: v.vin,
+      pdi: v.pdi,
       model: v.model || "",
       driveType: v.drive_type,
       vinValid: v.vin_valid,
@@ -281,7 +287,7 @@ export default function App() {
   }, [session]);
 
   const fetchServerData = useCallback(async () => {
-    if (!session) return;
+    if (!session || session.role === "pdi") return;
     if (!online) {
       setDataReady(true);
       return;
@@ -383,7 +389,7 @@ export default function App() {
   }, [scheduleServerData]);
 
   // §1.1 — Socket.io event-driven updates (only when logged in)
-  useSocket(scheduleServerData, Boolean(session));
+  useSocket(scheduleServerData, Boolean(session) && session.role !== "pdi");
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -437,10 +443,16 @@ export default function App() {
       setDataReady(true);
     }
     setSession(nextSession);
-    const initialView = nextSession.role === "admin" ? "dashboard" : nextSession.role === "delivery_incharge" ? "requisitions" : "scan";
+    const initialView = nextSession.role === "pdi" ? "pdi" : nextSession.role === "admin" ? "dashboard" : nextSession.role === "delivery_incharge" ? "requisitions" : "scan";
     setView(initialView);
     window.history.replaceState(null, "", getRoutePath(initialView, nextSession.role));
   }} authExpiredMessage={authExpiredMessage} onClearAuthExpired={() => setAuthExpiredMessage("")} />;
+
+  if (session.role === "pdi") return <div className="app-shell">
+    <Header session={session} online={online} notifications={[]} onNavigate={() => {}}
+      onLogout={() => { setSession(null); setState(createInitialState()); window.history.replaceState(null, "", "/"); }} />
+    <main className="content"><PdiWorkspace key={session.token} session={session} online={online} /></main>
+  </div>;
 
   const isAdmin = session.role === "admin";
   const stats = dashboard(state, isAdmin ? null : session.yardId);
@@ -524,6 +536,7 @@ function Login({ onLogin, authExpiredMessage = "", onClearAuthExpired }) {
   const [branches, setBranches] = useState(fallbackBranches);
   const [branchId, setBranchId] = useState(fallbackBranches[0]?.id || "");
   const [passwordInput, setPasswordInput] = useState("");
+  const [pdiUsername, setPdiUsername] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -573,7 +586,7 @@ function Login({ onLogin, authExpiredMessage = "", onClearAuthExpired }) {
     const targetYard = yards.find((y) => y.id === yardId) || yards[0];
     const targetBranch = branches.find((b) => b.id === branchId);
     const cleanUsername =
-      role === "admin"
+      role === "pdi" ? pdiUsername.trim() : role === "admin"
         ? "admin"
         : role === "delivery_incharge"
           ? targetBranch?.id || ""
@@ -615,7 +628,10 @@ function Login({ onLogin, authExpiredMessage = "", onClearAuthExpired }) {
         return;
       }
 
-      if (res.user.role === "admin") {
+      if (res.user.role === "pdi") {
+        const userBranch = branches.find(b => b.id === res.user.branch_id);
+        onLogin(sessionFromLogin(res, { name: `${res.user.username} · ${userBranch?.name || "PDI team"}`, branchId: res.user.branch_id }));
+      } else if (res.user.role === "admin") {
         onLogin(sessionFromLogin(res, { name: "Admin Console" }));
       } else if (res.user.role === "delivery_incharge") {
         const userBranchId = res.user.branch_id || branchId;
@@ -633,7 +649,7 @@ function Login({ onLogin, authExpiredMessage = "", onClearAuthExpired }) {
       }
       return;
     } catch (apiErr) {
-      if (isLocalValid && import.meta.env.DEV) {
+      if (role !== "pdi" && isLocalValid && import.meta.env.DEV) {
         if (role === "admin") {
           onLogin({ role: "admin", yardId: null, name: "Admin Console" });
         } else if (role === "delivery_incharge") {
@@ -673,6 +689,7 @@ function Login({ onLogin, authExpiredMessage = "", onClearAuthExpired }) {
             <div className="segmented">
               <button type="button" className={role === "stockyard" ? "active" : ""} onClick={() => handleRoleChange("stockyard")}>Stockyard</button>
               <button type="button" className={role === "delivery_incharge" ? "active" : ""} onClick={() => handleRoleChange("delivery_incharge")}>Delivery</button>
+              <button type="button" className={role === "pdi" ? "active" : ""} onClick={() => handleRoleChange("pdi")}>PDI</button>
               <button type="button" className={role === "admin" ? "active" : ""} onClick={() => handleRoleChange("admin")}>Admin</button>
             </div>
 
@@ -713,6 +730,11 @@ function Login({ onLogin, authExpiredMessage = "", onClearAuthExpired }) {
               </>
             )}
 
+            {role === "pdi" && <>
+              <label htmlFor="pdi-username">Inspector username</label>
+              <input id="pdi-username" required value={pdiUsername} onChange={e => setPdiUsername(e.target.value)} autoComplete="username" />
+              <small>Your PDI account is assigned to your branch by Admin.</small>
+            </>}
             <label htmlFor="password">Password</label>
             <div className="password-field-wrapper">
               <input
@@ -721,7 +743,7 @@ function Login({ onLogin, authExpiredMessage = "", onClearAuthExpired }) {
                 required
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder={role === "admin" ? "Enter Admin Password" : role === "delivery_incharge" ? "Enter Delivery Password" : `Enter Password for ${selectedYardObj?.code || yardId}`}
+                placeholder={role === "pdi" ? "Enter PDI password" : role === "admin" ? "Enter Admin Password" : role === "delivery_incharge" ? "Enter Delivery Password" : `Enter Password for ${selectedYardObj?.code || yardId}`}
               />
               <button
                 type="button"
@@ -766,7 +788,7 @@ function Header({ session, online, notifications, onNavigate, onLogout }) {
             <span className="pwa-install-label">Install App</span>
           </button>
         )}
-        {session.role !== "admin" && <NotificationBell notifications={notifications || []} onNavigate={onNavigate} />}
+        {session.role !== "admin" && session.role !== "pdi" && <NotificationBell notifications={notifications || []} onNavigate={onNavigate} />}
         <span className={online ? "pill ok online-pill" : "pill warn online-pill"} aria-label={online ? "Online" : "Offline"}>
           {online ? "Online" : "Offline"}
         </span>
@@ -2031,6 +2053,7 @@ function VehicleCard({ vehicle, flags, isAdmin = false, canReturnDisplay = false
           ) : null}
           <small>{vehicle.keyNo ? `Key No: ${vehicle.keyNo}` : "No key number"}</small>
           {entryLabel ? <small>{entryLabel}</small> : null}
+          <PdiDetails vin={vehicle.vin} pdi={vehicle.pdi} />
           {onDisplay ? <span className="badge badge-display">On display</span> : null}
         </div>
       </div>

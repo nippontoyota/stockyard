@@ -23,7 +23,11 @@ async function fetchWithRetry(url, options = {}, retries = 1) {
       const res = await fetch(url, { ...fetchOptions, signal: controller.signal });
       clearTimeout(timeout);
       if (!res.ok) {
-        const err = new Error(`HTTP ${res.status}`);
+        const body = await res.json().catch(() => ({}));
+        const err = new Error(body.error === "Validation error"
+          ? (body.details?.[0]?.message || body.error)
+          : (body.error || `HTTP ${res.status}`));
+        err.code = body.code;
         err.status = res.status;
         if (isRetryableError(err, res.status) && i < retries - 1) {
           await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
@@ -472,3 +476,10 @@ export async function deliverVehicles(vins) {
     body: JSON.stringify({ vins }),
   });
 }
+
+// PDI uses dedicated branch-scoped endpoints, never the stock IN/OUT APIs.
+export const getPdiVehicle = vin => apiFetch(`/api/pdi/vehicles/${encodeURIComponent(vin)}`);
+export const getPdiHistory = (vin, page = 1) => apiFetch(`/api/pdi/vehicles/${encodeURIComponent(vin)}/inspections?page=${page}`);
+export const getPdiList = (view, params) => apiFetch(`/api/pdi/${view === "history" ? "inspections" : "vehicles"}?${new URLSearchParams(params)}`);
+export const savePdiInspection = (vin, body) => apiFetch(`/api/pdi/vehicles/${encodeURIComponent(vin)}/inspections`, { method: "POST", body: JSON.stringify(body) });
+export const createPdiAccount = body => apiFetch("/api/admin/pdi-accounts", { method: "POST", body: JSON.stringify(body) });

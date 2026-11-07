@@ -12,6 +12,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:clear": "tsx src/db/clear.ts",
     "db:sync-yards": "tsx src/db/syncYards.ts",
+    "db:migrate-pdi": "node scripts/migrate-pdi.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -30,6 +31,7 @@
     "zod": "^3.25.67"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
     "@supabase/supabase-js": "^2.110.8",
     "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.18",

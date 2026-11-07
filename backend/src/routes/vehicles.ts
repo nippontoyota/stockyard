@@ -1,3 +1,4 @@
+import { latestPdiSummary } from '../lib/pdiSummary.js';
 import { Router } from 'express';
 import { eq, and, desc, ilike, sql, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
@@ -71,6 +72,7 @@ router.get('/incoming', async (req, res, next) => {
     const rows = await db
       .select({
         id: vehicles.id,
+        pdi: latestPdiSummary(),
         vin: vehicles.vin,
         model: vehicles.model,
         drive_type: vehicles.drive_type,
@@ -259,6 +261,7 @@ router.get('/', async (req, res, next) => {
     const rows = await db
       .select({
         id: vehicles.id,
+        pdi: latestPdiSummary(),
         vin: vehicles.vin,
         model: vehicles.model,
         drive_type: vehicles.drive_type,
@@ -294,6 +297,7 @@ router.get('/:vin', async (req, res, next) => {
     const [vehicle] = await db
       .select({
         id: vehicles.id,
+        pdi: latestPdiSummary(),
         vin: vehicles.vin,
         model: vehicles.model,
         drive_type: vehicles.drive_type,

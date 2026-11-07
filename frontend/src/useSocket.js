@@ -14,10 +14,13 @@ export function useSocket(onDataChange, enabled = true) {
   useEffect(() => {
     if (!enabled || !onDataChange) return;
 
-    const refresh = () => {
+    let forceRefresh = false;
+    const refresh = (force = false) => {
+      forceRefresh = forceRefresh || force;
       clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        onDataChangeRef.current?.();
+        onDataChangeRef.current?.({ force: forceRefresh });
+        forceRefresh = false;
       }, REFRESH_DEBOUNCE_MS);
     };
 
@@ -29,8 +32,9 @@ export function useSocket(onDataChange, enabled = true) {
       timeout: 20000,
     });
 
-    const events = ['scan:new', 'flag:created', 'requisition:changed'];
-    for (const event of events) socket.on(event, refresh);
+    const events = ['scan:new', 'flag:created', 'requisition:changed', 'pdi:changed'];
+    const listeners = events.map(event => [event, () => refresh(event === 'pdi:changed')]);
+    for (const [event, listener] of listeners) socket.on(event, listener);
 
     socket.on('disconnect', () => {
       clearInterval(heartbeatRef.current);
@@ -52,7 +56,7 @@ export function useSocket(onDataChange, enabled = true) {
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
-      for (const event of events) socket.off(event, refresh);
+      for (const [event, listener] of listeners) socket.off(event, listener);
       socket.removeAllListeners();
       socket.disconnect();
       clearInterval(heartbeatRef.current);

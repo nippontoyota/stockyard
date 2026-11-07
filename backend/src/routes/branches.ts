@@ -1,3 +1,4 @@
+import { latestPdiSummary } from '../lib/pdiSummary.js';
 import { Router } from 'express';
 import { eq, and, count, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
@@ -123,6 +124,7 @@ router.get('/:id/stock', async (req, res, next) => {
         vin: vehicles.vin,
         model: vehicles.model,
         vehicle_id: vehicles.id,
+        pdi: latestPdiSummary(),
         current_yard_id: vehicleStatus.current_yard_id,
         last_changed_at: vehicleStatus.last_changed_at,
       })

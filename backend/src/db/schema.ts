@@ -6,8 +6,10 @@ import {
   boolean,
   timestamp,
   index,
+  bigserial,
+  check,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 // ─── yards ───────────────────────────────────────────────────────────
 export const yards = pgTable('yards', {
@@ -24,7 +26,7 @@ export const credentials = pgTable('credentials', {
   id: uuid('id').defaultRandom().primaryKey(),
   username: text('username').notNull().unique(),
   password: text('password').notNull(),
-  role: text('role').notNull(), // 'admin' | 'yard' | 'delivery_incharge'
+  role: text('role').notNull(), // 'admin' | 'yard' | 'delivery_incharge' | 'pdi'
   yard_id: text('yard_id'),
   branch_id: uuid('branch_id'), // new for delivery_incharge
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -162,6 +164,29 @@ export const requisitions = pgTable('requisitions', {
   rejection_reason: text('rejection_reason'),
   fulfilled_at: timestamp('fulfilled_at', { withTimezone: true }),
 });
+
+// Append-only inspection history. No movement or existing vehicle fields are changed.
+export const pdiInspections = pgTable('pdi_inspections', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  sequence: bigserial('sequence', { mode: 'number' }).notNull().unique(),
+  vehicle_id: uuid('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'restrict' }),
+  vin_snapshot: text('vin_snapshot').notNull(),
+  branch_id: uuid('branch_id').notNull().references(() => branches.id, { onDelete: 'restrict' }),
+  yard_id: text('yard_id').notNull().references(() => yards.id, { onDelete: 'restrict' }),
+  inspector_id: uuid('inspector_id').notNull().references(() => credentials.id, { onDelete: 'restrict' }),
+  inspector_username_snapshot: text('inspector_username_snapshot').notNull(),
+  checking_completed: boolean('checking_completed').notNull(),
+  result: text('result').notNull(),
+  remarks: text('remarks').notNull().default(''),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  submission_id: uuid('submission_id').notNull().unique(),
+}, (t) => [
+  index('pdi_vehicle_sequence_idx').on(t.vehicle_id, t.sequence),
+  index('pdi_branch_sequence_idx').on(t.branch_id, t.sequence),
+  check('pdi_completed_check', sql`${t.checking_completed} = true`),
+  check('pdi_result_check', sql`${t.result} IN ('ok', 'repair_required')`),
+  check('pdi_remarks_check', sql`length(${t.remarks}) <= 2000 AND (${t.result} <> 'repair_required' OR length(trim(${t.remarks})) > 0)`),
+]).enableRLS();
 
 // ─── notifications ───────────────────────────────────────────────────
 export const notifications = pgTable('notifications', {

@@ -1,3 +1,4 @@
+import { PdiAccounts } from "./PdiAccounts.jsx";
 import React, { useState, useEffect } from "react";
 import { yards, fallbackBranches } from "../stockyardLogic.js";
 import { getCredentialsApi, updateCredentialApi, getAdminBranches } from "../api.js";
@@ -10,7 +11,7 @@ import {
 
 function mergeWithDefaults(apiRows, defaults) {
   const byUsername = new Map(apiRows.map((row) => [row.username, row]));
-  return defaults.map((fallback) => {
+  const merged = defaults.map((fallback) => {
     const found = byUsername.get(fallback.username);
     if (!found) return fallback;
     return {
@@ -21,6 +22,7 @@ function mergeWithDefaults(apiRows, defaults) {
       isDefault: found.password === defaultPasswordForRole(found.role, found.yardCode || fallback.yardCode),
     };
   });
+  return [...merged, ...apiRows.filter(row => row.role === "pdi")];
 }
 
 export function CredentialsTab() {
@@ -121,7 +123,7 @@ export function CredentialsTab() {
 
   const filteredCredentials = credentials.filter((item) => {
     const matchesRole = roleFilter === "all" || item.role === roleFilter;
-    const searchString = `${item.yardCode || ""} ${item.yardName || ""} ${item.yardId || ""} ${item.branchId || ""}`.toLowerCase();
+    const searchString = `${item.username || ""} ${item.yardCode || ""} ${item.yardName || ""} ${item.yardId || ""} ${item.branchId || ""}`.toLowerCase();
     const matchesSearch = searchString.includes(searchQuery.toLowerCase());
     return matchesRole && matchesSearch;
   });
@@ -166,6 +168,7 @@ export function CredentialsTab() {
         </button>
       </div>
 
+      {(roleFilter === "all" || roleFilter === "pdi") && <PdiAccounts accounts={filteredCredentials.filter(c => c.role === "pdi")} branches={branches} onRefresh={loadCredentials} />}
       {toastMessage && <div className="notice ok">{toastMessage}</div>}
 
       <div className="controls-row credentials-controls">
@@ -208,6 +211,7 @@ export function CredentialsTab() {
           >
             Admin
           </button>
+          <button type="button" className={roleFilter === "pdi" ? "active" : ""} onClick={() => setRoleFilter("pdi")}>PDI ({credentials.filter(c => c.role === "pdi").length})</button>
         </div>
       </div>
 

@@ -533,7 +533,12 @@ router.delete('/vehicles/:vin', async (req, res, next) => {
     });
 
     res.json({ vin, deleted: true });
-  } catch (err) {
+  } catch (err: any) {
+    const cause = err.cause || err;
+    if (['23503', '23001'].includes(cause.code) && String(cause.constraint_name || cause.constraint || '').includes('pdi')) {
+      res.status(409).json({ error: 'This vehicle has PDI history and cannot be deleted.' });
+      return;
+    }
     next(err);
   }
 });

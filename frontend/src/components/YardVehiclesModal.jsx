@@ -1,3 +1,4 @@
+import { PdiDetails } from "./PdiDetails.jsx";
 import React, { useState, useEffect } from "react";
 import { flagLabel, createScan, applyScan, yardsByRegion, findYardById, findApprovedTransferReq, requisitionDestinationYardId, requisitionRequesterLabel, DRIVE_TYPES, driveTypeLabel, outRemarkLabel, isVehicleOnDisplay } from "../stockyardLogic.js";
 import { bulkSync } from "../api.js";
@@ -520,6 +521,7 @@ export function YardVehiclesModal({ yard, state, setState, onClose, readOnly = f
                     <div className="v-row-info">
                       <div className="v-row-top">
                         <strong>{vehicle.vin}</strong>
+                        <PdiDetails vin={vehicle.vin} pdi={vehicle.pdi} />
                         {onDisplay && <span className="badge badge-display">On display</span>}
                         {activeFlag && (
                           <span className="badge bad">{flagLabel(activeFlag.type)}</span>

@@ -30,6 +30,7 @@ import pushRoutes from './routes/pushSubscriptions.js';
 import { db, pingDatabase } from './db/client.js';
 import { sql } from 'drizzle-orm';
 import crypto from 'crypto';
+import pdiRoutes from './routes/pdi.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -135,6 +136,7 @@ app.get('/api/auth/me', authenticate, (req, res) => {
 
 // Routes
 app.use('/api/auth', authRouter);
+app.use('/api/pdi', pdiRoutes);
 app.use('/api/scans', scanRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/yards', yardRoutes);
@@ -182,10 +184,7 @@ async function start() {
       sql`ALTER TABLE requisitions ADD COLUMN IF NOT EXISTS destination_yard_id text REFERENCES yards(id)`,
     ).catch((err) => console.error('Failed to ensure destination_yard_id column:', err));
 
-    // Run legacy variant/colour migration exactly once at startup
-    db.execute(
-      sql`UPDATE vehicles SET variant = NULL, colour = NULL WHERE variant IS NOT NULL OR colour IS NOT NULL`
-    ).catch((err) => console.error('Failed to clear legacy variant/colour:', err));
+    // Preserve existing variant/colour values; startup must not clear vehicle data.
 
     // F6 — Dwell check: delay after boot so login traffic isn't competing with scan work.
     setTimeout(() => {

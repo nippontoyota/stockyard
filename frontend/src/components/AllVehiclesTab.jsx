@@ -1,3 +1,4 @@
+import { PdiDetails } from "./PdiDetails.jsx";
 import React, { useEffect, useState } from "react";
 import {
   updateVehicleDetails,
@@ -480,7 +481,7 @@ export function AllVehiclesTab({ state, setState, initialEditVin, onInitialEditC
                       }
                     }}
                   >
-                    <td className="mono">{v.vin}</td>
+                    <td className="mono">{v.vin}<PdiDetails vin={v.vin} pdi={v.pdi} /></td>
                     <td>{v.model}</td>
                     <td className="mono">{v.keyNo || "—"}</td>
                     <td>{entryLabel || "—"}</td>

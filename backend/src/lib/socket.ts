@@ -58,3 +58,8 @@ export function emitFlagEvent(data: {
 export function emitRequisitionEvent() {
   if (io) io.emit('requisition:changed');
 }
+
+export function emitPdiEvent() {
+  // Existing sockets broadcast globally. Send no VIN, branch, or inspection data.
+  if (io) io.emit('pdi:changed');
+}
