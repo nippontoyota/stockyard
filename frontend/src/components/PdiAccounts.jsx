@@ -17,12 +17,15 @@ export function PdiAccounts({ accounts, branches, onRefresh }) {
     if (!open) return;
     const dialog = dialogRef.current;
     const previousOverflow = document.body.style.overflow;
-    dialog.showModal();
-    dialog.querySelector('input')?.focus();
+    const previousRootOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
+    dialog.showModal();
+    dialog.querySelector('input')?.focus({ preventScroll: true });
     return () => {
       dialog.close();
       document.body.style.overflow = previousOverflow;
+      document.documentElement.style.overflow = previousRootOverflow;
     };
   }, [open]);
 

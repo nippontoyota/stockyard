@@ -4237,6 +4237,7 @@ button.primary:disabled {
 .pdi-accounts-heading, .pdi-account-dialog-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
 .pdi-accounts-heading h3, .pdi-account-dialog-heading h3 { margin: 0; }
 .pdi-account-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; margin: auto; padding: 24px; border: 1px solid var(--border-soft); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 24px 64px #0b1c3033; }
+.pdi-account-dialog { overscroll-behavior: contain; }
 .pdi-account-dialog::backdrop { background: #0b1c3080; }
 .pdi-account-dialog-heading { flex-wrap: nowrap; }
 .pdi-account-dialog-heading .pdi-account-close { flex-shrink: 0; font-size: 24px; padding: 0; width: 44px; }
