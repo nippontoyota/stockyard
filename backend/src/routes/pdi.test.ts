@@ -37,6 +37,7 @@ let base: string;
 let migration: string;
 const branchA = '10000000-0000-4000-8000-000000000001';
 const branchB = '10000000-0000-4000-8000-000000000002';
+const branchC = '10000000-0000-4000-8000-000000000003';
 const inspectorA = '20000000-0000-4000-8000-000000000001';
 const inspectorB = '20000000-0000-4000-8000-000000000002';
 const vehicleA = '30000000-0000-4000-8000-000000000001';
@@ -236,22 +237,46 @@ describe('branch PDI integration', () => {
     expect((await request('/pdi/vehicles?page=1.5')).status).toBe(400);
   });
 
-  it('creates individual branch accounts without updating old credentials; passwords are case-sensitive', async () => {
+  it('creates one branch account without updating old credentials; passwords are case-sensitive', async () => {
+    await pg.query("INSERT INTO branches (id,name) VALUES ($1,'Branch C')", [branchC]);
     const before = (await pg.query('SELECT * FROM credentials ORDER BY id')).rows;
-    const created = await request('/admin/pdi-accounts', admin, { username: 'pdi.new', password: 'NewInspector123', branch_id: branchA });
+    expect((await request('/admin/pdi-accounts', admin, { username: 'pdi.a', password: 'NewInspector123', branch_id: branchC })).body.error).toContain('username already exists');
+    const created = await request('/admin/pdi-accounts', admin, { username: 'pdi.new', password: 'NewInspector123', branch_id: branchC });
     expect(created.status).toBe(201);
     expect((await pg.query('SELECT * FROM credentials WHERE id <> $1 ORDER BY id', [created.body.id])).rows).toEqual(before);
     const login = await request('/auth/login', admin, { username: 'pdi.new', password: 'NewInspector123' });
     expect(login.status).toBe(200);
     expect(login.body.user.role).toBe('pdi');
     expect((await request('/auth/login', admin, { username: 'pdi.new', password: 'newinspector123' })).status).toBe(401);
-    expect((await request('/admin/pdi-accounts', admin, { username: 'pdi.new', password: 'NewInspector123', branch_id: branchB })).status).toBe(409);
+    expect((await request('/admin/pdi-accounts', admin, { username: 'pdi.a', password: 'NewInspector123', branch_id: branchC })).status).toBe(409);
     const rows = await request('/admin/credentials', admin);
     expect(rows.body.credentials.find((c: any) => c.username === 'pdi.new').password).toBeNull();
     expect((await request('/admin/credentials/update', admin, { username: 'pdi.new', password: 'short' })).status).toBe(400);
     expect((await request('/admin/credentials/update', admin, { username: 'pdi.new', password: 'ChangedPassword123' })).status).toBe(200);
     expect((await request('/auth/login', admin, { username: 'pdi.new', password: 'NewInspector123' })).status).toBe(401);
     expect((await request('/auth/login', admin, { username: 'pdi.new', password: 'ChangedPassword123' })).status).toBe(200);
+  });
+
+  it('rejects another account for an occupied branch without changing existing data', async () => {
+    const before = await originalData();
+    const duplicate = await request('/admin/pdi-accounts', admin, { username: 'pdi.another', password: 'NewInspector123', branch_id: branchA });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.error).toContain('already has a PDI account');
+    expect(await originalData()).toEqual(before);
+  });
+
+  it('accepts only one simultaneous account creation per branch', async () => {
+    await pg.query("INSERT INTO branches (id,name) VALUES ($1,'Branch C')", [branchC]);
+    // Delivery credentials do not occupy the branch's PDI slot.
+    await pg.query("INSERT INTO credentials (username,password,role,branch_id) VALUES ('delivery.c','existing','delivery_incharge',$1)", [branchC]);
+    const before = (await pg.query('SELECT * FROM credentials ORDER BY id')).rows;
+    const results = await Promise.all(['pdi.first', 'pdi.second'].map(username =>
+      request('/admin/pdi-accounts', admin, { username, password: 'NewInspector123', branch_id: branchC }),
+    ));
+    expect(results.map(r => r.status).sort()).toEqual([201, 409]);
+    const created = results.find(r => r.status === 201)!;
+    expect((await pg.query('SELECT * FROM credentials WHERE id <> $1 ORDER BY id', [created.body.id])).rows).toEqual(before);
+    expect((await pg.query("SELECT count(*)::int AS n FROM credentials WHERE role = 'pdi' AND branch_id = $1", [branchC])).rows).toEqual([{ n: 1 }]);
   });
 
   it('disables PDI access for inactive branches and preserves old reads when PDI is switched off', async () => {

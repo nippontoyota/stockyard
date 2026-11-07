@@ -168,7 +168,7 @@ export function CredentialsTab() {
         </button>
       </div>
 
-      {(roleFilter === "all" || roleFilter === "pdi") && <PdiAccounts accounts={filteredCredentials.filter(c => c.role === "pdi")} branches={branches} onRefresh={loadCredentials} />}
+      {(roleFilter === "all" || roleFilter === "pdi") && <PdiAccounts accounts={filteredCredentials.filter(c => c.role === "pdi")} assignedBranchIds={credentials.filter(c => c.role === "pdi").map(c => c.branchId)} branches={branches} onRefresh={loadCredentials} />}
       {toastMessage && <div className="notice ok">{toastMessage}</div>}
 
       <div className="controls-row credentials-controls">

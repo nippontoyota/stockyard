@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPdiAccount, updateCredentialApi, humanizeApiError } from '../api.js';
 import { useToast } from '../hooks/useToast.js';
 
-export function PdiAccounts({ accounts, branches, onRefresh }) {
+export function PdiAccounts({ accounts, assignedBranchIds, branches, onRefresh }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [branch, setBranch] = useState('');
@@ -12,6 +12,7 @@ export function PdiAccounts({ accounts, branches, onRefresh }) {
   const [error, setError] = useState('');
   const dialogRef = useRef(null);
   const { toastMessage, toast, clearToast } = useToast(5000);
+  const availableBranches = branches.filter(b => b.active !== false && !assignedBranchIds.includes(b.id));
 
   useEffect(() => {
     if (!open) return;
@@ -60,8 +61,9 @@ export function PdiAccounts({ accounts, branches, onRefresh }) {
   return <section className="pdi-accounts pdi-panel">
     <div className="pdi-accounts-heading">
       <h3>PDI branch teams</h3>
-      <button type="button" className="primary" onClick={() => openForm()}>Create PDI account</button>
+      <button type="button" className="primary" disabled={!availableBranches.length} onClick={() => openForm()}>Create PDI account</button>
     </div>
+    <p>{availableBranches.length ? 'Each branch can have one PDI account. Only branches without an account are available.' : 'No branches are available for a new PDI account. Each active branch can have one account.'}</p>
     {toastMessage && <div className="pdi-account-toast notice ok" role="status">{toastMessage}</div>}
     <dialog ref={dialogRef} className="pdi-account-dialog" aria-labelledby="pdi-account-title"
       aria-describedby="pdi-account-description" onCancel={event => { event.preventDefault(); closeForm(); }}>
@@ -69,13 +71,13 @@ export function PdiAccounts({ accounts, branches, onRefresh }) {
         <h3 id="pdi-account-title">{editing ? 'Change PDI password' : 'Create PDI account'}</h3>
         <button type="button" className="pdi-account-close" aria-label="Close PDI account popup" disabled={busy} onClick={closeForm}>×</button>
       </div>
-      <p id="pdi-account-description">{editing ? 'Set a new password for this inspector.' : 'Create an individual account for an inspector and choose the branch they can inspect.'}</p>
+      <p id="pdi-account-description">{editing ? 'Set a new password for this branch’s PDI account.' : 'Create the PDI account for a branch. Each branch can have only one account.'}</p>
       {error && <p role="alert" className="notice bad">{error}</p>}
       <form className="pdi-account-form" onSubmit={save} aria-busy={busy}>
       {editing ? <p>New password for <strong>{editing.username}</strong></p> : <>
         <label>Inspector username<input required minLength={3} maxLength={80} pattern="[a-zA-Z0-9._\-]+" autoComplete="off" value={username} onChange={e => setUsername(e.target.value)} disabled={busy} /></label>
         <label>Branch<select aria-label="Branch" required value={branch} onChange={e => setBranch(e.target.value)} disabled={busy}>
-          <option value="">Select a branch</option>{branches.filter(b => b.active !== false).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          <option value="">Select a branch</option>{availableBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select></label>
       </>}
       <label>{editing ? 'New password' : 'Password'}<input type="password" autoComplete="new-password" required minLength={8} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} disabled={busy} /></label>

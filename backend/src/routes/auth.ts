@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/client.js';
 import { credentials, yards, branches } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   ADMIN_USERNAME,
   ADMIN_DEFAULT_PASSWORD,
@@ -247,12 +247,20 @@ authRouter.post('/pdi-accounts', authenticate, requireRole('admin'), async (req,
       password: z.string().trim().min(8).max(128),
       branch_id: z.string().uuid(),
     }).strict().parse(req.body);
-    const [branch] = await db.select().from(branches).where(eq(branches.id, body.branch_id));
-    if (!branch?.active) return res.status(400).json({ error: 'Select an active branch.' });
-    const [account] = await db.insert(credentials).values({
-      username: body.username, password: hashPdiPassword(body.password), role: 'pdi', branch_id: body.branch_id,
-    }).onConflictDoNothing().returning({ id: credentials.id, username: credentials.username, branch_id: credentials.branch_id });
-    if (!account) return res.status(409).json({ error: 'That username already exists. Choose another.' });
-    return res.status(201).json(account);
+    const result = await db.transaction(async tx => {
+      // Serialize account creation for this branch without modifying its row.
+      const [branch] = await tx.select().from(branches).where(eq(branches.id, body.branch_id)).for('update');
+      if (!branch?.active) return { status: 400, body: { error: 'Select an active branch.' } };
+      const [existing] = await tx.select({ id: credentials.id }).from(credentials).where(and(
+        eq(credentials.role, 'pdi'), eq(credentials.branch_id, body.branch_id),
+      )).limit(1);
+      if (existing) return { status: 409, body: { error: 'This branch already has a PDI account. Use its existing login or change its password.' } };
+      const [account] = await tx.insert(credentials).values({
+        username: body.username, password: hashPdiPassword(body.password), role: 'pdi', branch_id: body.branch_id,
+      }).onConflictDoNothing().returning({ id: credentials.id, username: credentials.username, branch_id: credentials.branch_id });
+      if (!account) return { status: 409, body: { error: 'That username already exists. Choose another.' } };
+      return { status: 201, body: account };
+    });
+    return res.status(result.status).json(result.body);
   } catch (err) { next(err); }
 });

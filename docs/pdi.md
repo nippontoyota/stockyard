@@ -1,6 +1,6 @@
 # Branch PDI
 
-PDI records pre-delivery inspections against existing vehicles. Each inspector has an individual account assigned to one branch. Its existing `branch_yards` mapping determines which vehicles that inspector can access. Only vehicles currently IN in a linked yard can receive an inspection.
+PDI records pre-delivery inspections against existing vehicles. Each branch has one PDI account shared by its PDI team. Its existing `branch_yards` mapping determines which vehicles that inspector can access. Only vehicles currently IN in a linked yard can receive an inspection.
 
 An inspection requires a completed-checking confirmation and either **OK for sale** or **Repair required**. Repair results require remarks. The latest inspection supplies the vehicle tag; previous inspections remain available. Repair tags never block delivery, transfers, IN/OUT, or resolve existing flags.
 
@@ -18,7 +18,7 @@ The code defaults to PDI disabled (`PDI_ENABLED` must be exactly `true`). Existi
    This runs only `migrations/pdi.sql` in a transaction. It creates `pdi_inspections`, its sequence/indexes/constraints, and enables RLS on the new table. It does not insert, update, or delete existing data. Re-running it is safe. The API database role must own the new table or have appropriate privileges and an explicit RLS policy; public Supabase REST roles have no inspection access by default.
 
 3. Set `PDI_ENABLED=true` in the backend environment and deploy/restart the updated backend and frontend. Keep the change that removes the old startup variant/colour-clearing UPDATE; deploying an older backend would restore that destructive startup behaviour.
-4. In **Admin → Setup → Passwords → PDI branch teams**, create inspector accounts with a username, branch, and password of at least 8 characters. New PDI passwords are hashed, case-sensitive, and never returned by the credentials API. Admin can reset them. Existing credentials retain their current format and behaviour.
+4. In **Admin → Setup → Passwords → PDI branch teams**, create one PDI account per branch with a username, branch, and password of at least 8 characters. Branches with a PDI account are excluded from the creation form. The API locks the branch while checking and creating an account, so simultaneous requests cannot create duplicates through the application. This rule needs no new migration; existing accounts and inspection history are retained, including any duplicates created before the rule was introduced. New PDI passwords are hashed, case-sensitive, and never returned by the credentials API. Admin can reset them. Existing credentials retain their current format and behaviour.
 5. Pilot one branch: log in as PDI, inspect an IN vehicle, verify the result in Admin/Stockyard/Delivery stock, and attempt an outside-branch VIN. Then create accounts for the other teams.
 
 No live database migration, backup, or production rollout is performed merely by building or testing the repository.
